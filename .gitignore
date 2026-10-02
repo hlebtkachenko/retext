@@ -1,0 +1,9 @@
+.build/
+build/
+shots/
+.claude/
+.sign-identity
+.DS_Store
+.swiftpm/
+xcuserdata/
+DerivedData/

@@ -1,0 +1,37 @@
+name: Bug report
+description: Something doesn't work as described
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App where you used Retext
+      placeholder: Mail, Safari, Slack, VS Code…
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.1"
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`
+  - type: input
+    id: retext
+    attributes:
+      label: Retext version or commit
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or other details
+      description: Don't paste private text you don't want public.

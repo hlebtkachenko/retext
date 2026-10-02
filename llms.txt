@@ -1,0 +1,22 @@
+# Retext
+
+> Retext is an open-source macOS menu-bar app (Swift 6, SwiftUI, Liquid Glass) that fixes grammar, translates and rewrites selected text in any app, in place, with one shortcut. It calls the user's installed Claude Code CLI (`claude -p`) with the user's own login and pastes the result back with the original formatting. Apache-2.0. Requires macOS 26+.
+
+Key facts:
+- Shortcuts: ⌥Space opens a bar under the selection (type an instruction or pick an action); ⌥1…⌥9 run actions directly while text is selected; Esc cancels; ⌘Z undoes.
+- Default actions: Fix grammar, English, and a translation into the Mac's language when it isn't English. Up to 9 custom actions with their own prompts and model.
+- Engine: `claude -p` with tools, MCP and user settings disabled; Claude Haiku for short grammar fixes, Claude Sonnet otherwise (aliases `haiku`, `sonnet`).
+- Works in any app with selectable text via the macOS Accessibility API and a CGEvent tap; read-only text (web pages, PDFs) is copied to the clipboard instead of pasted.
+- Local data: ~/Library/Application Support/Retext/{settings,history,usage}.json. No telemetry; nothing is sent anywhere except through Claude Code.
+- Build from source: `./build.sh` (Xcode 26+). No third-party dependencies.
+- Not affiliated with Anthropic.
+
+## Docs
+- [README](https://github.com/hlebtkachenko/retext/blob/main/README.md): features, requirements, build, shortcuts, privacy, FAQ
+- [ARCHITECTURE.md](https://github.com/hlebtkachenko/retext/blob/main/ARCHITECTURE.md): flow from shortcut to paste, files, decisions
+- [AGENTS.md](https://github.com/hlebtkachenko/retext/blob/main/AGENTS.md): build, test and demo commands for coding agents
+- [CHANGELOG.md](https://github.com/hlebtkachenko/retext/blob/main/CHANGELOG.md): release notes
+
+## Source
+- [Sources/RetextCore](https://github.com/hlebtkachenko/retext/tree/main/Sources/RetextCore): settings, routing, prompts, cache, history, usage (tested)
+- [Sources/Retext](https://github.com/hlebtkachenko/retext/tree/main/Sources/Retext): app, event tap, Accessibility, popup, settings window
