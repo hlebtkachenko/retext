@@ -115,10 +115,26 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     // MARK: File
 
     public static func load(from url: URL) -> RetextSettings {
-        guard let data = try? Data(contentsOf: url), let settings = try? JSONDecoder().decode(RetextSettings.self, from: data) else {
+        guard let data = try? Data(contentsOf: url), var settings = try? JSONDecoder().decode(RetextSettings.self, from: data) else {
             return RetextSettings()
         }
+        settings.migrate()
         return settings
+    }
+
+    /// 1.2.0 defaults the user never edited move to the current ones; edited prompts and styles stay as they are.
+    mutating func migrate() {
+        let oldGrammar = "Correct grammar, spelling and punctuation of the text. Keep its language and keep wording that is already correct."
+        for i in actions.indices {
+            let prompt = actions[i].prompt
+            if prompt == oldGrammar {
+                actions[i].prompt = Self.grammarPrompt
+            } else if let match = prompt.wholeMatch(of: #/Translate the text into natural, correct (.+)\. If it is already (.+), only correct its grammar\./#),
+                      match.1 == match.2 {
+                actions[i].prompt = Self.translatePrompt(String(match.1))
+            }
+        }
+        appStyles.removeAll { $0.bundleID == "com.apple.mail" && $0.style == "Email etiquette: polite greeting and sign-off, clear paragraphs." }
     }
 
     public func save(to url: URL) { Store.write(self, to: url) }

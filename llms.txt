@@ -5,7 +5,7 @@
 Key facts:
 - Shortcuts: ⌥Space opens a bar under the selection (type an instruction or pick an action); ⌥1…⌥9 run actions directly while text is selected; Esc cancels; ⌘Z undoes.
 - Default actions: Fix grammar, English, and a translation into the Mac's language when it isn't English. Up to 9 custom actions with their own prompts and model.
-- Engine: `claude -p` with tools, MCP and user settings disabled; Claude Haiku for short grammar fixes, Claude Sonnet otherwise (aliases `haiku`, `sonnet`).
+- Engine: `claude -p` with tools, MCP and user settings disabled; Claude Sonnet by default (alias `sonnet`), Haiku per action if chosen (alias `haiku`).
 - Works in any app with selectable text via the macOS Accessibility API and a CGEvent tap; read-only text (web pages, PDFs) is copied to the clipboard instead of pasted.
 - Local data: ~/Library/Application Support/Retext/{settings,history,usage}.json. No telemetry; nothing is sent anywhere except through Claude Code.
 - Build from source: `./build.sh` (Xcode 26+). No third-party dependencies.

@@ -106,6 +106,24 @@ import Testing
         #expect(partial.actions.count == RetextSettings.defaultActions.count)
     }
 
+    @Test func untouched120DefaultsMigrate() throws {
+        let json = #"""
+        {"actions": [
+          {"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB1", "title": "Fix grammar", "symbol": "x", "kind": "grammar", "model": "auto",
+           "prompt": "Correct grammar, spelling and punctuation of the text. Keep its language and keep wording that is already correct."},
+          {"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB2", "title": "Czech", "symbol": "x", "kind": "translate", "model": "auto",
+           "prompt": "Translate the text into natural, correct Czech. If it is already Czech, only correct its grammar."},
+          {"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB3", "title": "Mine", "symbol": "x", "kind": "other", "model": "auto", "prompt": "Make it shorter."}],
+         "appStyles": [{"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB4", "bundleID": "com.apple.mail",
+                        "style": "Email etiquette: polite greeting and sign-off, clear paragraphs."}]}
+        """#
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-migrate-\(UUID()).json")
+        try Data(json.utf8).write(to: url)
+        let loaded = RetextSettings.load(from: url)
+        #expect(loaded.actions.map(\.prompt) == [RetextSettings.grammarPrompt, RetextSettings.translatePrompt("Czech"), "Make it shorter."])
+        #expect(loaded.appStyles.isEmpty)
+    }
+
     @Test func missingFileGivesDefaults() {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-missing-\(UUID()).json")
         let loaded = RetextSettings.load(from: url)

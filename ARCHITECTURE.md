@@ -11,7 +11,7 @@
 8. If the selection is read-only (no text role, `AXSelectedText` not settable, no `AXEditableAncestor`: web pages, PDFs, received mail) or changed while Claude worked (checked on the source app, not the system-wide focus, which can be Retext's field), the result is copied instead of pasted. While the "Copied" bubble shows (4 s), the event tap turns ⌘Z into "restore the previous clipboard"; outside that window ⌘Z is untouched.
 
 ## Files
-- `Sources/RetextCore/Settings.swift`: `RetextSettings` (actions, app styles, protected words, bar shortcut, claude path, history and Electron switches), defaults (the third action follows the Mac's first language), JSON load and save, `Store` paths.
+- `Sources/RetextCore/Settings.swift`: `RetextSettings` (actions, app styles, protected words, bar shortcut, claude path, history and Electron switches), defaults (the third action follows the Mac's first language), JSON load and save (load moves untouched 1.2.0 default prompts and the old Mail style to the current defaults), `Store` paths.
 - `Sources/RetextCore/Engine.swift`: model routing, system prompt, boundary-tag wrapper, cache key, no-change normalization, `claude -p` JSON parsing, error classification.
 - `Sources/RetextCore/History.swift`: history/cache (20 entries) and per-day usage counters.
 - `Sources/Retext/RetextApp.swift`: app entry, menu-bar menu (usage line, Recent, Settings…), shortcut event tap.
