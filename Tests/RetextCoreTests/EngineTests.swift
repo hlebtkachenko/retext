@@ -5,26 +5,18 @@ import Testing
 @Suite struct RoutingTests {
     let grammar = CustomAction(title: "Fix", symbol: "x", prompt: "p", kind: .grammar)
 
-    @Test func autoGrammarUsesHaikuBelowThreshold() {
-        #expect(Engine.model(for: grammar, textLength: 399, threshold: 400) == Model.haiku)
-        #expect(Engine.model(for: grammar, textLength: 400, threshold: 400) == Model.sonnet)
-        #expect(Engine.model(for: grammar, textLength: 50, threshold: 40) == Model.sonnet)
-    }
-
-    @Test func autoTranslateAndOtherUseSonnet() {
-        for kind in [ActionKind.translate, .other] {
-            let action = CustomAction(title: "T", symbol: "x", prompt: "p", kind: kind)
-            #expect(Engine.model(for: action, textLength: 5, threshold: 400) == Model.sonnet)
+    @Test func autoUsesSonnetForEveryKind() {
+        for kind in ActionKind.allCases {
+            #expect(Engine.model(for: CustomAction(title: "T", symbol: "x", prompt: "p", kind: kind)) == Model.sonnet)
         }
     }
 
     @Test func explicitModelOverrides() {
         var action = grammar
-        action.model = .sonnet
-        #expect(Engine.model(for: action, textLength: 5, threshold: 400) == Model.sonnet)
-        action.kind = .translate
         action.model = .haiku
-        #expect(Engine.model(for: action, textLength: 5000, threshold: 400) == Model.haiku)
+        #expect(Engine.model(for: action) == Model.haiku)
+        action.model = .sonnet
+        #expect(Engine.model(for: action) == Model.sonnet)
     }
 
     @Test func freeInstructionUsesSonnet() {
@@ -57,6 +49,32 @@ import Testing
     }
 }
 
+@Suite struct LayoutCheckTests {
+    @Test func oneLineInputStaysOneLine() {
+        let output = "Dobrý den, pane Nováku,\n\nposílám Vám návrh smlouvy."
+        #expect(Engine.checkLayout(input: "Dobrý den pane Nováku, posílám vám návrh smlouvy.", output: output, kind: .grammar)
+                == "Dobrý den, pane Nováku, posílám Vám návrh smlouvy.")
+        #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\nposílám to.", kind: .translate) == "Ahoj, posílám to.")
+    }
+
+    @Test func multiLineInputAndInstructionsPassThrough() {
+        #expect(Engine.checkLayout(input: "- a\n- b", output: "- A\n- B", kind: .grammar) == "- A\n- B")
+        #expect(Engine.checkLayout(input: "a, b, c", output: "- a\n- b\n- c", kind: nil) == "- a\n- b\n- c")
+        #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\n\nposílám to.", kind: .translate, styled: true) == "Ahoj,\n\nposílám to.")
+        let mail = RetextSettings(appStyles: [AppStyle(bundleID: "com.apple.mail", style: "formal")])
+        #expect(Engine.job(for: mail.actions[0], text: "x", settings: mail, bundleID: "com.apple.mail").styled)
+        #expect(!Engine.job(for: mail.actions[0], text: "x", settings: mail, bundleID: nil).styled)
+    }
+
+    @Test func grammarWithExtraTextIsRejected() {
+        let input = "Can you please to check this document?"
+        let leak = "Can you please check this document?\n\n(Note: I don't see a document attached. Please share it and I'll review it.)"
+        #expect(Engine.checkLayout(input: input, output: leak, kind: .grammar) == nil)
+        #expect(Engine.checkLayout(input: "u", output: "you", kind: .grammar) == "you")
+        #expect(Engine.checkLayout(input: "Díky!", output: "Thanks a lot, really appreciate it, see you!", kind: .translate) != nil)
+    }
+}
+
 @Suite struct NoChangeTests {
     @Test func normalizesWhitespace() {
         #expect(Engine.normalize("  Hello,\n\n  world \t") == "Hello, world")
@@ -70,7 +88,6 @@ import Testing
     @Test func roundTrip() throws {
         var settings = RetextSettings()
         settings.actions.append(CustomAction(title: "Shorter", symbol: "scissors", prompt: "Make it shorter.", kind: .other, model: .haiku))
-        settings.haikuThreshold = 250
         settings.menuShortcut = .controlOptionSpace
         let decoded = try JSONDecoder().decode(RetextSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded == settings)
@@ -80,13 +97,11 @@ import Testing
         let empty = try JSONDecoder().decode(RetextSettings.self, from: Data("{}".utf8))
         #expect(empty.actions.map(\.prompt) == RetextSettings.defaultActions.map(\.prompt))
         #expect(empty.protectedWords.isEmpty)
-        #expect(empty.haikuThreshold == 400)
         let partial = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"haikuThreshold": 100, "protectedWords": []}"#.utf8))
-        #expect(partial.haikuThreshold == 100)
         #expect(empty.menuShortcut == .optionSpace)
         #expect(empty.keepHistory && empty.electronSupport)
-        let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper", "haikuThreshold": 50}"#.utf8))
-        #expect(unknown.menuShortcut == .optionSpace && unknown.haikuThreshold == 50)
+        let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper"}"#.utf8))
+        #expect(unknown.menuShortcut == .optionSpace)
         #expect(partial.protectedWords.isEmpty)
         #expect(partial.actions.count == RetextSettings.defaultActions.count)
     }
@@ -95,7 +110,6 @@ import Testing
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-missing-\(UUID()).json")
         let loaded = RetextSettings.load(from: url)
         #expect(loaded.actions.map(\.prompt) == RetextSettings.defaultActions.map(\.prompt))
-        #expect(loaded.haikuThreshold == 400)
     }
 
     @Test func defaultActionsFollowTheMacLanguage() {

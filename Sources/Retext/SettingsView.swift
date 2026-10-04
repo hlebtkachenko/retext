@@ -62,7 +62,7 @@ struct SettingsView: View {
                 case .actions: ActionsPane(actions: $state.settings.actions)
                 case .styles: StylesPane(styles: $state.settings.appStyles)
                 case .words: WordsPane(words: $state.settings.protectedWords)
-                case .engine: EnginePane(threshold: $state.settings.haikuThreshold, claudePath: $state.settings.claudePath,
+                case .engine: EnginePane(claudePath: $state.settings.claudePath,
                                          claudeFound: state.claudeFound)
                 case .general: GeneralPane()
                 case .usage: UsagePane(usage: state.usage, history: state.history)
@@ -259,7 +259,6 @@ private struct WordsPane: View {
 
 private struct EnginePane: View {
     static let billing = "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
-    @Binding var threshold: Int
     @Binding var claudePath: String
     let claudeFound: Bool
 
@@ -275,28 +274,13 @@ private struct EnginePane: View {
                     .foregroundStyle(claudeFound ? .secondary : Color.orange)
             }
             Section {
-                LabeledContent("Haiku threshold") {
-                    HStack {
-                        TextField("Haiku threshold", value: $threshold, format: .number).labelsHidden()
-                            .multilineTextAlignment(.trailing).frame(width: 80)
-                        Text("characters")
-                        Stepper("", value: $threshold, in: 0...10_000, step: 50).labelsHidden()
-                    }
-                }
-            } header: {
-                Text("Model routing")
-            } footer: {
-                Text("Actions on Auto: grammar fixes shorter than the threshold use Haiku; longer ones, translations, other actions and typed instructions use Sonnet.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
                 LabeledContent("Haiku", value: "--model \(Model.haiku) (latest Haiku)")
                 LabeledContent("Sonnet", value: "--model \(Model.sonnet) (latest Sonnet)")
                 LabeledContent("Runs through", value: "claude -p")
             } header: {
                 Text("Models")
             } footer: {
-                Text(Self.billing).foregroundStyle(.secondary)
+                Text("Actions on Auto and typed instructions use Sonnet; pick Haiku per action in Actions. \(Self.billing)").foregroundStyle(.secondary)
             }
         }
     }

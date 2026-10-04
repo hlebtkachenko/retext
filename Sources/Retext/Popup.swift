@@ -236,7 +236,8 @@ final class PopupController {
         }
     }
 
-    /// The cached result when model, prompt and text match an entry in the history; otherwise Claude's answer, recorded.
+    /// The cached result when model, prompt and text match an entry in the history; otherwise Claude's answer after
+    /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
     /// With "Keep history" off, neither the cache nor the history is touched.
     private func result(of job: Job, for selection: Selection) async throws -> String {
         let state = AppState.shared
@@ -249,10 +250,11 @@ final class PopupController {
         let output = try await runner.run(job, text: selection.text, claudePath: state.settings.claudePath)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
+        guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
         if keep { state.history.add(HistoryEntry(key: key, appName: selection.app.localizedName ?? "", title: job.title,
-                                       input: selection.text, output: output.text, model: job.model,
+                                       input: selection.text, output: text, model: job.model,
                                        inputTokens: output.inputTokens, outputTokens: output.outputTokens, costUSD: output.costUSD)) }
-        return output.text
+        return text
     }
 
     /// For text that can't be edited in place: copy the result; while the bubble shows, ⌘Z brings the old clipboard back.

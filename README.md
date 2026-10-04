@@ -16,9 +16,10 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 
 - **Actions:** Fix grammar and English, plus a translation into your Mac's language when that isn't English. You can edit them or add your own, up to 9. ⌥1…⌥9 run them directly while text is selected.
 - **Free instructions:** type "shorter", "more formal" or "as a bullet list" into the bar and press Return.
-- **App styles:** extra guidance for a given app, for example "Email etiquette" for Mail.
+- **App styles:** optional extra guidance for a given app, for example "formal" for Mail. None by default.
 - **Protected words:** names and terms that are never changed or translated.
-- **Model routing:** short grammar fixes use Claude Haiku and everything else uses Claude Sonnet, through the Claude Code `haiku` and `sonnet` aliases. You can choose the model for each action.
+- **Model:** Claude Sonnet through the Claude Code `sonnet` alias. You can switch an action to Haiku (`haiku` alias).
+- **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Extras:** a "No changes needed" check, a cache of recent results, a Recent menu and a daily usage summary.
 
@@ -31,7 +32,7 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 | **What** | AI writing assistant for selected text: grammar and spelling fixes, translation, free-form rewrites ("shorter", "more formal") |
 | **Where** | Any macOS app with selectable text: Mail, Notes, Pages, Safari, Slack, VS Code, Telegram and more; read-only text is copied instead |
 | **How** | Select text, press ⌥Space (bar) or ⌥1…⌥9 (direct action); the result replaces the selection with its original formatting |
-| **Engine** | Your installed Claude Code CLI (`claude -p`), Claude Haiku for short fixes, Claude Sonnet for the rest; no API key handling in the app |
+| **Engine** | Your installed Claude Code CLI (`claude -p`), Claude Sonnet (Haiku per action if you choose); no API key handling in the app |
 | **Stack** | Swift 6, SwiftUI, Liquid Glass, AppKit, Accessibility API, CGEvent tap; no third-party dependencies |
 | **Requires** | macOS 26+, Xcode 26+ to build, Claude Code logged in, Accessibility permission |
 | **License** | Apache 2.0 |
