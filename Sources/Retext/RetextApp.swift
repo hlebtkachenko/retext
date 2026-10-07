@@ -8,14 +8,14 @@ struct RetextApp: App {
     @ObservedObject private var state = AppState.shared
 
     var body: some Scene {
-        MenuBarExtra("Retext", systemImage: "character.cursor.ibeam", isInserted: $state.settings.showMenuBarIcon) {
-            Text(delegate.hotkeyOK ? "Select text, then press \(state.settings.menuShortcut.label)" : "Allow Retext in Settings → Privacy and Security → Accessibility")
-            if !state.claudeFound { Text("Claude Code not found: install it or set its path in Settings → Engine") }
-            Text("⌥1…⌥\(state.settings.actions.count) run actions on selected text")
-            Text("\(state.settings.menuShortcut.label): type an instruction and Return, or ←/→ to an action. Esc cancels.")
+        MenuBarExtra("Retext", systemImage: "character.cursor.ibeam", isInserted: showIcon) {
+            // Clicking an action runs it on the selection in the app in front, like its ⌥N shortcut.
+            ForEach(Array(state.settings.actions.enumerated()), id: \.element.id) { index, action in
+                Button { delegate.controller.trigger(index) } label: { Label(action.title, systemImage: action.symbol) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option)
+            }
             Divider()
-            Text(state.usage.today.summary)
-            Menu("Recent") {
+            Menu("Recent (click to copy)") {
                 if state.history.entries.isEmpty { Text("Nothing yet") }
                 ForEach(state.history.entries) { entry in
                     Button(Self.short(entry)) {
@@ -24,10 +24,27 @@ struct RetextApp: App {
                     }
                 }
             }
+            Button(state.usage.today.summary) { SettingsWindow.shared.show(.usage) }
             Divider()
+            // Shown only when something blocks Retext; each opens the place that fixes it.
+            if !delegate.hotkeyOK {
+                Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                }
+            }
+            if !state.claudeFound {
+                Button("Claude Code not found…", systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
+            }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         }
+    }
+
+    /// SwiftUI writes isInserted back on every scene update; writing only real changes keeps that from
+    /// re-publishing settings and looping (a frozen main thread at full CPU).
+    private var showIcon: Binding<Bool> {
+        Binding(get: { state.settings.showMenuBarIcon },
+                set: { if $0 != state.settings.showMenuBarIcon { state.settings.showMenuBarIcon = $0 } })
     }
 
     /// "Fix grammar · Mail: Teh quick brown…" for the Recent submenu; clicking copies the output.
