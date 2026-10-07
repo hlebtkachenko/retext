@@ -17,7 +17,7 @@
 - `Sources/Retext/RetextApp.swift`: app entry, menu-bar menu (usage line, Recent, Settings…), shortcut event tap.
 - `Sources/Retext/AppState.swift`: shared settings, history and usage, saved on change.
 - `Sources/Retext/Popup.swift`: state model, SwiftUI view, instruction field, panel, placement, keyboard and click handling, run flow.
-- `Sources/Retext/SettingsView.swift`: native settings window (sidebar: Actions, App styles, Protected words, Engine, General, Usage). Engine: models, Claude Code path override. General: "Open at login" (reads and sets `SMAppService.mainApp`, off until the user turns it on), bar shortcut, "Improve Electron app support", "Keep history" and Clear History; switches to the `.regular` activation policy while open.
+- `Sources/Retext/SettingsView.swift`: native settings window (sidebar: Actions, App styles, Protected words, Engine, General, Usage). Engine: models, Claude Code path override. General: "Open at login" (reads and sets `SMAppService.mainApp`, off until the user turns it on), "Show in menu bar" (`MenuBarExtra(isInserted:)`; with it off, reopening the app shows Settings via `applicationShouldHandleReopen`), bar shortcut, "Improve Electron app support", "Keep history" and Clear History; switches to the `.regular` activation policy while open.
 - `Sources/Retext/Selection.swift`: Accessibility read, clipboard fallback, paste.
 - `Sources/Retext/Claude.swift`: `claude` discovery and the `claude -p` runner.
 

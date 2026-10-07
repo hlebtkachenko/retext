@@ -99,7 +99,7 @@ import Testing
         #expect(empty.protectedWords.isEmpty)
         let partial = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"haikuThreshold": 100, "protectedWords": []}"#.utf8))
         #expect(empty.menuShortcut == .optionSpace)
-        #expect(empty.keepHistory && empty.electronSupport)
+        #expect(empty.keepHistory && empty.electronSupport && empty.showMenuBarIcon)
         let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper"}"#.utf8))
         #expect(unknown.menuShortcut == .optionSpace)
         #expect(partial.protectedWords.isEmpty)

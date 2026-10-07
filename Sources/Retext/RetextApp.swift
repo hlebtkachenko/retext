@@ -8,7 +8,7 @@ struct RetextApp: App {
     @ObservedObject private var state = AppState.shared
 
     var body: some Scene {
-        MenuBarExtra("Retext", systemImage: "character.cursor.ibeam") {
+        MenuBarExtra("Retext", systemImage: "character.cursor.ibeam", isInserted: $state.settings.showMenuBarIcon) {
             Text(delegate.hotkeyOK ? "Select text, then press \(state.settings.menuShortcut.label)" : "Allow Retext in Settings → Privacy and Security → Accessibility")
             if !state.claudeFound { Text("Claude Code not found: install it or set its path in Settings → Engine") }
             Text("⌥1…⌥\(state.settings.actions.count) run actions on selected text")
@@ -72,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         }
         if Hotkeys.electronOnSwitch, let app = NSWorkspace.shared.frontmostApplication { SelectionIO.enableElectronAccessibility(app) }
+    }
+
+    /// Opening Retext while it runs (Finder, Spotlight) shows Settings, the way back when the menu-bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        SettingsWindow.shared.show()
+        return false
     }
 
     /// The tap needs the Accessibility grant; retry until it is given so no relaunch is needed.

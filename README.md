@@ -95,6 +95,7 @@ On first launch, allow Retext in System Settings → Privacy & Security → Acce
 ## Known conflicts
 
 - **⌥Space:** Retext always takes ⌥Space, before other apps' hotkeys for the same combo. On some keyboard layouts ⌥Space types a non-breaking space, and some launchers use it too. If that matters to you, switch to ⌃⌥Space in Settings → General. macOS can use ⌃⌥Space for "Select next source in Input menu" (System Settings → Keyboard → Keyboard Shortcuts → Input Sources); Retext takes it first, so turn that shortcut off if you rely on it.
+- **Menu-bar icon:** on a Mac with a notch, a crowded menu bar can hide the icon behind it. Turn off Settings → General → "Show in menu bar" to drop it; the shortcuts keep working, and opening Retext again from Spotlight or Finder brings up Settings.
 - **Electron apps** (Slack, VS Code, Claude and others) build their accessibility tree only when asked. With "Improve Electron app support" on (the default), Retext asks every app you switch to, so ⌥1…⌥9 work there right away. Turn it off to ask only when you use a shortcut; the first ⌥N in such an app may then pass through. Electron and web apps often report no selection position, so the bar opens under the text field or at the mouse pointer.
 
 ## Uninstall

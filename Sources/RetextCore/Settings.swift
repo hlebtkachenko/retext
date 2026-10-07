@@ -58,6 +58,8 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     /// On: AXManualAccessibility is set on every app switch, so ⌥N sees Electron selections before the first bar.
     /// Off: it is set only when Retext reads a selection.
     public var electronSupport = true
+    /// Off: no menu-bar icon; opening Retext again (Finder, Spotlight) shows Settings.
+    public var showMenuBarIcon = true
 
     public init(actions: [CustomAction] = RetextSettings.defaultActions,
                 appStyles: [AppStyle] = [],
@@ -77,6 +79,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         claudePath = (try? c.decodeIfPresent(String.self, forKey: .claudePath)) ?? d.claudePath
         keepHistory = (try? c.decodeIfPresent(Bool.self, forKey: .keepHistory)) ?? d.keepHistory
         electronSupport = (try? c.decodeIfPresent(Bool.self, forKey: .electronSupport)) ?? d.electronSupport
+        showMenuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon)) ?? d.showMenuBarIcon
     }
 
     public func style(for bundleID: String?) -> String? {

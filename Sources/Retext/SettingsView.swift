@@ -300,6 +300,12 @@ private struct GeneralPane: View {
                 Text(loginStatusText).foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Show in menu bar", isOn: $state.settings.showMenuBarIcon)
+            } footer: {
+                Text("Off: no icon in the menu bar, so it can't hide behind the notch. Shortcuts keep working; open Retext again from Spotlight or Finder to get back to Settings.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Picker("Open the bar with", selection: $state.settings.menuShortcut) {
                     ForEach(MenuShortcut.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
