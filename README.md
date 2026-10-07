@@ -21,7 +21,7 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 - **Model:** Claude Sonnet through the Claude Code `sonnet` alias. You can switch an action to Haiku (`haiku` alias).
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
-- **Extras:** a "No changes needed" check, a cache of recent results, a Recent menu and a daily usage summary.
+- **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
 
 ![Retext settings: the Actions pane](docs/images/settings.png)
 

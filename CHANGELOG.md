@@ -7,6 +7,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Added
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
 
+### Changed
+- The menu-bar menu lists your actions with their ⌥1…⌥9 shortcuts; clicking one runs it on the selected text. The help text is gone.
+- Recent says that a click copies the result, and the usage line opens Settings → Usage.
+- A missing Accessibility permission or Claude Code shows up in the menu only when it happens, and clicking it opens the place that fixes it.
+
 ## [1.3.0] - 2026-10-05
 
 ### Changed

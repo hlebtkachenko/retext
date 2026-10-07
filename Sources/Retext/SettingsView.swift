@@ -9,7 +9,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     static let shared = SettingsWindow()
     private(set) var window: NSWindow?
 
-    func show() {
+    /// With a pane, opens on it (rebuilding the content, since the sidebar selection is view state).
+    func show(_ pane: SettingsView.Pane? = nil) {
+        if let pane {
+            SettingsView.initialPane = pane
+            if let window {
+                let frame = window.frame
+                window.contentViewController = NSHostingController(rootView: SettingsView())
+                window.setFrame(frame, display: false)
+            }
+        }
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
             w.title = "Retext Settings"
