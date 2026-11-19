@@ -56,9 +56,9 @@ ADDONS = {
     ),
 }
 
-# name: (model, effort or None, add-on). Medium mirrors today's app: haiku, no --effort, no add-on.
+# name: (model, effort or None, add-on). Medium mirrors the app (Level.effort): haiku, --effort low, no add-on.
 CONFIGS = {
-    "medium": ("haiku", None, "none"),
+    "medium": ("haiku", "low", "none"),
     "high": ("sonnet", "medium", "high"),
     "max": ("opus", "medium", "max"),
     "sonnet-base": ("sonnet", None, "none"),

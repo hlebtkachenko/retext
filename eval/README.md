@@ -18,7 +18,7 @@ Defaults to the chosen levels (`medium,high,max`). Configs, add-ons and the judg
 
 ## Levels
 
-Medium: `haiku`, no `--effort`, no add-on (today's prompts). High: `sonnet`, effort `medium`, the `high` add-on. Max: `opus`, effort `medium`, the `max` add-on. The add-on goes right after the action prompt, before the content rules. Effort `low` for High and `high` for Max scored the same or lower in the draft passes; latest results: `results/2026-11-19-142544.md`.
+Medium: `haiku`, effort `low` (as in the app's `Level.effort`), no add-on (today's prompts). High: `sonnet`, effort `medium`, the `high` add-on. Max: `opus`, effort `medium`, the `max` add-on. The add-on goes right after the action prompt, before the content rules. Effort `low` for High and `high` for Max scored the same or lower in the draft passes; latest results: `results/2026-11-19-142544.md` (its Medium ran without `--effort`).
 
 ## Cost
 
