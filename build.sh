@@ -8,9 +8,10 @@ cd "$(dirname "$0")"
 identity="${RETEXT_SIGN_IDENTITY:-$(cat .sign-identity 2>/dev/null || echo -)}"
 swift build -c release
 app=build/Retext.app
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build/release/Retext "$app/Contents/MacOS/Retext"
 cp Info.plist "$app/Contents/Info.plist"
+cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 codesign --force --options runtime --sign "$identity" "$app"
 
 [[ "${1:-}" == "--no-install" ]] && exit 0
