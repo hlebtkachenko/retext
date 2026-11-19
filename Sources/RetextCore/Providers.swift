@@ -87,12 +87,39 @@ public struct CustomProviderSettings: Codable, Equatable, Sendable {
         ("Groq", "https://api.groq.com/openai/v1"),
     ]
 
-    /// The Keychain account of the API key for this base URL: "custom-api-key:<host>[:port]". The key is saved per host and
-    /// looked up for the request's own host, so a base URL changed to another server (by hand or by an imported
-    /// settings file) never receives the key saved for the old one. nil without a valid endpoint.
+    /// The Keychain account of the API key for this base URL: "custom-api-key:<scheme>://<host>[:port]". The key is saved
+    /// per server and looked up for the request's own server, so a base URL changed to another server or to http (by hand
+    /// or by an imported settings file) never receives the key saved for the old one. nil without a valid endpoint.
     public var keyAccount: String? {
-        guard let url = endpoint, let host = url.host?.lowercased() else { return nil }
-        return "custom-api-key:\(host)\(url.port.map { ":\($0)" } ?? "")"
+        guard let url = endpoint, let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+        return "custom-api-key:\(scheme)://\(host)\(url.port.map { ":\($0)" } ?? "")"
+    }
+
+    /// An http endpoint on a host that isn't local: no key is sent there (it would cross the network unencrypted).
+    public var needsHTTPS: Bool {
+        guard let url = endpoint, let host = url.host else { return false }
+        return url.scheme?.lowercased() == "http" && !Self.isLocal(host)
+    }
+
+    /// This Mac or the local network: localhost, *.local, loopback, private IPv4 (10/8, 172.16/12, 192.168/16),
+    /// IPv4 and IPv6 link-local, IPv6 unique local (fc00::/7). Such servers (Ollama, LM Studio) need no key and may use http.
+    public static func isLocal(_ host: String) -> Bool {
+        var h = host.lowercased()
+        if h.hasPrefix("["), h.hasSuffix("]") { h = String(h.dropFirst().dropLast()) }
+        if let zone = h.firstIndex(of: "%") { h = String(h[..<zone]) }
+        if h == "localhost" || h.hasSuffix(".local") || h == "::1" { return true }
+        let parts = h.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 4, parts.allSatisfy({ $0.allSatisfy(\.isNumber) }) {
+            let octets = parts.compactMap { UInt8($0) }
+            guard octets.count == 4 else { return false }
+            switch (octets[0], octets[1]) {
+            case (127, _), (10, _), (192, 168), (169, 254), (172, 16...31): return true
+            default: return false
+            }
+        }
+        guard h.contains(":"), let first = h.split(separator: ":", omittingEmptySubsequences: false).first,
+              let hextet = UInt16(first, radix: 16) else { return false }
+        return hextet & 0xFE00 == 0xFC00 || hextet & 0xFFC0 == 0xFE80
     }
 
     /// `{base}/chat/completions`, or nil when the base URL isn't an http(s) URL.

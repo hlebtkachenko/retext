@@ -7,6 +7,7 @@ enum APIRunner {
     /// Throws `ClaudeFailure`. URLSession stops the request when the calling task is cancelled; `timeout` bounds the whole call.
     static func run(_ job: Job, text: String, custom: CustomProviderSettings, key: String?, timeout: Duration) async throws -> ClaudeOutput {
         guard let url = custom.endpoint, !job.model.isEmpty else { throw ClaudeFailure.notFound }
+        if custom.needsHTTPS { throw ClaudeFailure.other("use https for this server.") }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -50,7 +51,7 @@ private final class SameServerRedirects: NSObject, URLSessionTaskDelegate, Senda
     }
 }
 
-/// The custom API keys in the login Keychain: generic passwords, one per host (`CustomProviderSettings.keyAccount`),
+/// The custom API keys in the login Keychain: generic passwords, one per server (`CustomProviderSettings.keyAccount`),
 /// never written to settings.json, logs or the UI.
 enum Keychain {
     private static func base(_ account: String) -> [String: Any] {

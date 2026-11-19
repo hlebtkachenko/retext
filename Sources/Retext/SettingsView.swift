@@ -653,7 +653,7 @@ private struct CustomAPISection: View {
             Text("Custom API")
         } footer: {
             Text(keyError ? "The Keychain didn't accept the key. Try again."
-                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain for this URL's host and never shown again; it is sent only to that host.")
+                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain for this URL's server and never shown again; it is sent only to that server. http works only for local-network servers.")
                 .foregroundStyle(keyError ? Color.orange : .secondary)
         }
         Section {

@@ -43,16 +43,15 @@ struct ProviderStatus: Equatable, Sendable {
                                           problem: "Custom API not set up…")
             guard let url = settings.custom.endpoint, let host = url.host else { return notSetUp }
             guard Level.allCases.allSatisfy({ !settings.model(for: $0).model.isEmpty }) else { return notSetUp }
+            if settings.custom.needsHTTPS {
+                return ProviderStatus(ready: false, detail: "Use https for this server.", problem: "Custom API needs https…")
+            }
             // Local servers (Ollama, LM Studio) take no key; remote APIs need one.
-            if !isLocal(host), !Keychain.hasAPIKey(account: settings.custom.keyAccount) {
+            if !CustomProviderSettings.isLocal(host), !Keychain.hasAPIKey(account: settings.custom.keyAccount) {
                 return ProviderStatus(ready: false, detail: "Save the API key for \(host) in Settings → Engine.", problem: "API key missing…")
             }
             return .ok(host)
         }
-    }
-
-    static func isLocal(_ host: String) -> Bool {
-        ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host.lowercased()) || host.lowercased().hasSuffix(".local")
     }
 
     private static func ok(_ detail: String) -> ProviderStatus { ProviderStatus(ready: true, detail: detail, problem: nil) }

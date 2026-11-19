@@ -67,13 +67,37 @@ import Testing
 
     @Test func apiKeyIsBoundToTheHost() {
         let account = CustomProviderSettings(baseURL: "https://OpenRouter.ai/api/v1").keyAccount
-        #expect(account == "custom-api-key:openrouter.ai")
+        #expect(account == "custom-api-key:https://openrouter.ai")
         #expect(CustomProviderSettings(baseURL: "https://openrouter.ai/other/v2/").keyAccount == account)
         #expect(CustomProviderSettings(baseURL: "https://evil.example/api/v1").keyAccount != account)
         #expect(CustomProviderSettings(baseURL: "https://openrouter.ai.evil.example/api/v1").keyAccount != account)
-        #expect(CustomProviderSettings(baseURL: "http://localhost:11434/v1").keyAccount == "custom-api-key:localhost:11434")
+        #expect(CustomProviderSettings(baseURL: "http://openrouter.ai/api/v1").keyAccount != account)
+        #expect(CustomProviderSettings(baseURL: "http://localhost:11434/v1").keyAccount == "custom-api-key:http://localhost:11434")
         #expect(CustomProviderSettings(baseURL: "http://localhost:1234/v1").keyAccount != CustomProviderSettings(baseURL: "http://localhost:11434/v1").keyAccount)
         #expect(CustomProviderSettings(baseURL: "not a url").keyAccount == nil)
+    }
+
+    @Test func localHostsFromRealURLs() {
+        func local(_ base: String) -> Bool {
+            CustomProviderSettings(baseURL: base).endpoint?.host.map(CustomProviderSettings.isLocal) ?? false
+        }
+        for base in ["http://localhost:11434/v1", "http://127.0.0.1:1234/v1", "http://[::1]:11434/v1", "http://studio.local:1234/v1",
+                     "http://10.0.0.5/v1", "http://172.16.0.1/v1", "http://172.31.255.1/v1", "http://192.168.1.20:11434/v1",
+                     "http://169.254.1.1/v1", "http://[fd00::1]:11434/v1", "http://[fc00::1]/v1", "http://[fe80::1]/v1"] {
+            #expect(local(base), "\(base)")
+        }
+        for base in ["https://openrouter.ai/api/v1", "http://10.0.0.1.evil.example/v1", "http://192.168.1.1.nip.io/v1",
+                     "http://172.32.0.1/v1", "http://172.15.0.1/v1", "http://[fc::1]/v1", "http://[2001:db8::1]/v1",
+                     "http://8.8.8.8/v1", "http://local.evil.example/v1"] {
+            #expect(!local(base), "\(base)")
+        }
+    }
+
+    @Test func keysGoOverHTTPSUnlessTheServerIsLocal() {
+        #expect(CustomProviderSettings(baseURL: "http://api.example/v1").needsHTTPS)
+        #expect(!CustomProviderSettings(baseURL: "https://api.example/v1").needsHTTPS)
+        #expect(!CustomProviderSettings(baseURL: "http://192.168.1.20:11434/v1").needsHTTPS)
+        #expect(!CustomProviderSettings(baseURL: "").needsHTTPS)
     }
 
     @Test func redirectsStayOnTheSameServer() {
