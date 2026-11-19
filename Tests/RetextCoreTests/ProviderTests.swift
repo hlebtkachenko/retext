@@ -66,6 +66,17 @@ import Testing
         #expect(CustomProviderSettings(baseURL: "file:///etc").endpoint == nil)
     }
 
+    @Test func apiKeyIsBoundToTheHost() {
+        let account = CustomProviderSettings(baseURL: "https://OpenRouter.ai/api/v1").keyAccount
+        #expect(account == "custom-api-key:openrouter.ai")
+        #expect(CustomProviderSettings(baseURL: "https://openrouter.ai/other/v2/").keyAccount == account)
+        #expect(CustomProviderSettings(baseURL: "https://evil.example/api/v1").keyAccount != account)
+        #expect(CustomProviderSettings(baseURL: "https://openrouter.ai.evil.example/api/v1").keyAccount != account)
+        #expect(CustomProviderSettings(baseURL: "http://localhost:11434/v1").keyAccount == "custom-api-key:localhost:11434")
+        #expect(CustomProviderSettings(baseURL: "http://localhost:1234/v1").keyAccount != CustomProviderSettings(baseURL: "http://localhost:11434/v1").keyAccount)
+        #expect(CustomProviderSettings(baseURL: "not a url").keyAccount == nil)
+    }
+
     @Test func messagesNameTheProvider() {
         #expect(ClaudeFailure.notFound.message(for: .chatgpt).hasPrefix("Codex not found"))
         #expect(ClaudeFailure.notLoggedIn.message(for: .custom) == "API key rejected. Check it in Settings → Engine.")

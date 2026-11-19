@@ -87,6 +87,14 @@ public struct CustomProviderSettings: Codable, Equatable, Sendable {
         ("Groq", "https://api.groq.com/openai/v1"),
     ]
 
+    /// The Keychain account of the API key for this base URL: "custom-api-key:<host>[:port]". The key is saved per host and
+    /// looked up for the request's own host, so a base URL changed to another server (by hand or by an imported
+    /// settings file) never receives the key saved for the old one. nil without a valid endpoint.
+    public var keyAccount: String? {
+        guard let url = endpoint, let host = url.host?.lowercased() else { return nil }
+        return "custom-api-key:\(host)\(url.port.map { ":\($0)" } ?? "")"
+    }
+
     /// `{base}/chat/completions`, or nil when the base URL isn't an http(s) URL.
     public var endpoint: URL? {
         var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)

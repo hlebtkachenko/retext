@@ -31,14 +31,15 @@ enum APIRunner {
     }
 }
 
-/// The custom API key in the login Keychain: a generic password, never written to settings.json, logs or the UI.
+/// The custom API keys in the login Keychain: generic passwords, one per host (`CustomProviderSettings.keyAccount`),
+/// never written to settings.json, logs or the UI.
 enum Keychain {
-    private static var base: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "co.hleb.retext", kSecAttrAccount as String: "custom-api-key"]
+    private static func base(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "co.hleb.retext", kSecAttrAccount as String: account]
     }
 
-    static func apiKey() -> String? {
-        var query = base
+    static func apiKey(account: String) -> String? {
+        var query = base(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
@@ -46,16 +47,18 @@ enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Whether a key is saved, without reading it (no Keychain prompt).
-    static var hasAPIKey: Bool {
-        var query = base
+    /// Whether a key is saved for the account, without reading it (no Keychain prompt).
+    static func hasAPIKey(account: String?) -> Bool {
+        guard let account else { return false }
+        var query = base(account)
         query[kSecReturnAttributes as String] = true
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
     /// Saves the key, or removes it when `key` is empty. Returns false when the Keychain refused.
     @discardableResult
-    static func setAPIKey(_ key: String) -> Bool {
+    static func setAPIKey(_ key: String, account: String) -> Bool {
+        let base = base(account)
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if key.isEmpty {
             let status = SecItemDelete(base as CFDictionary)

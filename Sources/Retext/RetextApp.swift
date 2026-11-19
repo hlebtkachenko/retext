@@ -142,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let start = Date()
             do {
                 let output = try await ProviderRunner.run(job, text: text, settings: settings, timeout: level.timeout,
-                                                          apiKey: { provider == .custom ? env["RETEXT_SMOKE_KEY"] : nil })
+                                                          apiKey: { _ in provider == .custom ? env["RETEXT_SMOKE_KEY"] : nil })
                 print("OK \(provider.rawValue) \(level.rawValue) \(job.model)/\(job.effort) \(String(format: "%.1f", Date().timeIntervalSince(start))) s, "
                       + "\(output.inputTokens) in, \(output.outputTokens) out: \(output.text)")
                 exit(0)

@@ -617,8 +617,9 @@ private struct CustomAPISection: View {
     @Binding var custom: CustomProviderSettings
     @ObservedObject private var state = AppState.shared
     @State private var key = ""
-    @State private var keySaved = Keychain.hasAPIKey
     @State private var keyError = false
+    /// Bumped on save and remove, so the view reads the Keychain again.
+    @State private var keyVersion = 0
 
     var body: some View {
         Section {
@@ -635,13 +636,13 @@ private struct CustomAPISection: View {
             }
             LabeledContent("API key") {
                 HStack {
-                    SecureField("API key", text: $key, prompt: Text(keySaved ? "Saved" : "Not needed for local servers")).labelsHidden()
+                    SecureField("API key", text: $key, prompt: Text(keyPrompt)).labelsHidden()
                         .onSubmit(saveKey)
-                    Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if keySaved {
+                    Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty || custom.keyAccount == nil)
+                    if keySaved, let account = custom.keyAccount {
                         Button("Remove", role: .destructive) {
-                            Keychain.setAPIKey("")
-                            keySaved = Keychain.hasAPIKey
+                            Keychain.setAPIKey("", account: account)
+                            keyVersion += 1
                             state.checkProvider()
                         }
                     }
@@ -652,7 +653,7 @@ private struct CustomAPISection: View {
             Text("Custom API")
         } footer: {
             Text(keyError ? "The Keychain didn't accept the key. Try again."
-                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain and never shown again; it is sent only to this URL.")
+                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain for this URL's host and never shown again; it is sent only to that host.")
                 .foregroundStyle(keyError ? Color.orange : .secondary)
         }
         Section {
@@ -673,11 +674,19 @@ private struct CustomAPISection: View {
         }
     }
 
+    /// Read from the Keychain on each render (attributes only), so it follows the base URL's host as it changes.
+    private var keySaved: Bool { _ = keyVersion; return Keychain.hasAPIKey(account: custom.keyAccount) }
+
+    private var keyPrompt: String {
+        guard let host = custom.endpoint?.host else { return "Enter the base URL first" }
+        return keySaved ? "Saved for \(host)" : "No key saved for this host"
+    }
+
     private func saveKey() {
-        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        keyError = !Keychain.setAPIKey(key)
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty, let account = custom.keyAccount else { return }
+        keyError = !Keychain.setAPIKey(key, account: account)
         key = ""
-        keySaved = Keychain.hasAPIKey
+        keyVersion += 1
         state.checkProvider()
     }
 
@@ -794,6 +803,8 @@ private struct GeneralPane: View {
                 if var pendingImport {
                     pendingImport.claudePath = state.settings.claudePath
                     pendingImport.codexPath = state.settings.codexPath
+                    // The API key is saved for the current host: an imported file must not point it at another server.
+                    pendingImport.custom.baseURL = state.settings.custom.baseURL
                     replaceSettings(with: pendingImport)
                 }
                 pendingImport = nil

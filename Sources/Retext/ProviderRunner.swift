@@ -3,13 +3,13 @@ import RetextCore
 
 /// Sends a job to its provider's runner.
 enum ProviderRunner {
-    /// `apiKey` is read only for the custom API (default: the Keychain).
+    /// `apiKey` is read only for the custom API, for the endpoint's own host (default: the Keychain).
     static func run(_ job: Job, text: String, settings: RetextSettings, timeout: Duration,
-                    apiKey: @Sendable () -> String? = Keychain.apiKey) async throws -> ClaudeOutput {
+                    apiKey: @Sendable (String) -> String? = Keychain.apiKey(account:)) async throws -> ClaudeOutput {
         switch job.provider {
         case .claude: try await ClaudeRunner.run(job, text: text, claudePath: settings.claudePath, timeout: timeout)
         case .chatgpt: try await CodexRunner.run(job, text: text, codexPath: settings.codexPath, timeout: timeout)
-        case .custom: try await APIRunner.run(job, text: text, custom: settings.custom, key: apiKey(), timeout: timeout)
+        case .custom: try await APIRunner.run(job, text: text, custom: settings.custom, key: settings.custom.keyAccount.flatMap(apiKey), timeout: timeout)
         }
     }
 }
@@ -44,8 +44,8 @@ struct ProviderStatus: Equatable, Sendable {
             guard let url = settings.custom.endpoint, let host = url.host else { return notSetUp }
             guard Level.allCases.allSatisfy({ !settings.model(for: $0).model.isEmpty }) else { return notSetUp }
             // Local servers (Ollama, LM Studio) take no key; remote APIs need one.
-            if !isLocal(host), !Keychain.hasAPIKey {
-                return ProviderStatus(ready: false, detail: "Save the API key in Settings → Engine.", problem: "API key missing…")
+            if !isLocal(host), !Keychain.hasAPIKey(account: settings.custom.keyAccount) {
+                return ProviderStatus(ready: false, detail: "Save the API key for \(host) in Settings → Engine.", problem: "API key missing…")
             }
             return .ok(host)
         }
