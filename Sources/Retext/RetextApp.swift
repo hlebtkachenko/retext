@@ -32,8 +32,8 @@ struct RetextApp: App {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
             }
-            if !state.claudeFound {
-                Button("Claude Code not found…", systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
+            if let problem = state.providerStatus?.problem {
+                Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
             }
             if state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) {
                 Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A `claude` that exits before reading a large selection must not kill Retext.
         signal(SIGPIPE, SIG_IGN)
+        if let i = CommandLine.arguments.firstIndex(of: "--provider-smoke") { return providerSmoke(Array(CommandLine.arguments.dropFirst(i + 1))) }
         if let i = CommandLine.arguments.firstIndex(of: "--demo") {
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
@@ -93,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         Hotkeys.menu = { [weak self] in self?.controller.trigger() }
         Hotkeys.action = { [weak self] index in self?.controller.trigger(index) }
         Hotkeys.configure(AppState.shared.settings)
-        AppState.shared.checkClaude()
+        AppState.shared.checkProvider()
         startHotkeys()
         // Electron apps expose their selection only after AXManualAccessibility is set. With "Improve Electron app
         // support" on, set it on every app switch so the ⌥N selection check in the event tap works there before the
@@ -115,6 +116,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(30))
                 UpdateChecker.checkIfDue()
+            }
+        }
+    }
+
+    /// `--provider-smoke <claude|chatgpt|custom> <medium|high|max>`: one Fix grammar run on a fixed text through the runner
+    /// (no cache, no history, settings.json untouched), printed, then exit. Custom reads RETEXT_SMOKE_BASE_URL,
+    /// RETEXT_SMOKE_MODEL and RETEXT_SMOKE_KEY (optional) instead of the saved settings and the Keychain.
+    private func providerSmoke(_ args: [String]) {
+        guard let provider = args.first.flatMap(Provider.init(rawValue:)), let level = args.dropFirst().first.flatMap(Level.init(rawValue:)) else {
+            print("usage: --provider-smoke claude|chatgpt|custom medium|high|max")
+            exit(2)
+        }
+        var settings = AppState.shared.settings
+        settings.provider = provider
+        let env = ProcessInfo.processInfo.environment
+        if provider == .custom {
+            settings.custom.baseURL = env["RETEXT_SMOKE_BASE_URL"] ?? settings.custom.baseURL
+            if let model = env["RETEXT_SMOKE_MODEL"] { settings.custom.models[level] = ProviderModel(model: model) }
+        }
+        let action = RetextSettings.defaultActions(languages: ["en"])[0]
+        let text = "I has two cat."
+        let job = Engine.job(for: action, level: level, text: text, settings: settings, bundleID: nil)
+        Task {
+            let start = Date()
+            do {
+                let output = try await ProviderRunner.run(job, text: text, settings: settings, timeout: level.timeout,
+                                                          apiKey: { provider == .custom ? env["RETEXT_SMOKE_KEY"] : nil })
+                print("OK \(provider.rawValue) \(level.rawValue) \(job.model)/\(job.effort) \(String(format: "%.1f", Date().timeIntervalSince(start))) s, "
+                      + "\(output.inputTokens) in, \(output.outputTokens) out: \(output.text)")
+                exit(0)
+            } catch {
+                let failure = error as? ClaudeFailure ?? .other("\(error)")
+                print("FAIL \(provider.rawValue) \(level.rawValue) \(job.model)/\(job.effort): \(failure) | \(failure.message(for: provider))")
+                exit(1)
             }
         }
     }

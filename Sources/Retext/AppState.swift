@@ -10,11 +10,13 @@ final class AppState: ObservableObject {
         didSet {
             settings.save(to: Store.url("settings.json"))
             Hotkeys.configure(settings)
-            if settings.claudePath != oldValue.claudePath { checkClaude() }
+            if settings.provider != oldValue.provider || settings.claudePath != oldValue.claudePath
+                || settings.codexPath != oldValue.codexPath || settings.custom != oldValue.custom
+                || settings.chatGPTModels != oldValue.chatGPTModels { checkProvider() }
         }
     }
-    /// False when no `claude` executable was found; the menu then says so.
-    @Published var claudeFound = true
+    /// The active provider's local check; nil until the first check. The menu shows its problem.
+    @Published var providerStatus: ProviderStatus?
     /// A newer release found by `UpdateChecker`; the menu offers it.
     @Published var update: Release?
     @Published var history: History { didSet { history.save(to: Store.url("history.json")) } }
@@ -26,11 +28,12 @@ final class AppState: ObservableObject {
         usage = Usage.load(from: Store.url("usage.json"))
     }
 
-    func checkClaude() {
-        let path = settings.claudePath
+    /// Checks the active provider again (after a settings change, a key change or a failed run).
+    func checkProvider() {
+        let settings = settings
         Task.detached {
-            let found = ClaudeRunner.executable(override: path) != nil
-            await MainActor.run { AppState.shared.claudeFound = found }
+            let status = ProviderStatus.check(settings)
+            await MainActor.run { if AppState.shared.settings.provider == settings.provider { AppState.shared.providerStatus = status } }
         }
     }
 }

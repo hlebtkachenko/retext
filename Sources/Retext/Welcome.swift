@@ -55,11 +55,11 @@ struct WelcomeView: View {
     var body: some View {
         Form {
             Section {
-                Text("Select text in any app, press \(state.settings.menuShortcut.label) and pick an action or type an instruction. Retext replaces the selection with Claude's result, in the original font.")
+                Text("Select text in any app, press \(state.settings.menuShortcut.label) and pick an action or type an instruction. Retext replaces the selection with the result, in the original font.")
             }
             Section("Setup") {
                 AccessibilityRow()
-                ClaudeCodeRow()
+                ProviderRow()
             }
             Section {
                 TextField("Sample text", text: $sample, axis: .vertical)
@@ -112,28 +112,27 @@ struct AccessibilityRow: View {
     }
 }
 
-/// Where Retext finds `claude`, looked up again when the path override changes.
-struct ClaudeCodeRow: View {
+/// Whether the active provider is ready (Claude Code, Codex or the custom API), checked again when its settings change.
+struct ProviderRow: View {
     @ObservedObject private var state = AppState.shared
-    /// nil while looking; then the path, or "" when not found.
-    @State private var path: String?
 
     var body: some View {
+        let status = state.providerStatus
         LabeledContent {
-            switch path {
+            switch status {
             case nil: ProgressView().controlSize(.small)
-            case "": Label("Not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            case let path?: Label(path, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
+            case let status? where status.ready:
+                Label(status.detail, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
+            case .some: Label("Not ready", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
         } label: {
-            Text("Claude Code")
-            Text(path == "" ? "Install Claude Code and log in, or set its path in Settings → Engine." : "Runs the requests with your own login.")
+            Text(state.settings.provider.title)
+            Text(status.map { $0.ready ? readyText : $0.detail } ?? readyText)
         }
-        .task(id: state.settings.claudePath) {
-            let override = state.settings.claudePath
-            let found = await Task.detached { ClaudeRunner.executable(override: override) }.value
-            path = found ?? ""
-            state.claudeFound = found != nil
-        }
+        .onAppear { state.checkProvider() }
+    }
+
+    private var readyText: String {
+        state.settings.provider == .custom ? "Sends the requests to the API you set." : "Runs the requests with your own login."
     }
 }

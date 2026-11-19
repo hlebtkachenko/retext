@@ -70,8 +70,7 @@ struct SettingsView: View {
                 case .actions: ActionsPane(actions: $state.settings.actions)
                 case .styles: StylesPane(styles: $state.settings.appStyles)
                 case .words: WordsPane(settings: $state.settings)
-                case .engine: EnginePane(defaultLevel: $state.settings.defaultLevel, claudePath: $state.settings.claudePath,
-                                         claudeFound: state.claudeFound)
+                case .engine: EnginePane()
                 case .general: GeneralPane()
                 case .usage: UsagePane(usage: state.usage, history: state.history)
                 }
@@ -414,70 +413,277 @@ private struct PasteListSheet: View {
 
 private struct EnginePane: View {
     static let billing = "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
-    @Binding var defaultLevel: Level
-    @Binding var claudePath: String
-    let claudeFound: Bool
-    @State private var testing = false
-    @State private var testResult: (ok: Bool, text: String)?
+    @ObservedObject private var state = AppState.shared
 
     var body: some View {
+        let provider = state.settings.provider
         Form {
             Section {
-                TextField("Claude Code path", text: $claudePath, prompt: Text("Found automatically"))
-                HStack {
-                    Button("Test Claude Code", action: test).disabled(testing)
-                    if testing { ProgressView().controlSize(.small) }
-                    if let testResult {
-                        Label(testResult.text, systemImage: testResult.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(testResult.ok ? Color.green : .orange)
-                            .textSelection(.enabled)
-                    }
+                Picker("Provider", selection: $state.settings.provider) {
+                    ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
-            } header: {
-                Text("Claude Code")
             } footer: {
-                Text(claudeFound ? "Leave empty to use the claude found in your login shell or the usual install paths. The test sends one tiny request at Medium."
-                                 : "Claude Code not found. Install it, or enter the full path to the claude executable.")
-                    .foregroundStyle(claudeFound ? .secondary : Color.orange)
+                Text(Self.about(provider)).foregroundStyle(.secondary)
+            }
+            switch provider {
+            case .claude: ClaudeSection(claudePath: $state.settings.claudePath)
+            case .chatgpt: ChatGPTSection(settings: $state.settings)
+            case .custom: CustomAPISection(custom: $state.settings.custom)
             }
             Section {
-                Picker("Default level", selection: $defaultLevel) {
+                Picker("Default level", selection: $state.settings.defaultLevel) {
                     ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
-                LabeledContent("Medium", value: "Haiku: fast, the standard prompts")
-                LabeledContent("High", value: "Sonnet: deeper native rewrite of word order, word choice, missing small words and calques")
-                LabeledContent("Max", value: "Opus: the most polished result, slowest")
+                ForEach(Level.allCases, id: \.self) { level in
+                    LabeledContent(level.title, value: describe(level))
+                }
             } header: {
                 Text("Quality")
             } footer: {
-                Text("⌥1…⌥9 and every bar start at the default level. In the bar, ↑ and ↓ change the level for that run. A run stops after \(Self.seconds(.medium)) seconds at Medium and High, \(Self.seconds(.max)) at Max. \(Self.billing)")
+                Text("⌥1…⌥9 and every bar start at the default level. In the bar, ↑ and ↓ change the level for that run. High and Max add extra instructions for a deeper native rewrite. A run stops after \(Self.seconds(.medium)) seconds at Medium and High, \(Self.seconds(.max)) at Max.")
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    private static func seconds(_ level: Level) -> Int64 { level.timeout.components.seconds }
+    static func about(_ provider: Provider) -> String {
+        switch provider {
+        case .claude: billing
+        case .chatgpt: "Uses your own ChatGPT login through the Codex CLI: usage counts against your plan's Codex limits. Retext never reads or stores your OpenAI credentials. Your text goes to OpenAI."
+        case .custom: "Sends the selected text to the API at the base URL you set, with your API key (kept in the macOS Keychain, never in settings.json). That API's pricing and privacy terms apply."
+        }
+    }
 
-    /// One tiny `claude -p` at Medium, then `claude --version`; counted in Usage like any other call.
-    private func test() {
-        let path = claudePath
-        testing = true
-        testResult = nil
-        Task {
-            defer { testing = false }
-            let job = Job(title: "Test", model: Level.medium.model, effort: Level.medium.effort, system: "Reply with OK.")
-            do {
-                let output = try await ClaudeRunner().run(job, text: "ok", claudePath: path, timeout: Level.medium.timeout)
-                AppState.shared.usage.recordCall(model: job.model, output: output)
-                AppState.shared.claudeFound = true
-                let version = await ClaudeRunner.version(claudePath: path)
-                testResult = (true, version.map { "Works (Claude Code \($0))" } ?? "Works")
-            } catch {
-                let failure = error as? ClaudeFailure ?? .other("")
-                if failure == .notFound { AppState.shared.claudeFound = false }
-                testResult = (false, failure.message)
+    private func describe(_ level: Level) -> String {
+        let role = switch level {
+        case .medium: "fast, the standard prompts"
+        case .high: "deeper native rewrite of word order, word choice, missing small words and calques"
+        case .max: "the most polished result, slowest"
+        }
+        let m = state.settings.model(for: level)
+        switch state.settings.provider {
+        case .claude: return "\(Model.shortName(m.model)): \(role)"
+        case .chatgpt, .custom:
+            guard !m.model.isEmpty else { return "No model set" }
+            return "\(m.model)\(m.effort.isEmpty ? "" : " (\(m.effort))"): \(role)"
+        }
+    }
+
+    static func seconds(_ level: Level) -> Int64 { level.timeout.components.seconds }
+}
+
+/// Runs one tiny request at Medium with the active provider; counted in Usage like any other call.
+private struct TestButton: View {
+    let title: String
+    /// Extra checks before the request (nil = go on) and a description of what was tested after it.
+    var precheck: () async -> ClaudeFailure? = { nil }
+    var success: () async -> String = { "Works" }
+    @ObservedObject private var state = AppState.shared
+    @State private var testing = false
+    @State private var result: (ok: Bool, text: String)?
+
+    var body: some View {
+        HStack {
+            Button(title, action: test).disabled(testing)
+            if testing { ProgressView().controlSize(.small) }
+            if let result {
+                Label(result.text, systemImage: result.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(result.ok ? Color.green : .orange)
+                    .textSelection(.enabled)
             }
         }
+    }
+
+    private func test() {
+        let settings = state.settings
+        testing = true
+        result = nil
+        Task {
+            defer { testing = false }
+            let m = settings.model(for: .medium)
+            let job = Job(title: "Test", provider: settings.provider, model: m.model, effort: m.effort, system: "Reply with OK.")
+            do {
+                if let failure = await precheck() { throw failure }
+                let output = try await ProviderRunner.run(job, text: "ok", settings: settings, timeout: Level.medium.timeout)
+                state.usage.recordCall(model: job.model, output: output)
+                result = (true, await success())
+            } catch {
+                let failure = error as? ClaudeFailure ?? .other("")
+                result = (false, failure.message(for: settings.provider))
+            }
+            state.checkProvider()
+        }
+    }
+}
+
+private struct ClaudeSection: View {
+    @Binding var claudePath: String
+    @ObservedObject private var state = AppState.shared
+
+    var body: some View {
+        let found = state.providerStatus?.ready != false
+        Section {
+            TextField("Claude Code path", text: $claudePath, prompt: Text("Found automatically"))
+            TestButton(title: "Test Claude Code", success: {
+                await ClaudeRunner.version(claudePath: claudePath).map { "Works (Claude Code \($0))" } ?? "Works"
+            })
+        } header: {
+            Text("Claude Code")
+        } footer: {
+            Text(found ? "Leave empty to use the claude found in your login shell or the usual install paths. The test sends one tiny request at Medium."
+                       : "Claude Code not found. Install it, or enter the full path to the claude executable.")
+                .foregroundStyle(found ? .secondary : Color.orange)
+        }
+    }
+}
+
+private struct ChatGPTSection: View {
+    static let efforts = ["low", "medium", "high", "xhigh", "max"]
+    @Binding var settings: RetextSettings
+    /// nil while checking; then the login state, or nil again when Codex can't be run.
+    @State private var loggedIn: Bool??
+    @State private var models: [String] = []
+
+    var body: some View {
+        Section {
+            TextField("Codex path", text: $settings.codexPath, prompt: Text("Found automatically"))
+            LabeledContent("Login") {
+                switch loggedIn {
+                case nil: ProgressView().controlSize(.small)
+                case .some(true): Label("Signed in with ChatGPT", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                case .some(false): Label("Not signed in with ChatGPT", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                case .some(nil): Label("Codex not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+            }
+            TestButton(title: "Test ChatGPT", precheck: {
+                switch await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath) {
+                case nil: .notFound
+                case false?: .notLoggedIn
+                case true?: nil
+                }
+            }, success: {
+                await CodexRunner.version(codexPath: settings.codexPath).map { "Works (Codex \($0))" } ?? "Works"
+            })
+        } header: {
+            Text("ChatGPT (Codex)")
+        } footer: {
+            Text("Needs the Codex CLI (npm install -g @openai/codex), signed in with codex login using your ChatGPT account. Leave the path empty to use the codex found in your login shell or the usual install paths. Retext runs Codex with its tools, web search, plugins and your Codex settings turned off.")
+                .foregroundStyle(.secondary)
+        }
+        .task(id: settings.codexPath) {
+            loggedIn = nil
+            loggedIn = .some(await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath))
+            models = await CodexRunner.models(codexPath: settings.codexPath)
+        }
+        Section {
+            ForEach(Level.allCases, id: \.self) { level in
+                let base = Provider.chatgpt.defaultModel(level)
+                LabeledContent(level.title) {
+                    HStack {
+                        Picker("Model", selection: field(level, \.model)) {
+                            Text("Default (\(base.model))").tag("")
+                            ForEach(options(level), id: \.self) { Text($0).tag($0) }
+                        }
+                        Picker("Effort", selection: field(level, \.effort)) {
+                            Text("Default (\(base.effort))").tag("")
+                            ForEach(Self.efforts, id: \.self) { Text($0).tag($0) }
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+        } header: {
+            Text("ChatGPT models")
+        } footer: {
+            Text("Which models a ChatGPT plan offers changes over time. Pick another model or effort for a level if a run says the model isn't available; the list comes from codex debug models.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Listed models plus the saved one, so a model that left the list still shows.
+    private func options(_ level: Level) -> [String] {
+        let saved = settings.chatGPTModels[level]?.model ?? ""
+        return models + (saved.isEmpty || models.contains(saved) ? [] : [saved])
+    }
+
+    private func field(_ level: Level, _ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
+        Binding(get: { settings.chatGPTModels[level]?[keyPath: path] ?? "" },
+                set: { settings.chatGPTModels[level, default: ProviderModel()][keyPath: path] = $0 })
+    }
+}
+
+private struct CustomAPISection: View {
+    @Binding var custom: CustomProviderSettings
+    @ObservedObject private var state = AppState.shared
+    @State private var key = ""
+    @State private var keySaved = Keychain.hasAPIKey
+    @State private var keyError = false
+
+    var body: some View {
+        Section {
+            LabeledContent("Base URL") {
+                HStack {
+                    TextField("Base URL", text: $custom.baseURL, prompt: Text("https://openrouter.ai/api/v1")).labelsHidden()
+                    Menu("Presets") {
+                        ForEach(CustomProviderSettings.presets, id: \.url) { preset in
+                            Button("\(preset.name): \(preset.url)") { custom.baseURL = preset.url }
+                        }
+                    }
+                    .fixedSize()
+                }
+            }
+            LabeledContent("API key") {
+                HStack {
+                    SecureField("API key", text: $key, prompt: Text(keySaved ? "Saved" : "Not needed for local servers")).labelsHidden()
+                        .onSubmit(saveKey)
+                    Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if keySaved {
+                        Button("Remove", role: .destructive) {
+                            Keychain.setAPIKey("")
+                            keySaved = Keychain.hasAPIKey
+                            state.checkProvider()
+                        }
+                    }
+                }
+            }
+            TestButton(title: "Test API", success: { "Works (\(custom.endpoint?.host ?? "API"))" })
+        } header: {
+            Text("Custom API")
+        } footer: {
+            Text(keyError ? "The Keychain didn't accept the key. Try again."
+                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain and never shown again; it is sent only to this URL.")
+                .foregroundStyle(keyError ? Color.orange : .secondary)
+        }
+        Section {
+            ForEach(Level.allCases, id: \.self) { level in
+                LabeledContent(level.title) {
+                    HStack {
+                        TextField("Model", text: field(level, \.model), prompt: Text("Model id"))
+                        TextField("Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
+                    }
+                    .labelsHidden()
+                }
+            }
+        } header: {
+            Text("Models")
+        } footer: {
+            Text("The model id the API expects for each level, such as anthropic/claude-sonnet-4.5 on OpenRouter or llama3.3 on Ollama. Effort is sent as reasoning_effort (low, medium or high) only when set, for models that support it.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func saveKey() {
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        keyError = !Keychain.setAPIKey(key)
+        key = ""
+        keySaved = Keychain.hasAPIKey
+        state.checkProvider()
+    }
+
+    private func field(_ level: Level, _ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
+        Binding(get: { custom.models[level]?[keyPath: path] ?? "" },
+                set: { custom.models[level, default: ProviderModel()][keyPath: path] = $0 })
     }
 }
 
@@ -497,7 +703,7 @@ private struct GeneralPane: View {
         Form {
             Section {
                 AccessibilityRow()
-                ClaudeCodeRow()
+                ProviderRow()
                 Button("Show Welcome Window…") { WelcomeWindow.shared.show() }
             } header: {
                 Text("Permissions")
@@ -537,7 +743,7 @@ private struct GeneralPane: View {
             } header: {
                 Text("Updates")
             } footer: {
-                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. This is the only network request Retext makes itself.")
+                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. Apart from the custom API, when you choose it, this is the only network request Retext makes itself.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -567,7 +773,7 @@ private struct GeneralPane: View {
             } header: {
                 Text("About")
             } footer: {
-                Text("Not affiliated with Anthropic. Claude and Claude Code are trademarks of Anthropic.").foregroundStyle(.secondary)
+                Text("Not affiliated with Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.").foregroundStyle(.secondary)
             }
         }
         .onAppear { loginStatus = SMAppService.mainApp.status }
@@ -584,9 +790,10 @@ private struct GeneralPane: View {
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {
             Button("Replace Settings", role: .destructive) {
-                // The Claude Code path belongs to this Mac, not to the exported file.
+                // The Claude Code and Codex paths belong to this Mac, not to the exported file.
                 if var pendingImport {
                     pendingImport.claudePath = state.settings.claudePath
+                    pendingImport.codexPath = state.settings.codexPath
                     replaceSettings(with: pendingImport)
                 }
                 pendingImport = nil
@@ -666,7 +873,7 @@ private struct UsagePane: View {
             } header: {
                 Text("Recent days")
             } footer: {
-                Text("The price is what the same tokens would cost at API list prices. \(EnginePane.billing) \(history.entries.count) results are cached.")
+                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only. \(EnginePane.billing) \(history.entries.count) results are cached.")
                     .foregroundStyle(.secondary)
             }
         }

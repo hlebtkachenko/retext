@@ -154,7 +154,6 @@ final class PopupController {
     private static let gap: CGFloat = 8      // space between the selection and the glass
 
     private let model = PopupModel()
-    private let runner = ClaudeRunner()
     private var panel: KeyPanel?
     private var selection: Selection?
     private var work: Task<Void, Never>?
@@ -194,7 +193,7 @@ final class PopupController {
         model.phase = switch state {
         case "working": .working("Translating to Czech…")
         case "done": .done
-        case "error": .message("Claude didn't answer. Your text is unchanged.", isError: true)
+        case "error": .message(ClaudeFailure.other("").message(for: AppState.shared.settings.provider), isError: true)
         case "empty": .message("Select text first", isError: false)
         case "nochange": .message("No changes needed", isError: false, symbol: "checkmark.circle")
         default: .menu
@@ -262,24 +261,24 @@ final class PopupController {
             } catch {
                 guard !Task.isCancelled, model.phase != .menu, panel?.isVisible == true else { return }
                 let failure = error as? ClaudeFailure ?? .other("")
-                if failure == .notFound { AppState.shared.claudeFound = false }
-                flash(.message(failure.message, isError: true), for: failure == .other("") ? 3 : 5)
+                if failure == .notFound || failure == .notLoggedIn { AppState.shared.checkProvider() }
+                flash(.message(failure.message(for: job.provider), isError: true), for: failure == .other("") ? 3 : 5)
             }
         }
     }
 
-    /// The cached result when model, effort, prompt and text match an entry in the history; otherwise Claude's answer after
+    /// The cached result when provider, model, effort, prompt and text match an entry in the history; otherwise the answer after
     /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
     /// With "Keep history" off, neither the cache nor the history is touched.
     private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
-        let key = Engine.cacheKey(model: job.model, effort: job.effort, system: job.system, text: selection.text)
+        let key = Engine.cacheKey(job, baseURL: state.settings.custom.baseURL, text: selection.text)
         let keep = state.settings.keepHistory
         if keep, let hit = state.history.lookup(key) {
             state.usage.recordHit()
             return hit.output
         }
-        let output = try await runner.run(job, text: selection.text, claudePath: state.settings.claudePath, timeout: timeout)
+        let output = try await ProviderRunner.run(job, text: selection.text, settings: state.settings, timeout: timeout)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
         guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
