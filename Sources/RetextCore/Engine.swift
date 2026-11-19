@@ -34,11 +34,11 @@ public enum Level: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// The `claude -p --effort` value. Provisional, to be tuned.
+    /// The `claude -p --effort` value. Medium effort scored best for High and Max in eval/ (2026-11-19).
     public var effort: String {
         switch self {
         case .medium: "low"
-        case .high: "low"
+        case .high: "medium"
         case .max: "medium"
         }
     }
@@ -91,10 +91,10 @@ public enum Engine {
     /// Bump when the prompt wrapping changes, so old cache entries stop matching.
     public static let promptVersion = "5"
 
-    /// Added after the task at High.
-    public static let highAddOn = "TODO-ADDON-HIGH"
+    /// Added after the task at High. Calibrated with eval/ (32 cases, blind Opus judge); re-run it after editing.
+    public static let highAddOn = "Go beyond grammar. Read the result sentence by sentence as a native editor and fix everything a native speaker would notice: unnatural word order, wrong word choice or collocations, missing or wrong small words (such as reflexive se and si in Czech, articles in English, prepositions, case endings, verb aspect and tense), and phrasing carried over from another language, including phrases that are grammatical but that a native wouldn't use. Rewrite those parts the way a native would, restructuring the sentence when needed. Every change must fix something a native would notice: don't swap correct words for synonyms, and leave correct punctuation, contractions, capitalization and natural wording as they are."
     /// Added after the task at Max.
-    public static let maxAddOn = "TODO-ADDON-MAX"
+    public static let maxAddOn = "Hold the result to the standard of a senior native editor finishing an important email. Read every sentence and every phrase for anything a native reader would notice: unnatural word order, wrong word choice or collocations, missing or wrong small words (such as reflexive se and si in Czech, articles in English, prepositions, case endings, verb aspect and tense), and constructions carried over from another language, including phrases that are grammatical but that a native wouldn't use. Rewrite such parts the way an educated native speaker would write them in this register, restructuring sentences when a native would, so the result reads polished and idiomatic; casual text stays casual. Keep every fact, name, number, commitment and nuance, the writer's voice and the forms of address. Every change must fix something a native would notice: don't swap correct words for synonyms or more formal ones, and leave correct punctuation, contractions, capitalization and natural wording as they are."
 
     public static func systemPrompt(_ task: String, addOn: String? = nil, style: String?, protectedWords: [String]) -> String {
         var parts = [task.trimmingCharacters(in: .whitespacesAndNewlines)]

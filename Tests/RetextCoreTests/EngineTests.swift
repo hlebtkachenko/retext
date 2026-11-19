@@ -7,7 +7,7 @@ import Testing
 
     @Test func levelsMapToModelEffortAndAddOn() {
         #expect(Level.allCases.map(\.model) == [Model.haiku, Model.sonnet, Model.opus])
-        #expect(Level.allCases.map(\.effort) == ["low", "low", "medium"])
+        #expect(Level.allCases.map(\.effort) == ["low", "medium", "medium"])
         #expect(Level.allCases.map(\.addOn) == [nil, Engine.highAddOn, Engine.maxAddOn])
         #expect(Level.allCases.map(\.title) == ["Medium", "High", "Max"])
     }
