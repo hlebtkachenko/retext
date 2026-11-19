@@ -1,6 +1,6 @@
 # Retext
 
-Native macOS menu-bar app: select text anywhere, press ⌥Space and type an instruction or pick an action (Fix grammar, English, a translation into the Mac's language, or your own), or press ⌥1…⌥9 directly; the selection is replaced in place via `claude -p` (the `haiku` alias for short grammar fixes, `sonnet` otherwise). Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account.
+Native macOS menu-bar app: select text anywhere, press ⌥Space and type an instruction or pick an action (Fix grammar, English, a translation into the Mac's language, or your own), or press ⌥1…⌥9 directly; the selection is replaced in place via `claude -p` (the `sonnet` alias; `haiku` when an action is set to Haiku). Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account.
 
 - Stack: Swift 6 package (language mode 5), SwiftUI + Liquid Glass (macOS 26+), AppKit NSPanel, CGEvent tap for shortcuts, Accessibility API. No dependencies.
 - Targets: `RetextCore` (pure logic: settings, routing, prompts, cache key, history, usage; tested), `Retext` (the app), `RetextCoreTests` (Swift Testing).
