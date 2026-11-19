@@ -56,6 +56,10 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var showMenuBarIcon = true
     /// The level every bar opens at and ⌥1…⌥9 run at.
     public var defaultLevel = Level.medium
+    /// The welcome window was shown. False only for a new install: a settings file without the key is an upgrade.
+    public var onboarded = false
+    /// Once a day at launch, ask GitHub for the latest release and offer it in the menu.
+    public var checkForUpdates = true
 
     public init(actions: [CustomAction] = RetextSettings.defaultActions,
                 appStyles: [AppStyle] = [],
@@ -77,6 +81,8 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         electronSupport = (try? c.decodeIfPresent(Bool.self, forKey: .electronSupport)) ?? d.electronSupport
         showMenuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon)) ?? d.showMenuBarIcon
         defaultLevel = (try? c.decodeIfPresent(Level.self, forKey: .defaultLevel)) ?? d.defaultLevel
+        onboarded = (try? c.decodeIfPresent(Bool.self, forKey: .onboarded)) ?? true
+        checkForUpdates = (try? c.decodeIfPresent(Bool.self, forKey: .checkForUpdates)) ?? d.checkForUpdates
     }
 
     public func style(for bundleID: String?) -> String? {
@@ -112,17 +118,58 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         "Translate the text into \(language) the way a native \(language) speaker would write it in the same situation. Convey the meaning and intent, not the words: restructure sentences, reorder words and use idiomatic \(language) phrasing. Never carry over constructions, word order or idioms from the source language. Keep the register (casual stays casual, neutral stays neutral, formal stays formal) and use correct forms of address. Keep all of the meaning, including emphasis and politeness, but render fillers and particles the way \(language) would, or leave them out where \(language) wouldn't use them. Make sure the result is flawless \(language): grammar, spelling, inflection and word order. If the text is already \(language), fix its grammar and rewrite any phrasing a native speaker wouldn't use; leave natural wording as it is."
     }
 
+    /// The built-in prompt for an action's kind and title (Reset Prompt); nil for Other, which has none.
+    public static func defaultPrompt(for action: CustomAction) -> String? {
+        switch action.kind {
+        case .grammar: grammarPrompt
+        case .translate: translatePrompt(action.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .other: nil
+        }
+    }
+
+    /// Terms from a pasted list, split at commas and line breaks, trimmed, without empties or repeats.
+    public static func terms(in list: String) -> [String] {
+        var seen = Set<String>()
+        return list.split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// Adds the terms in `list` that aren't protected yet, in order.
+    public mutating func addProtectedWords(_ list: String) {
+        for term in Self.terms(in: list) where !protectedWords.contains(term) { protectedWords.append(term) }
+    }
+
     // MARK: File
 
+    public enum ImportError: Error, Equatable {
+        /// Valid JSON, but not a Retext settings file (it has no actions).
+        case notSettings
+    }
+
     public static func load(from url: URL) -> RetextSettings {
-        guard let data = try? Data(contentsOf: url), var settings = try? JSONDecoder().decode(RetextSettings.self, from: data) else {
-            return RetextSettings()
-        }
+        guard let data = try? Data(contentsOf: url), let settings = try? decode(data) else { return RetextSettings() }
+        return settings
+    }
+
+    /// Settings from an exported file (the settings.json format). Throws on invalid JSON and on JSON without
+    /// `actions` (every other key has a default, so history.json or `{}` would otherwise import as the defaults).
+    public static func imported(from data: Data) throws -> RetextSettings {
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard object?["actions"] is [Any] else { throw ImportError.notSettings }
+        return try decode(data)
+    }
+
+    private static func decode(_ data: Data) throws -> RetextSettings {
+        var settings = try JSONDecoder().decode(RetextSettings.self, from: data)
         settings.migrate()
         // The Add button stops at nine, but a hand-edited file can hold more; only ⌥1…⌥9 exist.
         settings.actions = Array(settings.actions.prefix(maxActions))
         return settings
     }
+
+    /// The settings.json format, for export.
+    public func encoded() throws -> Data { try Store.encoder.encode(self) }
 
     /// 1.2.0 defaults the user never edited move to the current ones; edited prompts and styles stay as they are.
     mutating func migrate() {
