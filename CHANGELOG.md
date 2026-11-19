@@ -14,6 +14,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Usage statistics keep the last 90 days; older days are dropped.
 
 ### Fixed
+- Mail: results are pasted into the message again instead of only copied, also when the selection includes a signature, and ⌥1…⌥9 work in the message body.
+- ⌥1…⌥9 work on selected text in Safari pages too (the result is copied, since a page can't be edited).
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
 - Retext no longer crashes at launch when settings.json holds more than nine actions; only the first nine are kept.

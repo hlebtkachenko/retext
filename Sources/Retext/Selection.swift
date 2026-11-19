@@ -8,6 +8,8 @@ struct Selection {
     let attributes: [NSAttributedString.Key: Any]?
     /// False for read-only text (web pages, PDFs, received mail): the result is copied, not pasted.
     let editable: Bool
+    /// The selection as Accessibility reported it at read time; nil when the app doesn't report it.
+    let axText: String?
     /// Selection bounds in AX coordinates (origin at top-left of the primary screen), when the app reports them.
     let rect: CGRect?
 }
@@ -20,20 +22,22 @@ enum SelectionIO {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         enableElectronAccessibility(app)
         let element = focusedElement(of: app)
+        let axText = element.flatMap(selectedText)
         let copied = await copyViaClipboard()
         var text = copied?.text
-        if text?.isEmpty ?? true { text = element.flatMap(selectedText) }
+        if text?.isEmpty ?? true { text = axText }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return Selection(app: app, text: text, attributes: copied?.attributes, editable: element.map(isEditable) ?? true,
-                         rect: element.flatMap(bounds))
+                         axText: axText, rect: element.flatMap(bounds))
     }
 
     /// Whether the source app still has the same text selected. Unknown counts as unchanged.
-    /// Whitespace is ignored because AX and the clipboard can differ in line endings.
+    /// Compares Accessibility with Accessibility: ⌘C can render the same selection differently (Mail gives a signature
+    /// image's file name, AX an attachment character). Whitespace is ignored.
     /// Asks the source app, not the system-wide focus, which can be Retext's own instruction field.
     static func stillSelected(_ selection: Selection) -> Bool {
-        let text = selection.text
-        guard let now = focusedElement(of: selection.app).flatMap(selectedText), !now.isEmpty else { return true }
+        guard let text = selection.axText, !text.isEmpty,
+              let now = focusedElement(of: selection.app).flatMap(selectedText), !now.isEmpty else { return true }
         let squash = { (s: String) in s.filter { !$0.isWhitespace && !$0.isNewline } }
         return squash(now) == squash(text)
     }
@@ -91,12 +95,20 @@ enum SelectionIO {
         if let role = role as? String, [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role) { return true }
         var settable = DarwinBoolean(false)
         if AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success, settable.boolValue { return true }
+        // Mail's message body is an AXWebArea with a settable value; a read-only web page's value isn't settable.
+        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue { return true }
         return AXUIElementCopyAttributeValue(element, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
     }
 
+    /// AXSelectedText, else WebKit's text-marker selection (Mail's message body and Safari pages report only that).
     static func selectedText(_ element: AXUIElement) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success else { return nil }
+        var value: CFTypeRef?, range: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success, let text = value as? String {
+            return text
+        }
+        guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &range) == .success, let range,
+              AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, range, &value) == .success
+        else { return nil }
         return value as? String
     }
 

@@ -179,6 +179,6 @@ enum Hotkeys {
         guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getpid() else { return false }
         if !electronOnSwitch { SelectionIO.enableElectronAccessibility(app) }
         guard let element = SelectionIO.focusedElement(of: app, timeout: 0.1) else { return false }
-        return !(SelectionIO.selectedText(element) ?? "").isEmpty
+        return !(SelectionIO.selectedText(element) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
