@@ -52,8 +52,7 @@ import Testing
         let claude = Job(title: "t", model: "m", effort: "low", system: "s")
         let chatgpt = Job(title: "t", provider: .chatgpt, model: "m", effort: "low", system: "s")
         let custom = Job(title: "t", provider: .custom, model: "m", effort: "low", system: "s")
-        // Claude keeps its pre-provider keys.
-        #expect(Engine.cacheKey(claude, text: "x") == Engine.cacheKey(model: "m", effort: "low", system: "s", text: "x"))
+        #expect(Engine.cacheKey(claude, text: "x") == Engine.cacheKey(provider: "claude", model: "m", effort: "low", system: "s", text: "x"))
         let keys = [Engine.cacheKey(claude, text: "x"), Engine.cacheKey(chatgpt, text: "x"),
                     Engine.cacheKey(custom, baseURL: "http://a/v1", text: "x"), Engine.cacheKey(custom, baseURL: "http://b/v1", text: "x")]
         #expect(Set(keys).count == 4)

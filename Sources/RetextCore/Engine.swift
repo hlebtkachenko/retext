@@ -141,17 +141,15 @@ public enum Engine {
     }
 
     /// SHA-256 over provider (with the base URL for Custom), model, effort, prompt version, full system prompt and text.
-    /// Claude keeps its old keys (no provider part), so its cache survives the update.
-    public static func cacheKey(provider: String = "", model: String, effort: String, system: String, text: String) -> String {
-        let joined = (provider.isEmpty ? [] : [provider]) + [model, effort, promptVersion, system, text]
-        let joinedText = joined.joined(separator: "\u{1F}")
+    public static func cacheKey(provider: String, model: String, effort: String, system: String, text: String) -> String {
+        let joinedText = [provider, model, effort, promptVersion, system, text].joined(separator: "\u{1F}")
         return SHA256.hash(data: Data(joinedText.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The job's cache key; `baseURL` (Custom only) keeps two servers with the same model name apart.
     public static func cacheKey(_ job: Job, baseURL: String = "", text: String) -> String {
         let provider = switch job.provider {
-        case .claude: ""
+        case .claude: "claude"
         case .chatgpt: "chatgpt"
         case .custom: "custom \(baseURL.trimmingCharacters(in: .whitespacesAndNewlines))"
         }
