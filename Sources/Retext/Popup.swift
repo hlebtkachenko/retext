@@ -252,6 +252,7 @@ final class PopupController {
                 }
                 let final = keepOuterWhitespace(of: selection.text, around: result)
                 if !selection.editable { return copy(final, note: "Copied to clipboard") }
+                if selection.hasAttachment { return copy(final, note: "Selection has an image, copied instead") }
                 if !SelectionIO.stillSelected(selection) { return copy(final, note: "Selection changed. Copied.") }
                 panel?.orderOut(nil)
                 await SelectionIO.replace(in: selection.app, with: final, attributes: selection.attributes)

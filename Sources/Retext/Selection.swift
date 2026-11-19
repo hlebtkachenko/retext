@@ -10,6 +10,9 @@ struct Selection {
     let editable: Bool
     /// The selection as Accessibility reported it at read time; nil when the app doesn't report it.
     let axText: String?
+    /// The selection holds an image or other attachment (a Mail signature image): pasting plain text over it would
+    /// turn the image into its file name, so the result is copied instead.
+    let hasAttachment: Bool
     /// Selection bounds in AX coordinates (origin at top-left of the primary screen), when the app reports them.
     let rect: CGRect?
 }
@@ -27,8 +30,9 @@ enum SelectionIO {
         var text = copied?.text
         if text?.isEmpty ?? true { text = axText }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let attachment = copied?.hasAttachment == true || axText?.contains(attachmentCharacter) == true
         return Selection(app: app, text: text, attributes: copied?.attributes, editable: element.map(isEditable) ?? true,
-                         axText: axText, rect: element.flatMap(bounds))
+                         axText: axText, hasAttachment: attachment, rect: element.flatMap(bounds))
     }
 
     /// Whether the source app still has the same text selected. Unknown counts as unchanged.
@@ -73,6 +77,9 @@ enum SelectionIO {
         NSPasteboard.general.setString(text, forType: .string)
         return saved.allSatisfy(\.isEmpty) ? nil : { restore(saved) }
     }
+
+    /// U+FFFC OBJECT REPLACEMENT CHARACTER: how Accessibility and plain text mark an inline image or attachment.
+    private static let attachmentCharacter: Character = "\u{FFFC}"
 
     // MARK: Accessibility
 
@@ -182,7 +189,7 @@ enum SelectionIO {
     }
 
     @MainActor
-    private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?)? {
+    private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?, hasAttachment: Bool)? {
         let saved = snapshot()
         let before = NSPasteboard.general.changeCount
         press(kVK_ANSI_C)
@@ -191,15 +198,14 @@ enum SelectionIO {
         }
         guard NSPasteboard.general.changeCount != before else { return nil }
         let pb = NSPasteboard.general
-        var attributes: [NSAttributedString.Key: Any]?
-        if let data = pb.data(forType: .rtf), let rich = NSAttributedString(rtf: data, documentAttributes: nil), rich.length > 0 {
-            attributes = rich.attributes(at: 0, effectiveRange: nil)
-        } else if let data = pb.data(forType: .rtfd), let rich = NSAttributedString(rtfd: data, documentAttributes: nil), rich.length > 0 {
-            attributes = rich.attributes(at: 0, effectiveRange: nil)
-        }
+        let rtf = pb.data(forType: .rtf).flatMap { NSAttributedString(rtf: $0, documentAttributes: nil) }
+        let rtfd = pb.data(forType: .rtfd).flatMap { NSAttributedString(rtfd: $0, documentAttributes: nil) }
+        let attributes = [rtf, rtfd].compactMap { $0 }.first { $0.length > 0 }?.attributes(at: 0, effectiveRange: nil)
         let text = pb.string(forType: .string)
+        let hasAttachment = rtf?.containsAttachments == true || rtfd?.containsAttachments == true
+            || text?.contains(attachmentCharacter) == true
         restore(saved)
-        return (text, attributes)
+        return (text, attributes, hasAttachment)
     }
 
     private static func press(_ key: Int) {
