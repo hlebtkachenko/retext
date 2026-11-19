@@ -17,6 +17,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
 - Retext no longer crashes at launch when settings.json holds more than nine actions; only the first nine are kept.
+- Esc stops Claude Code even right after you start an action, and pressing a shortcut again straight after Esc no longer runs two jobs at once or leaves one that Esc can't stop.
 
 ## [1.3.0] - 2026-10-05
 

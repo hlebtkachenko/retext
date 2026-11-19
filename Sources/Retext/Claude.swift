@@ -1,12 +1,11 @@
 import Foundation
+import os
 import RetextCore
 
 /// Runs `claude -p` with the user's own Claude Code login. User settings, hooks, plugins and MCP are skipped for speed.
-/// Setup and cancel run on main; the process I/O runs in a detached task.
+/// Setup runs on main; the process I/O runs in a detached task.
 @MainActor
 final class ClaudeRunner {
-    private var process: Process?
-
     nonisolated private static let candidates = ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
         .map { NSString(string: $0).expandingTildeInPath }
 
@@ -37,7 +36,8 @@ final class ClaudeRunner {
         return loginShellPath ?? candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Throws `ClaudeFailure`.
+    /// Throws `ClaudeFailure`. Cancelling the calling task, or the 60 s timeout, stops this call's own process only;
+    /// a run cancelled before launch never launches.
     func run(_ job: Job, text: String, claudePath: String) async throws -> ClaudeOutput {
         let p = Process()
         p.arguments = ["-p", "--model", job.model, "--effort", "low", "--output-format", "json",
@@ -49,30 +49,42 @@ final class ClaudeRunner {
         p.standardInput = input
         p.standardOutput = output
         p.standardError = errors
-        process = p
-
-        return try await Task.detached {
-            guard let path = Self.executable(override: claudePath) else { throw ClaudeFailure.notFound }
-            p.executableURL = URL(fileURLWithPath: path)
-            do { try p.run() } catch { throw ClaudeFailure.notFound }
-            try? input.fileHandleForWriting.write(contentsOf: Data(Engine.wrap(text).utf8))
-            try? input.fileHandleForWriting.close()
-            // Read stderr alongside stdout so a full stderr pipe can't block the process.
-            let stderr = Task.detached { errors.fileHandleForReading.readDataToEndOfFile() }
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = await stderr.value
-            p.waitUntilExit()
-            let parsed = ClaudeOutput.parse(data)
-            if p.terminationReason == .exit, p.terminationStatus == 0, let parsed, parsed.is_error != true, !parsed.text.isEmpty {
-                return parsed
+        // Launch and stop share one lock, so a stop can't hit a process that isn't launched yet (terminate would raise).
+        let state = OSAllocatedUnfairLock(initialState: (launched: false, stopped: false))
+        let stop: @Sendable () -> Void = {
+            state.withLock { s in
+                s.stopped = true
+                if s.launched, p.isRunning { p.terminate() }
             }
-            guard p.terminationReason == .exit else { throw ClaudeFailure.other("") }  // cancelled or timed out
-            let message = [parsed?.is_error == true ? parsed?.result : nil, String(decoding: errorData, as: UTF8.self)]
-                .compactMap { $0 }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ClaudeFailure.classify(message)
-        }.value
-    }
+        }
+        let timeout = Task { try await Task.sleep(for: .seconds(60)); stop() }
+        defer { timeout.cancel() }
 
-    /// Only a running process can be terminated; before launch (the first lookup can take a moment) there is nothing to stop.
-    func cancel() { if process?.isRunning == true { process?.terminate() } }
+        return try await withTaskCancellationHandler {
+            try await Task.detached {
+                guard let path = Self.executable(override: claudePath) else { throw ClaudeFailure.notFound }
+                p.executableURL = URL(fileURLWithPath: path)
+                try state.withLock { s in
+                    if s.stopped { throw CancellationError() }
+                    do { try p.run() } catch { throw ClaudeFailure.notFound }
+                    s.launched = true
+                }
+                try? input.fileHandleForWriting.write(contentsOf: Data(Engine.wrap(text).utf8))
+                try? input.fileHandleForWriting.close()
+                // Read stderr alongside stdout so a full stderr pipe can't block the process.
+                let stderr = Task.detached { errors.fileHandleForReading.readDataToEndOfFile() }
+                let data = output.fileHandleForReading.readDataToEndOfFile()
+                let errorData = await stderr.value
+                p.waitUntilExit()
+                let parsed = ClaudeOutput.parse(data)
+                if p.terminationReason == .exit, p.terminationStatus == 0, let parsed, parsed.is_error != true, !parsed.text.isEmpty {
+                    return parsed
+                }
+                guard p.terminationReason == .exit else { throw ClaudeFailure.other("") }  // cancelled or timed out
+                let message = [parsed?.is_error == true ? parsed?.result : nil, String(decoding: errorData, as: UTF8.self)]
+                    .compactMap { $0 }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                throw ClaudeFailure.classify(message)
+            }.value
+        } onCancel: { stop() }
+    }
 }

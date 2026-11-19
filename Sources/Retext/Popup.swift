@@ -135,6 +135,8 @@ final class PopupController {
     private var panel: KeyPanel?
     private var selection: Selection?
     private var work: Task<Void, Never>?
+    /// Identifies the run that owns `work`.
+    private var runID = 0
     private var hideTask: Task<Void, Never>?
     private var monitors: [Any] = []
     private var anchor: CGRect?
@@ -212,10 +214,11 @@ final class PopupController {
         hideTask?.cancel()
         model.phase = .working(progress)
         fit()
+        runID &+= 1
+        let id = runID
         work = Task {
-            defer { work = nil }
-            let timeout = Task { try await Task.sleep(for: .seconds(60)); runner.cancel() }
-            defer { timeout.cancel() }
+            // After Esc and a fast re-trigger, `work` already belongs to the next run.
+            defer { if runID == id { work = nil } }
             do {
                 let result = try await result(of: job, for: selection)
                 if Engine.isUnchanged(input: selection.text, output: result) {
@@ -271,7 +274,6 @@ final class PopupController {
     }
 
     private func cancel() {
-        runner.cancel()
         work?.cancel()
         work = nil
         close()
