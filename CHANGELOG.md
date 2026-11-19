@@ -38,6 +38,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - ⌥1…⌥9 also work in web views that report an empty Accessibility selection, and a selection changed while Claude Code worked is detected there too, so the result is copied instead of pasted over the wrong text.
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
+- Keys typed in Settings or the welcome window while the bar is open no longer run or cancel the bar.
 - Retext no longer crashes at launch when settings.json holds more than nine actions; only the first nine are kept.
 - A settings.json that can't be read is copied to settings.json.invalid before Retext starts with the default settings, and the welcome window doesn't open for it or when only the history and usage files are left.
 - Esc stops Claude Code even right after you start an action, and pressing a shortcut again straight after Esc no longer runs two jobs at once or leaves one that Esc can't stop.

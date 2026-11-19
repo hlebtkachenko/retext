@@ -126,6 +126,7 @@ struct PopupView: View {
         .buttonStyle(.plain)
         .focusable(false)
         .help("Level: ↑/↓ to change")
+        .accessibilityLabel("Level \(model.level.title)")
     }
 
     private func status(_ text: String, hint: String? = nil, @ViewBuilder icon: () -> some View) -> some View {
@@ -418,7 +419,9 @@ final class PopupController {
     }
 
     /// The field keeps first responder throughout; a highlighted button is model state only, so typing always lands in the field.
+    /// Only the bar's own keys: a local monitor also sees keys meant for Settings or the welcome window.
     private func handle(_ event: NSEvent) -> Bool {
+        guard event.window === panel else { return false }
         let key = Int(event.keyCode)
         if key == kVK_Escape { cancel(); return true }
         guard model.phase == .menu, !event.modifierFlags.contains(.command) else { return false }
