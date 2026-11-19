@@ -36,9 +36,27 @@ final class ClaudeRunner {
         return loginShellPath ?? candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Throws `ClaudeFailure`. Cancelling the calling task, or the 60 s timeout, stops this call's own process only;
-    /// a run cancelled before launch never launches.
-    func run(_ job: Job, text: String, claudePath: String) async throws -> ClaudeOutput {
+    /// "2.1.284" from `claude --version`, or nil when it can't be run.
+    nonisolated static func version(claudePath: String) async -> String? {
+        await Task.detached {
+            guard let path = executable(override: claudePath) else { return nil }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: path)
+            p.arguments = ["--version"]
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            p.standardInput = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { return nil }
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return String(decoding: data, as: UTF8.self).split(whereSeparator: \.isWhitespace).first.map(String.init)
+        }.value
+    }
+
+    /// Throws `ClaudeFailure`. Cancelling the calling task, or the timeout (the level's, see `Level.timeout`), stops this
+    /// call's own process only; a run cancelled before launch never launches.
+    func run(_ job: Job, text: String, claudePath: String, timeout limit: Duration) async throws -> ClaudeOutput {
         let p = Process()
         p.arguments = ["-p", "--model", job.model, "--effort", job.effort, "--output-format", "json",
                        "--setting-sources", "", "--strict-mcp-config", "--tools", "",
@@ -57,7 +75,7 @@ final class ClaudeRunner {
                 if s.launched, p.isRunning { p.terminate() }
             }
         }
-        let timeout = Task { try await Task.sleep(for: .seconds(60)); stop() }
+        let timeout = Task { try await Task.sleep(for: limit); stop() }
         defer { timeout.cancel() }
 
         return try await withTaskCancellationHandler {

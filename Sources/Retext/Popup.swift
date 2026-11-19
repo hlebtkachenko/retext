@@ -242,11 +242,12 @@ final class PopupController {
         fit()
         runID &+= 1
         let id = runID
+        let timeout = model.level.timeout
         work = Task {
             // After Esc and a fast re-trigger, `work` already belongs to the next run.
             defer { if runID == id { work = nil } }
             do {
-                let result = try await result(of: job, for: selection)
+                let result = try await result(of: job, timeout: timeout, for: selection)
                 if Engine.isUnchanged(input: selection.text, output: result) {
                     return flash(.message("No changes needed", isError: false, symbol: "checkmark.circle"), for: 1.5)
                 }
@@ -269,7 +270,7 @@ final class PopupController {
     /// The cached result when model, prompt and text match an entry in the history; otherwise Claude's answer after
     /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
     /// With "Keep history" off, neither the cache nor the history is touched.
-    private func result(of job: Job, for selection: Selection) async throws -> String {
+    private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
         let key = Engine.cacheKey(model: job.model, system: job.system, text: selection.text)
         let keep = state.settings.keepHistory
@@ -277,7 +278,7 @@ final class PopupController {
             state.usage.recordHit()
             return hit.output
         }
-        let output = try await runner.run(job, text: selection.text, claudePath: state.settings.claudePath)
+        let output = try await runner.run(job, text: selection.text, claudePath: state.settings.claudePath, timeout: timeout)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
         guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
