@@ -12,6 +12,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Recent says that a click copies the result, and the usage line opens Settings → Usage.
 - A missing Accessibility permission or Claude Code shows up in the menu only when it happens, and clicking it opens the place that fixes it.
 
+### Fixed
+- Retext no longer quits when Claude Code stops before reading a very large selection.
+
 ## [1.3.0] - 2026-10-05
 
 ### Changed

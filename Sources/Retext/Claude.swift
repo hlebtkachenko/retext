@@ -53,7 +53,7 @@ final class ClaudeRunner {
             guard let path = Self.executable(override: claudePath) else { throw ClaudeFailure.notFound }
             p.executableURL = URL(fileURLWithPath: path)
             do { try p.run() } catch { throw ClaudeFailure.notFound }
-            input.fileHandleForWriting.write(Data(Engine.wrap(text).utf8))
+            try? input.fileHandleForWriting.write(contentsOf: Data(Engine.wrap(text).utf8))
             try? input.fileHandleForWriting.close()
             // Read stderr alongside stdout so a full stderr pipe can't block the process.
             let stderr = Task.detached { errors.fileHandleForReading.readDataToEndOfFile() }

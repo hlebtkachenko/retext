@@ -60,6 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var hotkeyOK = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A `claude` that exits before reading a large selection must not kill Retext.
+        signal(SIGPIPE, SIG_IGN)
         if let i = CommandLine.arguments.firstIndex(of: "--demo") {
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
