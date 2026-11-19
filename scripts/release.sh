@@ -34,7 +34,7 @@ notary=(--keychain-profile "${RETEXT_NOTARY_PROFILE:-}")
 # Submits $1 to Apple's notary service and waits; fails unless the status is Accepted.
 submit() {
     local out status
-    out=$(xcrun notarytool submit "$1" --wait --output-format json "${notary[@]}")
+    out=$(xcrun notarytool submit "$1" --wait --output-format json "${notary[@]}") || true
     echo "$out"
     status=$(plutil -extract status raw - <<<"$out" 2>/dev/null || echo unknown)
     if [[ "$status" != Accepted ]]; then

@@ -1,6 +1,7 @@
 name: Release
 
 # Builds, signs, notarizes and staples the DMG for a pushed tag vX.Y.Z and attaches it to the GitHub release.
+# Skips everything when the release already has the DMG, so a re-run never replaces a published asset.
 # Required secrets and the per-release steps: docs/RELEASING.md.
 on:
   push:
@@ -15,13 +16,31 @@ concurrency:
 jobs:
   release:
     runs-on: macos-26
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - name: Skip when the release already has the DMG
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "Retext-$version.dmg"; then
+            echo "Release $GITHUB_REF_NAME already has Retext-$version.dmg; delete that asset first to rebuild it."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.existing.outputs.skip != 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Swift version
+        if: steps.existing.outputs.skip != 'true'
         run: swift --version
 
       - name: Import the Developer ID certificate into a temporary keychain
+        if: steps.existing.outputs.skip != 'true'
         env:
           MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -41,6 +60,7 @@ jobs:
           echo "RETEXT_NOTARY_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
 
       - name: Store notarytool credentials
+        if: steps.existing.outputs.skip != 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -51,16 +71,19 @@ jobs:
           echo "RETEXT_NOTARY_PROFILE=retext-notary" >> "$GITHUB_ENV"
 
       - name: Build, sign, notarize and staple the DMG
+        if: steps.existing.outputs.skip != 'true'
         run: scripts/release.sh "${GITHUB_REF_NAME#v}"
 
       - name: Upload the DMG to the GitHub release
+        if: steps.existing.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           tag="$GITHUB_REF_NAME"
           version="${tag#v}"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --verify-tag --title "Retext $version" --generate-notes
-          gh release upload "$tag" "build/Retext-$version.dmg" "build/Retext-$version.dmg.sha256" --clobber
+          gh release upload "$tag" "build/Retext-$version.dmg" "build/Retext-$version.dmg.sha256"
 
       - name: Remove the temporary keychain
         if: always()

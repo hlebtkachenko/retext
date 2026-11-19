@@ -96,22 +96,13 @@ VERSION=1.4.0
    ```
    Expected: `Built build/Retext-VERSION.dmg`, a SHA-256 line, and `rejected` / `source=Unnotarized Developer ID` from `spctl`: that rejection is correct for an un-notarized build. Open the DMG and run the app once.
 
-3. Release. Pick one of the two paths.
-
-   With GitHub Actions (needs the secrets above):
+3. Release with GitHub Actions (needs the secrets above). `scripts/release.sh` without `--skip-notarize` also works locally to test notarization, but don't upload its DMG: the workflow publishes the assets.
    ```bash
    git tag "v$VERSION"
    git push origin "v$VERSION"
    gh run watch --repo hlebtkachenko/retext "$(gh run list --repo hlebtkachenko/retext --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"
    ```
-   Expected: the run ends green and the release `v$VERSION` has `Retext-$VERSION.dmg` and `Retext-$VERSION.dmg.sha256`. Edit the generated release notes on GitHub if needed.
-
-   Locally (uploads the app and the DMG to Apple's notary service, then publishes):
-   ```bash
-   scripts/release.sh "$VERSION"
-   gh release create "v$VERSION" "build/Retext-$VERSION.dmg" "build/Retext-$VERSION.dmg.sha256" --repo hlebtkachenko/retext --title "Retext $VERSION" --generate-notes
-   ```
-   Expected: `scripts/release.sh` prints `Accepted` twice, `The validate action worked!` twice and `accepted` / `source=Notarized Developer ID`. Creating the tag through `gh release create` also starts the workflow, which rebuilds and replaces the two assets; that is harmless once the secrets are set.
+   Expected: the run ends green and the release `v$VERSION` has `Retext-$VERSION.dmg` and `Retext-$VERSION.dmg.sha256`. Edit the generated release notes on GitHub if needed. A re-run skips the build when the release already has the DMG; to rebuild it, delete both assets from the release first.
 
 4. Check what users download.
    ```bash
