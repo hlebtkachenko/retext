@@ -77,10 +77,10 @@ The release workflow needs five repository secrets:
 
 ## Per release
 
-Set the version once per shell; every command below uses it.
+Use a new version: tags up to `v1.3.0` predate this script and their sources have no icon or release script, so the first DMG ships with the next version. Set it once per shell; every command below uses it.
 
 ```bash
-VERSION=1.3.0
+VERSION=1.4.0
 ```
 
 1. Set `CFBundleShortVersionString` to `$VERSION` and raise `CFBundleVersion` by one in `Info.plist`, add the `CHANGELOG.md` entry, and commit on `main`.
