@@ -2,8 +2,9 @@ import Foundation
 import RetextCore
 
 /// Runs `codex exec` with the user's own ChatGPT login (Codex CLI). Retext never reads or stores the credentials:
-/// a private CODEX_HOME holds only a symlink to Codex's auth.json, which keeps the user's AGENTS.md, config, MCP and
-/// skills out of the run, and lets Codex refresh its tokens in the real file.
+/// a private CODEX_HOME holds only a symlink to Codex's auth.json, which keeps the user's config, AGENTS.md, MCP and
+/// skills out of the run, and lets Codex refresh its tokens in the real file. With `Codex.arguments` the run has no
+/// shell, file-write or web tools and no skills.
 enum CodexRunner {
     nonisolated private static let candidates: [String] = {
         let nvm = NSString(string: "~/.nvm/versions/node").expandingTildeInPath
@@ -69,9 +70,12 @@ enum CodexRunner {
         guard let path = await locate(codexPath) else { throw ClaudeFailure.notFound }
         let home = try privateHome()
         try Task.checkCancellation()
+        // An empty working directory of its own: Codex reads AGENTS.md from the working directory.
+        let work = home.appendingPathComponent("work")
+        try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let result = try await Subprocess.run(path, Codex.arguments(model: job.model, effort: job.effort, system: job.system),
                                               input: Data(Engine.wrap(text).utf8), environment: environment(codex: path, home: home),
-                                              timeout: timeout)
+                                              directory: work, timeout: timeout)
         let parsed = Codex.parse(result.stdout)
         if result.exited, result.status == 0, parsed.error.isEmpty, !parsed.text.isEmpty { return parsed.claudeOutput }
         guard result.exited else { throw ClaudeFailure.other("") }  // cancelled or timed out

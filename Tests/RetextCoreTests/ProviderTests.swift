@@ -101,6 +101,7 @@ import Testing
             #expect(args.contains(feature) && args[args.firstIndex(of: feature)! - 1] == "--disable")
         }
         #expect(args.contains("model_reasoning_effort=\"low\""))
+        #expect(args.contains("skills.include_instructions=false") && args[args.firstIndex(of: "skills.include_instructions=false")! - 1] == "-c")
         #expect(args.contains(#"developer_instructions="Fix \"it\".\nNow.""#))
         #expect(args.suffix(2) == ["--json", "-"])
         #expect(!Codex.arguments(model: "m", effort: "", system: "s").contains { $0.hasPrefix("model_reasoning_effort") })

@@ -51,13 +51,14 @@ struct ProcessResult: Sendable {
 enum Subprocess {
     /// Runs `path` with `input` on stdin. Cancelling the calling task, or the timeout, stops this call's own process only;
     /// a run cancelled before launch never launches. Throws `ClaudeFailure.notFound` when it can't be launched.
+    /// `directory`: the working directory, default the temporary directory.
     static func run(_ path: String, _ arguments: [String], input: Data?, environment: [String: String]? = nil,
-                    timeout limit: Duration) async throws -> ProcessResult {
+                    directory: URL? = nil, timeout limit: Duration) async throws -> ProcessResult {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = arguments
         if let environment { p.environment = environment }
-        p.currentDirectoryURL = FileManager.default.temporaryDirectory
+        p.currentDirectoryURL = directory ?? FileManager.default.temporaryDirectory
         let stdin = Pipe(), output = Pipe(), errors = Pipe()
         p.standardInput = input == nil ? FileHandle.nullDevice : stdin
         p.standardOutput = output

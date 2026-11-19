@@ -139,7 +139,9 @@ public enum Codex {
         for feature in disabledFeatures { args += ["--disable", feature] }
         args += ["-m", model]
         if !effort.isEmpty { args += ["-c", "model_reasoning_effort=\(tomlString(effort))"] }
-        args += ["-c", "approval_policy=never", "-c", "web_search=disabled",
+        // skills.include_instructions=false: otherwise the list of the user's skills (~/.agents/skills, Codex's system
+        // skills) goes into every prompt.
+        args += ["-c", "approval_policy=never", "-c", "web_search=disabled", "-c", "skills.include_instructions=false",
                  "-c", "developer_instructions=\(tomlString(system))", "--json", "-"]
         return args
     }
