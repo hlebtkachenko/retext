@@ -803,7 +803,7 @@ private struct GeneralPane: View {
                 if var pendingImport {
                     pendingImport.claudePath = state.settings.claudePath
                     pendingImport.codexPath = state.settings.codexPath
-                    // The API key is saved for the current host: an imported file must not point it at another server.
+                    // The API key is saved for the current server: an imported file must not point it at another server.
                     pendingImport.custom.baseURL = state.settings.custom.baseURL
                     replaceSettings(with: pendingImport)
                 }

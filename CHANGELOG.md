@@ -13,7 +13,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
 - A welcome window on first launch checks the Accessibility permission and Claude Code and has a sample text to try Retext on. Open it again from the menu (Welcome…) or Settings → General.
 - Settings → General shows the Accessibility and Claude Code status live, with a button that opens the Accessibility settings.
-- Export and import settings as JSON, and reset all settings to their defaults (Settings → General → Backup). Importing keeps this Mac's Claude Code path.
+- Export and import settings as JSON, and reset all settings to their defaults (Settings → General → Backup). Importing keeps this Mac's Claude Code and Codex paths and the custom API base URL.
 - Reset Prompt puts back the built-in prompt of a Grammar or Translate action, and Restore Default Actions brings back the default actions.
 - Test Claude Code in Settings → Engine sends one tiny request and shows the Claude Code version, or what went wrong.
 - Paste a list of protected words, one per line or separated by commas; the add field also takes several terms separated by commas.
