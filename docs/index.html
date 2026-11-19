@@ -23,7 +23,8 @@
     --text: #1c1c1f;
     --muted: #5c5c66;
     --border: #e2e3e8;
-    --accent: #2563eb;
+    --brand: #0f2e66;
+    --accent: #1f5fd6;
     --accent-text: #ffffff;
     --radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
@@ -38,8 +39,9 @@
       --text: #f2f2f4;
       --muted: #a3a3ad;
       --border: #333339;
-      --accent: #5b8cff;
-      --accent-text: #0d0d10;
+      --brand: var(--text);
+      --accent: #7aa5ff;
+      --accent-text: #0f2e66;
     }
   }
   * { box-sizing: border-box; }
@@ -48,9 +50,9 @@
   a { color: var(--accent); }
   h1, h2, h3 { line-height: 1.2; margin: 0; }
 
-  .hero { text-align: center; padding: 72px 0 48px; }
+  .hero { text-align: center; padding: 64px 0 48px; }
   .hero img.icon { width: 112px; height: 112px; }
-  .hero h1 { font-size: 3rem; margin-top: 16px; letter-spacing: -0.02em; }
+  .hero h1 { font-size: 3rem; margin-top: 16px; letter-spacing: -0.02em; color: var(--brand); }
   .hero .tagline { font-size: 1.375rem; color: var(--muted); margin: 8px 0 32px; }
   .download {
     display: inline-block; padding: 12px 24px; border-radius: var(--radius);
@@ -75,10 +77,10 @@
   section { padding: 0 0 48px; }
   section > h2 { font-size: 1.5rem; margin-bottom: 20px; }
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-  .features h3 { font-size: 1.0625rem; margin-bottom: 6px; }
+  .features h3 { font-size: 1.0625rem; margin-bottom: 8px; }
   .features p, section li, section p { color: var(--muted); margin: 0; }
   section ul { margin: 0; padding-left: 20px; }
-  section li + li { margin-top: 6px; }
+  section li + li { margin-top: 8px; }
 
   footer {
     border-top: 1px solid var(--border); padding-top: 24px; padding-bottom: 48px;
@@ -121,7 +123,7 @@
       </div>
       <div>
         <h3>Your Claude Code, no API keys</h3>
-        <p>Retext runs your installed Claude Code CLI with your own login, so it never handles credentials. The source is open on GitHub.</p>
+        <p>Retext runs your installed Claude Code CLI with your own login, so it never handles credentials.</p>
       </div>
       <div>
         <h3>Three quality levels</h3>
@@ -141,7 +143,7 @@
 
   <section aria-labelledby="privacy">
     <h2 id="privacy">Privacy</h2>
-    <p>The text you run goes through Claude Code to Anthropic, the same as any Claude Code request. Retext has no telemetry, no analytics and no server of its own; settings and history stay on your Mac.</p>
+    <p>The text you run goes through Claude Code to Anthropic, the same as any Claude Code request. Retext has no telemetry, no analytics and no server of its own; settings and history stay on your Mac. Its only network request is a daily update check to GitHub, which you can turn off in Settings.</p>
   </section>
 </main>
 <footer>
