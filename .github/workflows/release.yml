@@ -1,0 +1,68 @@
+name: Release
+
+# Builds, signs, notarizes and staples the DMG for a pushed tag vX.Y.Z and attaches it to the GitHub release.
+# Required secrets and the per-release steps: docs/RELEASING.md.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Import the Developer ID certificate into a temporary keychain
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          keychain_password=$(openssl rand -base64 24)
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          base64 --decode <<<"$MACOS_CERT_P12_BASE64" > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/Developer ID Application/ {print $2; exit}')
+          [[ -n "$identity" ]] || { echo "No Developer ID Application identity in MACOS_CERT_P12_BASE64" >&2; exit 1; }
+          echo "RETEXT_RELEASE_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "RETEXT_NOTARY_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Store notarytool credentials
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials retext-notary --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --keychain "$RETEXT_NOTARY_KEYCHAIN"
+          echo "RETEXT_NOTARY_PROFILE=retext-notary" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize and staple the DMG
+        run: scripts/release.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Upload the DMG to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --verify-tag --title "Retext $version" --generate-notes
+          gh release upload "$tag" "build/Retext-$version.dmg" "build/Retext-$version.dmg.sha256" --clobber
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: |
+          if [[ -n "${RETEXT_NOTARY_KEYCHAIN:-}" ]]; then security delete-keychain "$RETEXT_NOTARY_KEYCHAIN" || true; fi
