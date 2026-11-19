@@ -260,8 +260,9 @@ final class PopupController {
     /// For text that can't be edited in place: copy the result; while the bubble shows, ⌘Z brings the old clipboard back.
     private func copy(_ text: String, note: String) {
         let restore = SelectionIO.copyRestorable(text)
-        Hotkeys.undo = restore.map { restore in
-            { [weak self] in
+        Hotkeys.undo = nil
+        if let restore {
+            Hotkeys.undo = { [weak self] in
                 restore()
                 self?.flash(.message("Previous clipboard restored", isError: false, symbol: "arrow.uturn.backward"), for: 1.2)
             }

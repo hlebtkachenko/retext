@@ -2,14 +2,16 @@ import Foundation
 import RetextCore
 
 /// Runs `claude -p` with the user's own Claude Code login. User settings, hooks, plugins and MCP are skipped for speed.
+/// Setup and cancel run on main; the process I/O runs in a detached task.
+@MainActor
 final class ClaudeRunner {
     private var process: Process?
 
-    private static let candidates = ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+    nonisolated private static let candidates = ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
         .map { NSString(string: $0).expandingTildeInPath }
 
     /// `command -v claude` in a login shell, looked up once on first use (apps don't inherit the shell's PATH).
-    private static let loginShellPath: String? = {
+    nonisolated private static let loginShellPath: String? = {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
         p.arguments = ["-lc", "command -v claude"]
@@ -29,7 +31,7 @@ final class ClaudeRunner {
     }()
 
     /// The override when set (nil if it isn't executable), else the login shell's `claude`, else the usual install paths.
-    static func executable(override: String) -> String? {
+    nonisolated static func executable(override: String) -> String? {
         let custom = NSString(string: override.trimmingCharacters(in: .whitespaces)).expandingTildeInPath
         if !custom.isEmpty { return FileManager.default.isExecutableFile(atPath: custom) ? custom : nil }
         return loginShellPath ?? candidates.first { FileManager.default.isExecutableFile(atPath: $0) }

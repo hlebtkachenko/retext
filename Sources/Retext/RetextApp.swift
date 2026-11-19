@@ -75,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             controller.demo(state)
             return
         }
-        let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        // The value of kAXTrustedCheckOptionPrompt, a C global var that Swift 6 treats as shared mutable state.
+        let prompt = "AXTrustedCheckOptionPrompt"
         _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
         Hotkeys.menu = { [weak self] in self?.controller.trigger() }
         Hotkeys.action = { [weak self] index in self?.controller.trigger(index) }
@@ -86,8 +87,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // support" on, set it on every app switch so the ⌥N selection check in the event tap works there before the
         // first ⌥Space; with it off, the tap and SelectionIO.read() set it only when they read.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
-            if Hotkeys.electronOnSwitch, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-                SelectionIO.enableElectronAccessibility(app)
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            // queue: .main delivers on the main thread.
+            MainActor.assumeIsolated {
+                if Hotkeys.electronOnSwitch, let app { SelectionIO.enableElectronAccessibility(app) }
             }
         }
         if Hotkeys.electronOnSwitch, let app = NSWorkspace.shared.frontmostApplication { SelectionIO.enableElectronAccessibility(app) }
@@ -109,16 +112,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 /// ⌥-key shortcuts via a session event tap. The tap sees keys before other apps' hotkeys
 /// (another app may also register ⌥Space). The bar shortcut (⌥Space or ⌃⌥Space) is always taken. ⌥1…⌥N are taken only when the frontmost app has
 /// selected text, so layouts where ⌥digit types a character (Czech ⌥2 = @) keep working everywhere else.
+@MainActor
 enum Hotkeys {
-    static var menu: (() -> Void)?
-    static var action: ((Int) -> Void)?
+    static var menu: (@MainActor () -> Void)?
+    static var action: (@MainActor (Int) -> Void)?
     static var actionCount = 0
     /// ⌥ or ⌃⌥, with Space, opens the bar.
     static var menuModifiers = CGEventFlags.maskAlternate
     /// Mirrors "Improve Electron app support".
     static var electronOnSwitch = true
     /// Set only while a "Copied" bubble is visible: ⌘Z then restores the previous clipboard instead of reaching the app.
-    static var undo: (() -> Void)?
+    static var undo: (@MainActor () -> Void)?
     private static var tap: CFMachPort?
     private static let digits = [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9]
 
@@ -133,32 +137,40 @@ enum Hotkeys {
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                           eventsOfInterest: mask, callback: { _, type, event, _ in
-            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                if let tap = Hotkeys.tap { CGEvent.tapEnable(tap: tap, enable: true) }
-                return Unmanaged.passUnretained(event)
-            }
             let modifiers = event.flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
             let key = Int(event.getIntegerValueField(.keyboardEventKeycode))
-            if let undo = Hotkeys.undo, modifiers == .maskCommand, key == kVK_ANSI_Z {
-                Hotkeys.undo = nil
-                DispatchQueue.main.async(execute: undo)
-                return nil
-            }
-            let fire: (() -> Void)?
-            if key == kVK_Space, modifiers == Hotkeys.menuModifiers {
-                fire = Hotkeys.menu
-            } else if modifiers == .maskAlternate, let index = Hotkeys.digits.firstIndex(of: key), index < Hotkeys.actionCount,
-                      Hotkeys.frontmostHasSelection() {
-                fire = Hotkeys.action.map { action in { action(index) } }
-            } else {
-                fire = nil
-            }
-            guard let fire else { return Unmanaged.passUnretained(event) }
-            if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 { DispatchQueue.main.async(execute: fire) }
-            return nil
+            let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            // The tap's run-loop source is on the main run loop (see below), so this callback runs on the main thread.
+            let swallow = MainActor.assumeIsolated { Hotkeys.handle(type: type, modifiers: modifiers, key: key, autorepeat: autorepeat) }
+            return swallow ? nil : Unmanaged.passUnretained(event)
         }, userInfo: nil) else { return false }
         self.tap = tap
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
+        return true
+    }
+
+    /// Whether the tap swallows the key; a matching shortcut is run on the next main-loop turn.
+    private static func handle(type: CGEventType, modifiers: CGEventFlags, key: Int, autorepeat: Bool) -> Bool {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return false
+        }
+        if let undo, modifiers == .maskCommand, key == kVK_ANSI_Z {
+            self.undo = nil
+            DispatchQueue.main.async(execute: undo)
+            return true
+        }
+        let fire: (@MainActor () -> Void)?
+        if key == kVK_Space, modifiers == menuModifiers {
+            fire = menu
+        } else if modifiers == .maskAlternate, let index = digits.firstIndex(of: key), index < actionCount,
+                  frontmostHasSelection(), let action {
+            fire = { action(index) }
+        } else {
+            fire = nil
+        }
+        guard let fire else { return false }
+        if !autorepeat { DispatchQueue.main.async(execute: fire) }
         return true
     }
 

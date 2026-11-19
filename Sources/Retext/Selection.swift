@@ -38,6 +38,8 @@ enum SelectionIO {
 
     /// Pastes `text` over the selection. With `attributes` it goes in as rich text in the original style,
     /// so apps like Mail keep the font instead of falling back to their default.
+    /// Main actor: `attributes` is not Sendable, and the caller is on main.
+    @MainActor
     static func replace(in app: NSRunningApplication, with text: String, attributes: [NSAttributedString.Key: Any]?) async {
         let saved = snapshot()
         let pb = NSPasteboard.general
