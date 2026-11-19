@@ -11,6 +11,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - The menu-bar menu lists your actions with their ⌥1…⌥9 shortcuts; clicking one runs it on the selected text. The help text is gone.
 - Recent says that a click copies the result, and the usage line opens Settings → Usage.
 - A missing Accessibility permission or Claude Code shows up in the menu only when it happens, and clicking it opens the place that fixes it.
+- Usage statistics keep the last 90 days; older days are dropped.
 
 ### Fixed
 - Retext no longer quits when Claude Code stops before reading a very large selection.

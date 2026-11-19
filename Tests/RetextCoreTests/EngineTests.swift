@@ -222,4 +222,15 @@ import Testing
         let decoded = try JSONDecoder().decode(Usage.self, from: JSONEncoder().encode(usage))
         #expect(decoded == usage)
     }
+
+    @Test func usageKeepsOnlyRecentDays() {
+        var usage = Usage()
+        let now = Date()
+        let old = Calendar.current.date(byAdding: .day, value: -Usage.keepDays, to: now)!
+        let edge = Calendar.current.date(byAdding: .day, value: 1 - Usage.keepDays, to: now)!
+        usage.recordHit(on: old)
+        usage.recordHit(on: edge)
+        usage.recordHit(on: now)
+        #expect(usage.days.keys.sorted() == [Usage.dayKey(edge), Usage.dayKey(now)])
+    }
 }

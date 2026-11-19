@@ -13,7 +13,7 @@
 ## Files
 - `Sources/RetextCore/Settings.swift`: `RetextSettings` (actions, app styles, protected words, bar shortcut, claude path, history and Electron switches), defaults (the third action follows the Mac's first language), JSON load and save (load moves untouched 1.2.0 default prompts and the old Mail style to the current defaults), `Store` paths.
 - `Sources/RetextCore/Engine.swift`: model routing, system prompt, boundary-tag wrapper, cache key, no-change normalization, `claude -p` JSON parsing, error classification.
-- `Sources/RetextCore/History.swift`: history/cache (20 entries) and per-day usage counters.
+- `Sources/RetextCore/History.swift`: history/cache (20 entries) and per-day usage counters (last 90 days).
 - `Sources/Retext/RetextApp.swift`: app entry, menu-bar menu (actions with ⌥N that run on the selection, Recent, usage line opening Settings → Usage, clickable Accessibility / Claude Code problems shown only when present, Settings…; `isInserted` binding writes only real changes, since SwiftUI writes it back on every scene update), shortcut event tap.
 - `Sources/Retext/AppState.swift`: shared settings, history and usage, saved on change.
 - `Sources/Retext/Popup.swift`: state model, SwiftUI view, instruction field, panel, placement, keyboard and click handling, run flow.
