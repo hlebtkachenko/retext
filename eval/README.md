@@ -14,7 +14,7 @@ python3 -I eval/run.py --configs medium,sonnet-base,high-low,high-medium,max-med
 python3 -I eval/run.py --cases cs-missing-se,en-give-me-know --no-judge
 ```
 
-Defaults to the chosen levels (`medium,high-medium,max-high`). Configs, add-ons and the judge model live at the top of `run.py`. The prompt strings there are copies of `Settings.swift` and `Engine.swift`; the script warns when they drift. Outputs and judge scores are cached by model, effort, system prompt and text, so a re-run only calls Claude for what changed (delete `results/draft/cache.json` for fresh samples).
+Defaults to the chosen levels (`medium,high,max`). Configs, add-ons and the judge model live at the top of `run.py`. The prompt strings there are copies of `Settings.swift` and `Engine.swift`; the script warns when they drift. Outputs and judge scores are cached by model, effort, system prompt and text, so a re-run only calls Claude for what changed (delete `results/draft/cache.json` for fresh samples).
 
 ## Levels
 
