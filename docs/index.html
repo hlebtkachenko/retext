@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retext: fix, translate and rewrite text in any Mac app</title>
+<meta name="description" content="Select text in any Mac app, press Option-Space, and Retext fixes, translates or rewrites it in place with your own Claude Code. Free and open source.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="images/icon-240.png">
+<link rel="apple-touch-icon" href="images/icon-240.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Retext">
+<meta property="og:description" content="Fix, translate and rewrite text in any Mac app">
+<meta property="og:url" content="https://hlebtkachenko.github.io/retext/">
+<meta property="og:image" content="https://hlebtkachenko.github.io/retext/images/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f4f5f7;
+    --text: #1c1c1f;
+    --muted: #5c5c66;
+    --border: #e2e3e8;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --radius: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618;
+      --surface: #212125;
+      --text: #f2f2f4;
+      --muted: #a3a3ad;
+      --border: #333339;
+      --accent: #5b8cff;
+      --accent-text: #0d0d10;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  main, footer { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); }
+  h1, h2, h3 { line-height: 1.2; margin: 0; }
+
+  .hero { text-align: center; padding: 72px 0 48px; }
+  .hero img.icon { width: 112px; height: 112px; }
+  .hero h1 { font-size: 3rem; margin-top: 16px; letter-spacing: -0.02em; }
+  .hero .tagline { font-size: 1.375rem; color: var(--muted); margin: 8px 0 32px; }
+  .download {
+    display: inline-block; padding: 12px 24px; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-text); font-weight: 600; font-size: 1.0625rem; text-decoration: none;
+  }
+  .download:hover { filter: brightness(1.08); }
+  .download:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .brew { margin: 20px auto 0; max-width: 100%; display: inline-block; text-align: left; }
+  .brew code {
+    display: block; overflow-x: auto; padding: 10px 14px; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--border); font-size: 0.9375rem;
+  }
+  .note { color: var(--muted); font-size: 0.9375rem; margin-top: 12px; }
+
+  .shot { margin: 0 0 64px; text-align: center; }
+  .shot img {
+    width: 420px; max-width: 100%; height: auto; border-radius: var(--radius);
+    border: 1px solid var(--border); background: #ffffff;
+  }
+  .shot figcaption { color: var(--muted); font-size: 0.9375rem; margin-top: 8px; }
+
+  section { padding: 0 0 48px; }
+  section > h2 { font-size: 1.5rem; margin-bottom: 20px; }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .features h3 { font-size: 1.0625rem; margin-bottom: 6px; }
+  .features p, section li, section p { color: var(--muted); margin: 0; }
+  section ul { margin: 0; padding-left: 20px; }
+  section li + li { margin-top: 6px; }
+
+  footer {
+    border-top: 1px solid var(--border); padding-top: 24px; padding-bottom: 48px;
+    color: var(--muted); font-size: 0.875rem;
+  }
+  footer p { margin: 4px 0; }
+
+  @media (max-width: 680px) {
+    .hero { padding-top: 48px; }
+    .hero h1 { font-size: 2.25rem; }
+    .hero .tagline { font-size: 1.125rem; }
+    .features { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <img class="icon" src="images/icon-240.png" alt="" width="112" height="112">
+    <h1>Retext</h1>
+    <p class="tagline">Fix, translate and rewrite text in any Mac app</p>
+    <a class="download" href="https://github.com/hlebtkachenko/retext/releases/latest">Download for Mac</a>
+    <div>
+      <div class="brew"><code>brew install --cask hlebtkachenko/tap/retext</code></div>
+    </div>
+    <p class="note">Free and open source. macOS 26 or later.</p>
+  </header>
+
+  <figure class="shot">
+    <img src="images/bar.png" width="840" height="195" alt="The Retext bar under a selected sentence, with an Edit as field and the Fix grammar, English and German actions">
+    <figcaption>Select text, press ⌥Space, pick an action or type an instruction.</figcaption>
+  </figure>
+
+  <section aria-labelledby="features">
+    <h2 id="features">What it does</h2>
+    <div class="features">
+      <div>
+        <h3>Any app, in place</h3>
+        <p>Mail, Notes, Pages, Safari, Slack, VS Code and more. The result replaces your selection and keeps its font, size and colour. ⌘Z undoes it.</p>
+      </div>
+      <div>
+        <h3>Your Claude Code, no API keys</h3>
+        <p>Retext runs your installed Claude Code CLI with your own login, so it never handles credentials. The source is open on GitHub.</p>
+      </div>
+      <div>
+        <h3>Three quality levels</h3>
+        <p>Medium (Haiku) for quick fixes, High (Sonnet) for a native rewrite, Max (Opus) for the most polished text. ↑ and ↓ switch the level in the bar.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="requirements">
+    <h2 id="requirements">Requirements</h2>
+    <ul>
+      <li>macOS 26 or later.</li>
+      <li><a href="https://code.claude.com/docs/en/overview">Claude Code</a> installed and logged in. Subscription usage counts against your plan's limits; API-key logins are billed to your account.</li>
+      <li>Accessibility permission, so Retext can read the selection and paste the result.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="privacy">
+    <h2 id="privacy">Privacy</h2>
+    <p>The text you run goes through Claude Code to Anthropic, the same as any Claude Code request. Retext has no telemetry, no analytics and no server of its own; settings and history stay on your Mac.</p>
+  </section>
+</main>
+<footer>
+  <p><a href="https://github.com/hlebtkachenko/retext">Source on GitHub</a> · Apache 2.0 license</p>
+  <p>Retext is an independent project and is not affiliated with Anthropic.</p>
+</footer>
+</body>
+</html>
