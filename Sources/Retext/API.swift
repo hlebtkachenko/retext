@@ -12,8 +12,12 @@ enum APIRunner {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let key, !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         request.httpBody = OpenAICompatible.body(model: job.model, effort: job.effort, system: job.system, user: Engine.wrap(text))
+        // A non-streaming answer sends nothing until it is done, so the idle timeout must be as long as the whole call.
+        let seconds = Double(timeout.components.seconds)
+        request.timeoutInterval = seconds
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForResource = Double(timeout.components.seconds)
+        config.timeoutIntervalForRequest = seconds
+        config.timeoutIntervalForResource = seconds
         let session = URLSession(configuration: config)
         defer { session.finishTasksAndInvalidate() }
         let data: Data, response: URLResponse

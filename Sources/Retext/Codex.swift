@@ -17,10 +17,12 @@ enum CodexRunner {
 
     /// Codex's own home: $CODEX_HOME (the app's or the login shell's), else ~/.codex.
     nonisolated private static let userHome: URL = {
-        let env = ProcessInfo.processInfo.environment["CODEX_HOME"]
-            ?? CommandLocator.loginShell(#"printf '%s\n' "$CODEX_HOME""#).last
-        guard let env, !env.isEmpty else { return URL(fileURLWithPath: NSString(string: "~/.codex").expandingTildeInPath) }
-        return URL(fileURLWithPath: NSString(string: env).expandingTildeInPath)
+        // Profiles can print noise: only the line with the marker counts.
+        let marker = "RETEXT_CODEX_HOME="
+        let raw = ProcessInfo.processInfo.environment["CODEX_HOME"]
+            ?? CommandLocator.loginShell(#"printf 'RETEXT_CODEX_HOME=%s\n' "$CODEX_HOME""#).last { $0.hasPrefix(marker) }.map { String($0.dropFirst(marker.count)) }
+        let path = NSString(string: raw ?? "").expandingTildeInPath
+        return URL(fileURLWithPath: path.hasPrefix("/") ? path : NSString(string: "~/.codex").expandingTildeInPath)
     }()
 
     /// Whether Codex has a login to use (auth.json exists; its contents are never read).
