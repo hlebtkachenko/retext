@@ -68,7 +68,7 @@ struct WelcomeView: View {
             } header: {
                 Text("Try it")
             } footer: {
-                Text("Select the sample text above and press \(state.settings.menuShortcut.label), then pick Fix grammar. ⌥1 runs the first action directly.")
+                Text("Select the sample text above and press \(state.settings.menuShortcut.label), then pick Fix grammar.")
                     .foregroundStyle(.secondary)
             }
         }
