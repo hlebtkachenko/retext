@@ -5,9 +5,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- Quality levels Medium (Claude Haiku), High (Claude Sonnet) and Max (Claude Opus). High and Max also add extra instructions. Pick the default level in Settings → Engine; ↑ and ↓ in the bar change it for that run, shown in a chip at the end of the bar.
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
 
 ### Changed
+- The per-action model picker is replaced by the quality levels. ⌥1…⌥9 and typed instructions use the default level, so with Medium they now run on Haiku (actions on Auto and typed instructions used Sonnet before). Model choices in existing settings are ignored.
 - The menu-bar menu lists your actions with their ⌥1…⌥9 shortcuts; clicking one runs it on the selected text. The help text is gone.
 - Recent says that a click copies the result, and the usage line opens Settings → Usage.
 - A missing Accessibility permission or Claude Code shows up in the menu only when it happens, and clicking it opens the place that fixes it.

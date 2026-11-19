@@ -18,7 +18,7 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 - **Free instructions:** type "shorter", "more formal" or "as a bullet list" into the bar and press Return.
 - **App styles:** optional extra guidance for a given app, for example "formal" for Mail. None by default.
 - **Protected words:** names and terms that are never changed or translated.
-- **Model:** Claude Sonnet through the Claude Code `sonnet` alias. You can switch an action to Haiku (`haiku` alias).
+- **Quality levels:** Medium (Claude Haiku, fast), High (Claude Sonnet, a deeper native rewrite) and Max (Claude Opus, the most polished, slowest), through the Claude Code `haiku`, `sonnet` and `opus` aliases. Every bar starts at the default level from Settings → Engine (Medium unless you change it); ↑ and ↓ in the bar change it for that run. ⌥1…⌥9 run at the default level.
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
@@ -32,7 +32,7 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 | **What** | AI writing assistant for selected text: grammar and spelling fixes, translation, free-form rewrites ("shorter", "more formal") |
 | **Where** | Any macOS app with selectable text: Mail, Notes, Pages, Safari, Slack, VS Code, Telegram and more; read-only text is copied instead |
 | **How** | Select text, press ⌥Space (bar) or ⌥1…⌥9 (direct action); the result replaces the selection with its original formatting |
-| **Engine** | Your installed Claude Code CLI (`claude -p`), Claude Sonnet (Haiku per action if you choose); no API key handling in the app |
+| **Engine** | Your installed Claude Code CLI (`claude -p`), three quality levels: Haiku, Sonnet or Opus; no API key handling in the app |
 | **Stack** | Swift 6, SwiftUI, Liquid Glass, AppKit, Accessibility API, CGEvent tap; no third-party dependencies |
 | **Requires** | macOS 26+, Xcode 26+ to build, Claude Code logged in, Accessibility permission |
 | **License** | Apache 2.0 |
@@ -82,6 +82,7 @@ On first launch, allow Retext in System Settings → Privacy & Security → Acce
 | ⌥1…⌥9 | Runs action 1…9 on the selected text, with or without the bar. They are taken only while text is selected, so layouts that type characters with ⌥digit keep working. |
 | Return | Runs the typed instruction, or the highlighted action. |
 | ← / → / Tab | Move between the field and the action buttons (← and → only while the field is empty). |
+| ↑ / ↓ | Raise or lower the quality level (Medium, High, Max) for this run. |
 | Esc | Cancels a running request or closes the bar. |
 | ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back. |
 
@@ -125,7 +126,7 @@ On first launch, allow Retext in System Settings → Privacy & Security → Acce
 
 **Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
 
-**Can I use another model or provider?** Retext calls `claude -p` with the `haiku` and `sonnet` aliases, so whatever your Claude Code is configured for applies. You can pick the model per action.
+**Can I use another model or provider?** Retext calls `claude -p` with the `haiku`, `sonnet` and `opus` aliases (Medium, High and Max), so whatever your Claude Code is configured for applies. Pick the default level in Settings → Engine, or change it for one run with ↑ and ↓ in the bar.
 
 ## Contributing
 

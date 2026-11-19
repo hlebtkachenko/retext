@@ -4,10 +4,6 @@ public enum ActionKind: String, Codable, CaseIterable, Sendable {
     case grammar, translate, other
 }
 
-public enum ModelChoice: String, Codable, CaseIterable, Sendable {
-    case auto, haiku, sonnet
-}
-
 /// The shortcut that opens the bar. ⌃⌥Space avoids apps that also use ⌥Space.
 public enum MenuShortcut: String, Codable, CaseIterable, Sendable {
     case optionSpace, controlOptionSpace
@@ -21,14 +17,12 @@ public struct CustomAction: Codable, Hashable, Identifiable, Sendable {
     public var symbol: String
     public var prompt: String
     public var kind: ActionKind
-    public var model: ModelChoice
 
-    public init(title: String, symbol: String, prompt: String, kind: ActionKind, model: ModelChoice = .auto) {
+    public init(title: String, symbol: String, prompt: String, kind: ActionKind) {
         self.title = title
         self.symbol = symbol
         self.prompt = prompt
         self.kind = kind
-        self.model = model
     }
 }
 
@@ -60,6 +54,8 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var electronSupport = true
     /// Off: no menu-bar icon; opening Retext again (Finder, Spotlight) shows Settings.
     public var showMenuBarIcon = true
+    /// The level every bar opens at and ⌥1…⌥9 run at.
+    public var defaultLevel = Level.medium
 
     public init(actions: [CustomAction] = RetextSettings.defaultActions,
                 appStyles: [AppStyle] = [],
@@ -80,6 +76,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         keepHistory = (try? c.decodeIfPresent(Bool.self, forKey: .keepHistory)) ?? d.keepHistory
         electronSupport = (try? c.decodeIfPresent(Bool.self, forKey: .electronSupport)) ?? d.electronSupport
         showMenuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon)) ?? d.showMenuBarIcon
+        defaultLevel = (try? c.decodeIfPresent(Level.self, forKey: .defaultLevel)) ?? d.defaultLevel
     }
 
     public func style(for bundleID: String?) -> String? {

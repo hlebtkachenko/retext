@@ -17,6 +17,8 @@ final class PopupModel: ObservableObject {
     /// nil = the instruction field; otherwise the highlighted action button.
     @Published var selected: Int?
     @Published var instruction = ""
+    /// This run's level: the default level each time the bar opens; Up/Down change it.
+    @Published var level = Level.medium
     @Published var above = false
     weak var field: NSTextField?
 }
@@ -102,8 +104,28 @@ struct PopupView: View {
                 .buttonStyle(.plain)
                 .onHover { if $0, model.instruction.isEmpty { model.selected = index } }
             }
+            levelChip
         }
         .padding(4)
+    }
+
+    /// The run's level; Up/Down step it, a click cycles it. Sized for the widest title so the capsule never clips.
+    private var levelChip: some View {
+        Button { model.level = model.level.next } label: {
+            HStack(spacing: 2) {
+                ZStack(alignment: .trailing) {
+                    ForEach(Level.allCases, id: \.self) { Text($0.title).opacity($0 == model.level ? 1 : 0) }
+                }
+                Image(systemName: "chevron.up.chevron.down").imageScale(.small)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .help("Level: ↑/↓ to change")
     }
 
     private func status(_ text: String, hint: String? = nil, @ViewBuilder icon: () -> some View) -> some View {
@@ -158,6 +180,7 @@ final class PopupController {
             if let action, action >= model.actions.count { return }
             model.selected = nil
             model.instruction = ""
+            model.level = AppState.shared.settings.defaultLevel
             model.phase = action.map { _ in .working("Working…") } ?? .menu
             show(near: selection.rect)
             if let action { run(action) }
@@ -166,6 +189,7 @@ final class PopupController {
 
     func demo(_ state: String) {
         model.actions = AppState.shared.settings.actions
+        model.level = CommandLine.arguments.last.flatMap(Level.init(rawValue:)) ?? AppState.shared.settings.defaultLevel
         model.phase = switch state {
         case "working": .working("Translating to Czech…")
         case "done": .done
@@ -190,14 +214,16 @@ final class PopupController {
         let action = model.actions[index]
         let settings = AppState.shared.settings
         model.selected = index
-        execute(Engine.job(for: action, text: selection.text, settings: settings, bundleID: selection.app.bundleIdentifier),
+        execute(Engine.job(for: action, level: model.level, text: selection.text, settings: settings,
+                           bundleID: selection.app.bundleIdentifier),
                 progress: progress(for: action))
     }
 
     private func runInstruction() {
         let instruction = model.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let selection, !instruction.isEmpty else { return }
-        execute(Engine.job(instruction: instruction, settings: AppState.shared.settings, bundleID: selection.app.bundleIdentifier),
+        execute(Engine.job(instruction: instruction, level: model.level, settings: AppState.shared.settings,
+                           bundleID: selection.app.bundleIdentifier),
                 progress: "Working…")
     }
 
@@ -212,7 +238,7 @@ final class PopupController {
     private func execute(_ job: Job, progress: String) {
         guard let selection, work == nil else { return }
         hideTask?.cancel()
-        model.phase = .working(progress)
+        model.phase = .working(model.level == .medium ? progress : "\(progress) · \(model.level.title)")
         fit()
         runID &+= 1
         let id = runID
@@ -396,6 +422,11 @@ final class PopupController {
         guard model.phase == .menu, !event.modifierFlags.contains(.command) else { return false }
         let count = model.actions.count
         let isReturn = key == kVK_Return || key == kVK_ANSI_KeypadEnter
+        // Up/Down step the level wherever the highlight is; swallowing them keeps the field's cursor still.
+        if key == kVK_UpArrow || key == kVK_DownArrow {
+            model.level = model.level.stepped(by: key == kVK_UpArrow ? 1 : -1)
+            return true
+        }
         guard let selected = model.selected else {
             let empty = model.instruction.isEmpty
             switch key {

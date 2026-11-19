@@ -71,7 +71,7 @@ struct SettingsView: View {
                 case .actions: ActionsPane(actions: $state.settings.actions)
                 case .styles: StylesPane(styles: $state.settings.appStyles)
                 case .words: WordsPane(words: $state.settings.protectedWords)
-                case .engine: EnginePane(claudePath: $state.settings.claudePath,
+                case .engine: EnginePane(defaultLevel: $state.settings.defaultLevel, claudePath: $state.settings.claudePath,
                                          claudeFound: state.claudeFound)
                 case .general: GeneralPane()
                 case .usage: UsagePane(usage: state.usage, history: state.history)
@@ -158,11 +158,6 @@ private struct ActionEditor: View {
                 Text("Grammar").tag(ActionKind.grammar)
                 Text("Translate").tag(ActionKind.translate)
                 Text("Other").tag(ActionKind.other)
-            }
-            Picker("Model", selection: $action.model) {
-                Text("Auto").tag(ModelChoice.auto)
-                Text("Haiku").tag(ModelChoice.haiku)
-                Text("Sonnet").tag(ModelChoice.sonnet)
             }
             TextField("Prompt", text: $action.prompt, prompt: Text("What Claude should do with the selected text"), axis: .vertical)
                 .lineLimit(3...8)
@@ -268,6 +263,7 @@ private struct WordsPane: View {
 
 private struct EnginePane: View {
     static let billing = "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
+    @Binding var defaultLevel: Level
     @Binding var claudePath: String
     let claudeFound: Bool
 
@@ -283,13 +279,17 @@ private struct EnginePane: View {
                     .foregroundStyle(claudeFound ? .secondary : Color.orange)
             }
             Section {
-                LabeledContent("Haiku", value: "--model \(Model.haiku) (latest Haiku)")
-                LabeledContent("Sonnet", value: "--model \(Model.sonnet) (latest Sonnet)")
-                LabeledContent("Runs through", value: "claude -p")
+                Picker("Default level", selection: $defaultLevel) {
+                    ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                LabeledContent("Medium", value: "Haiku: fast, the standard prompts")
+                LabeledContent("High", value: "Sonnet: deeper native rewrite of word order, word choice, missing small words and calques")
+                LabeledContent("Max", value: "Opus: the most polished result, slowest")
             } header: {
-                Text("Models")
+                Text("Quality")
             } footer: {
-                Text("Actions on Auto and typed instructions use Sonnet; pick Haiku per action in Actions. \(Self.billing)").foregroundStyle(.secondary)
+                Text("⌥1…⌥9 and every bar start at the default level. In the bar, ↑ and ↓ change the level for that run. \(Self.billing)")
+                    .foregroundStyle(.secondary)
             }
         }
     }

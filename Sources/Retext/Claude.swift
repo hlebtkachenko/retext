@@ -40,7 +40,7 @@ final class ClaudeRunner {
     /// a run cancelled before launch never launches.
     func run(_ job: Job, text: String, claudePath: String) async throws -> ClaudeOutput {
         let p = Process()
-        p.arguments = ["-p", "--model", job.model, "--effort", "low", "--output-format", "json",
+        p.arguments = ["-p", "--model", job.model, "--effort", job.effort, "--output-format", "json",
                        "--setting-sources", "", "--strict-mcp-config", "--tools", "",
                        "--disable-slash-commands", "--no-session-persistence",
                        "--system-prompt", job.system]
