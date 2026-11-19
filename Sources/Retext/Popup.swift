@@ -153,7 +153,7 @@ final class PopupController {
             }
             self.selection = selection
             model.actions = AppState.shared.settings.actions
-            guard action ?? 0 < model.actions.count else { return }
+            if let action, action >= model.actions.count { return }
             model.selected = nil
             model.instruction = ""
             model.phase = action.map { _ in .working("Working…") } ?? .menu

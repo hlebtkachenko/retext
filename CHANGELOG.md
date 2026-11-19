@@ -14,6 +14,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Fixed
 - Retext no longer quits when Claude Code stops before reading a very large selection.
+- ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
 
 ## [1.3.0] - 2026-10-05
 
