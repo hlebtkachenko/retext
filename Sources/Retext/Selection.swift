@@ -14,6 +14,8 @@ struct Selection {
 
 /// Reads and replaces the selected text in the frontmost app through Accessibility, with a clipboard fallback.
 enum SelectionIO {
+    /// Main actor, like `replace`: AppKit, the pasteboard and the ⌘C event stay on main; the waits are async sleeps.
+    @MainActor
     static func read() async -> Selection? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         enableElectronAccessibility(app)
@@ -167,6 +169,7 @@ enum SelectionIO {
         })
     }
 
+    @MainActor
     private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?)? {
         let saved = snapshot()
         let before = NSPasteboard.general.changeCount
