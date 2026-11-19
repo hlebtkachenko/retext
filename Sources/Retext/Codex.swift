@@ -2,9 +2,9 @@ import Foundation
 import RetextCore
 
 /// Runs `codex exec` with the user's own ChatGPT login (Codex CLI). Retext never reads or stores the credentials:
-/// a private CODEX_HOME holds only a symlink to Codex's auth.json, which keeps the user's config, AGENTS.md, MCP and
-/// skills out of the run, and lets Codex refresh its tokens in the real file. With `Codex.arguments` the run has no
-/// shell, file-write or web tools and no skills.
+/// a private CODEX_HOME holds only a symlink to Codex's auth.json, which keeps the user's config, AGENTS.md and MCP out
+/// of the run, and lets Codex refresh its tokens in the real file. With `Codex.arguments` the run can't run commands,
+/// write files (read-only sandbox) or search the web, and gets no skills list.
 enum CodexRunner {
     nonisolated private static let candidates: [String] = {
         let nvm = NSString(string: "~/.nvm/versions/node").expandingTildeInPath
