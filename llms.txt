@@ -8,6 +8,8 @@ Key facts:
 - Engine: `claude -p` with tools, MCP and user settings disabled; three quality levels: Medium (alias `haiku`, default), High (alias `sonnet`, extra instructions) and Max (alias `opus`, extra instructions); Up/Down in the bar change the level for one run.
 - Works in any app with selectable text via the macOS Accessibility API and a CGEvent tap; read-only text (web pages, PDFs) is copied to the clipboard instead of pasted.
 - Local data: ~/Library/Application Support/Retext/{settings,history,usage}.json. No telemetry; nothing is sent anywhere except through Claude Code.
+- Install: download the signed, notarized DMG from the latest GitHub release, or `brew install --cask hlebtkachenko/tap/retext` (from 1.4.0).
+- Update check: once a day at launch Retext asks the GitHub releases API for the latest version and shows "Update available" in the menu; it can be turned off in Settings → General.
 - Build from source: `./build.sh` (Xcode 26+). No third-party dependencies.
 - Not affiliated with Anthropic.
 

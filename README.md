@@ -7,12 +7,30 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
-[![SwiftUI + Liquid Glass](https://img.shields.io/badge/UI-SwiftUI%20%2B%20Liquid%20Glass-purple.svg)](#)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to your installed [Claude Code](https://code.claude.com/docs/en/overview) CLI (`claude -p`) and pastes the result over the selection. The original font, size and colour are kept.
 
 ![The Retext bar under a selected sentence in a text document](docs/images/bar.png)
+
+## Install
+
+Requires macOS 26+, Claude Code installed and logged in (your Claude plan's limits apply), and the Accessibility permission.
+
+1. Download `Retext-VERSION.dmg` from the [latest release](https://github.com/hlebtkachenko/retext/releases/latest). It is signed with a Developer ID and notarized by Apple.
+2. Open the DMG and drag Retext to Applications.
+3. Open Retext and grant the Accessibility permission when asked.
+
+Or with Homebrew:
+
+```sh
+brew install --cask hlebtkachenko/tap/retext
+```
+
+On first launch, a welcome window shows whether Retext has the Accessibility permission and has found Claude Code, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
+
+More: the [landing page](https://hlebtkachenko.github.io/retext/). Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes how a release is built, signed and published. To build it yourself, see [Build from source](#build-from-source).
+
+## Features
 
 - **Actions:** Fix grammar and English, plus a translation into your Mac's language when that isn't English. You can edit them or add your own, up to 9. ⌥1…⌥9 run them directly while text is selected.
 - **Free instructions:** type "shorter", "more formal" or "as a bullet list" into the bar and press Return.
@@ -47,33 +65,6 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 - The Accessibility permission (System Settings → Privacy & Security → Accessibility). Retext needs it to read the selection and to see its shortcuts.
 
 Retext uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account. The Usage pane shows the list-price equivalent of each call, as reported by `claude -p`.
-
-## Build and install
-
-```sh
-git clone https://github.com/hlebtkachenko/retext.git
-cd retext
-./build.sh
-```
-
-`./build.sh` builds a release binary, signs `build/Retext.app`, copies it to `~/Applications/Retext.app` and starts it. `./build.sh --no-install` only builds.
-
-Signing uses the first of these that is set:
-
-1. the `RETEXT_SIGN_IDENTITY` environment variable;
-2. a `.sign-identity` file in the repo root, holding one line with the name of a code-signing identity (the file is git-ignored);
-3. ad-hoc signing (`-`).
-
-To list your identities:
-
-```sh
-security find-identity -v -p codesigning
-```
-
-> [!WARNING]
-> macOS ties the Accessibility grant to the app's signature. An ad-hoc build gets a new signature on every rebuild, so after each `./build.sh` you have to remove Retext from the Accessibility list and allow it again. Sign with a stable identity (a free Apple Development certificate from Xcode is enough) to keep the grant.
-
-On first launch, a welcome window shows whether Retext has the Accessibility permission and has found Claude Code, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
 
 ## Settings
 
@@ -138,6 +129,31 @@ On first launch, a welcome window shows whether Retext has the Accessibility per
 **Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
 
 **Can I use another model or provider?** Retext calls `claude -p` with the `haiku`, `sonnet` and `opus` aliases (Medium, High and Max), so whatever your Claude Code is configured for applies. Pick the default level in Settings → Engine, or change it for one run with ↑ and ↓ in the bar.
+
+## Build from source
+
+```sh
+git clone https://github.com/hlebtkachenko/retext.git
+cd retext
+./build.sh
+```
+
+`./build.sh` builds a release binary, signs `build/Retext.app`, copies it to `~/Applications/Retext.app` and starts it. `./build.sh --no-install` only builds.
+
+Signing uses the first of these that is set:
+
+1. the `RETEXT_SIGN_IDENTITY` environment variable;
+2. a `.sign-identity` file in the repo root, holding one line with the name of a code-signing identity (the file is git-ignored);
+3. ad-hoc signing (`-`).
+
+To list your identities:
+
+```sh
+security find-identity -v -p codesigning
+```
+
+> [!WARNING]
+> macOS ties the Accessibility grant to the app's signature. An ad-hoc build gets a new signature on every rebuild, so after each `./build.sh` you have to remove Retext from the Accessibility list and allow it again. Sign with a stable identity (a free Apple Development certificate from Xcode is enough) to keep the grant.
 
 ## Contributing
 

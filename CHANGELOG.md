@@ -5,6 +5,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- An app icon.
+- A signed and notarized DMG download and a Homebrew cask (`brew install --cask hlebtkachenko/tap/retext`), from 1.4.0.
+- A landing page.
 - Quality levels Medium (Claude Haiku), High (Claude Sonnet) and Max (Claude Opus). High and Max also add extra instructions. Pick the default level in Settings → Engine; ↑ and ↓ in the bar change it for that run, shown in a chip at the end of the bar.
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
 - A welcome window on first launch checks the Accessibility permission and Claude Code and has a sample text to try Retext on. Open it again from the menu (Welcome…) or Settings → General.

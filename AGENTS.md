@@ -9,4 +9,6 @@ Native macOS menu-bar app: select text anywhere, press ⌥Space and type an inst
 - UI preview without a selection: `build/Retext.app/Contents/MacOS/Retext --demo menu|working|done|error|empty|nochange|welcome` (`--demo menu max` shows another level), or `--demo settings [actions|styles|words|engine|general|usage]` (the start of the pane title works too: `app`, `protected`). Demo prints the `screencapture` rectangle or window number. The welcome demo never marks Retext as onboarded.
 - Gate: `swift build` and `swift test` must pass; check UI changes with `--demo` screenshots.
 - E2E with synthetic keys: confirm the frontmost app and document are your own scratch TextEdit or Preview file before every keystroke.
+- Release: `scripts/release.sh VERSION`, see docs/RELEASING.md. Never notarize or tag without the owner's go.
+- Eval: `python3 -I eval/run.py`. Re-run it after editing prompts or add-ons. It uses the owner's Claude subscription.
 - See ARCHITECTURE.md for the flow.
