@@ -147,9 +147,27 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         case notSettings
     }
 
+    /// The settings at `url`, else the defaults. A settings file that can't be decoded is first copied to
+    /// `settings.json.invalid` next to it (an earlier copy is kept, never overwritten).
     public static func load(from url: URL) -> RetextSettings {
-        guard let data = try? Data(contentsOf: url), let settings = try? decode(data) else { return RetextSettings() }
+        let fm = FileManager.default
+        let exists = fm.fileExists(atPath: url.path)
+        if exists, let data = try? Data(contentsOf: url), let settings = try? decode(data) { return settings }
+        if exists {
+            let invalid = url.appendingPathExtension("invalid")
+            if !fm.fileExists(atPath: invalid.path) { try? fm.copyItem(at: url, to: invalid) }
+        }
+        let directory = url.deletingLastPathComponent()
+        let otherData = ["history.json", "usage.json"].contains { fm.fileExists(atPath: directory.appendingPathComponent($0).path) }
+        var settings = RetextSettings()
+        settings.onboarded = onboardedWithoutSettings(settingsFileExists: exists, otherDataExists: otherData)
         return settings
+    }
+
+    /// Whether to skip the welcome window when settings.json is missing or can't be decoded: only a new install
+    /// (no settings file and no history or usage) sees it; an unreadable file or leftover data means an earlier run.
+    public static func onboardedWithoutSettings(settingsFileExists: Bool, otherDataExists: Bool) -> Bool {
+        settingsFileExists || otherDataExists
     }
 
     /// Settings from an exported file (the settings.json format). Throws on invalid JSON and on JSON without

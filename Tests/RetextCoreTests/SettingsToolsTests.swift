@@ -57,6 +57,34 @@ import Testing
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"onboarded":false}"#.utf8)).onboarded == false)
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data("{}".utf8)).checkForUpdates == true)
     }
+
+    @Test func upgradersSkipTheWelcomeWindow() {
+        #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: false, otherDataExists: false) == false)
+        #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: false, otherDataExists: true) == true)
+        #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: true, otherDataExists: false) == true)
+        #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: true, otherDataExists: true) == true)
+    }
+
+    @Test func invalidSettingsAreCopiedAside() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("retext-invalid-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("settings.json")
+        try Data("not json".utf8).write(to: url)
+        let loaded = RetextSettings.load(from: url)
+        #expect(loaded.onboarded == true)
+        #expect(loaded.actions.map(\.prompt) == RetextSettings.defaultActions.map(\.prompt))
+        #expect(try Data(contentsOf: url) == Data("not json".utf8))
+        #expect(try Data(contentsOf: directory.appendingPathComponent("settings.json.invalid")) == Data("not json".utf8))
+    }
+
+    @Test func missingSettingsWithHistoryCountAsOnboarded() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("retext-upgrade-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("settings.json")
+        #expect(RetextSettings.load(from: url).onboarded == false)
+        try Data("{}".utf8).write(to: directory.appendingPathComponent("usage.json"))
+        #expect(RetextSettings.load(from: url).onboarded == true)
+    }
 }
 
 @Suite struct UpdateCheckTests {
