@@ -35,6 +35,9 @@ struct RetextApp: App {
             if !state.claudeFound {
                 Button("Claude Code not found…", systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
             }
+            if state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) {
+                Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
+            }
             Button("Welcome…") { WelcomeWindow.shared.show() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
@@ -104,6 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         if Hotkeys.electronOnSwitch, let app = NSWorkspace.shared.frontmostApplication { SelectionIO.enableElectronAccessibility(app) }
         if !AppState.shared.settings.onboarded { WelcomeWindow.shared.show() }
+        AppState.shared.update = UpdateChecker.available
+        UpdateChecker.checkIfDue()
     }
 
     /// Opening Retext while it runs (Finder, Spotlight) shows Settings, the way back when the menu-bar icon is hidden.

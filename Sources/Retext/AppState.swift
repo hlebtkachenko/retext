@@ -15,6 +15,8 @@ final class AppState: ObservableObject {
     }
     /// False when no `claude` executable was found; the menu then says so.
     @Published var claudeFound = true
+    /// A newer release found by `UpdateChecker`; the menu offers it.
+    @Published var update: Release?
     @Published var history: History { didSet { history.save(to: Store.url("history.json")) } }
     @Published var usage: Usage { didSet { usage.save(to: Store.url("usage.json")) } }
 

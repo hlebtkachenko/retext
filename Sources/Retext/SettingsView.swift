@@ -533,6 +533,14 @@ private struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Check for updates", isOn: $state.settings.checkForUpdates)
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Once a day at launch, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. This is the only network request Retext makes itself.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 HStack {
                     Button("Export Settings…", action: export)
                     Button("Import Settings…", action: chooseImport)
