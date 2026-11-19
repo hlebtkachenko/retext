@@ -7,6 +7,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Added
 - Quality levels Medium (Claude Haiku), High (Claude Sonnet) and Max (Claude Opus). High and Max also add extra instructions. Pick the default level in Settings → Engine; ↑ and ↓ in the bar change it for that run, shown in a chip at the end of the bar.
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
+- A welcome window on first launch checks the Accessibility permission and Claude Code and has a sample text to try Retext on. Open it again from the menu (Welcome…) or Settings → General.
+- Settings → General shows the Accessibility and Claude Code status live, with a button that opens the Accessibility settings.
+- Export and import settings as JSON, and reset all settings to their defaults (Settings → General → Backup).
+- Reset Prompt puts back the built-in prompt of a Grammar or Translate action, and Restore Default Actions brings back the default actions.
+- Test Claude Code in Settings → Engine sends one tiny request and shows the Claude Code version, or what went wrong.
+- Paste a list of protected words, one per line or separated by commas; the add field also takes several terms separated by commas.
+- Update check: once a day at launch Retext asks GitHub for the latest release and shows "Update available" in the menu when there is a newer one. Turn it off with "Check for updates" in Settings → General.
+- Settings → General has an About section with the version and a link to GitHub.
 
 ### Changed
 - The per-action model picker is replaced by the quality levels. ⌥1…⌥9 and typed instructions use the default level, so with Medium they now run on Haiku (actions on Auto and typed instructions used Sonnet before). Model choices in existing settings are ignored.
@@ -14,9 +22,15 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Recent says that a click copies the result, and the usage line opens Settings → Usage.
 - A missing Accessibility permission or Claude Code shows up in the menu only when it happens, and clicking it opens the place that fixes it.
 - Usage statistics keep the last 90 days; older days are dropped.
+- App styles: pick the app from a list of running and installed apps, with icons, instead of typing its bundle id.
+- Runs at Max may take up to 2 minutes before they time out; Medium and High keep 1 minute.
+- Deleting an action, clearing the history, importing and resetting settings ask for confirmation first.
+- Action rows and Remove buttons in Settings can be reached with the keyboard and VoiceOver. An SF Symbol name that doesn't exist shows a warning.
+- "Improve Electron app support" moved to a new Advanced section in Settings → General. Settings → Actions explains that ⌥N follows the list order and what each kind does.
 
 ### Fixed
-- Mail: results are pasted into the message again instead of only copied, also when the selection includes a signature, and ⌥1…⌥9 work in the message body.
+- Mail: results are pasted into the message again instead of only copied, and ⌥1…⌥9 work in the message body.
+- A selection that contains an image or other attachment (such as a Mail signature image) is no longer pasted over, which turned the image into its file name: the result is copied instead, and ⌘Z puts the previous clipboard back.
 - ⌥1…⌥9 work on selected text in Safari pages too (the result is copied, since a page can't be edited).
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.

@@ -21,6 +21,7 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 - **Quality levels:** Medium (Claude Haiku, fast), High (Claude Sonnet, a deeper native rewrite) and Max (Claude Opus, the most polished, slowest), through the Claude Code `haiku`, `sonnet` and `opus` aliases. Every bar starts at the default level from Settings → Engine (Medium unless you change it); ↑ and ↓ in the bar change it for that run. ⌥1…⌥9 run at the default level.
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
+- **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
 - **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
 
 ![Retext settings: the Actions pane](docs/images/settings.png)
@@ -72,7 +73,16 @@ security find-identity -v -p codesigning
 > [!WARNING]
 > macOS ties the Accessibility grant to the app's signature. An ad-hoc build gets a new signature on every rebuild, so after each `./build.sh` you have to remove Retext from the Accessibility list and allow it again. Sign with a stable identity (a free Apple Development certificate from Xcode is enough) to keep the grant.
 
-On first launch, allow Retext in System Settings → Privacy & Security → Accessibility. The shortcuts start working without a relaunch.
+On first launch, a welcome window shows whether Retext has the Accessibility permission and has found Claude Code, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
+
+## Settings
+
+- **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions brings back the defaults.
+- **App styles:** pick an app from the running and installed apps and describe the style for it.
+- **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
+- **Engine:** the default quality level, the Claude Code path, and Test Claude Code, which sends one tiny request and shows the version. A run stops after 1 minute at Medium and High, 2 minutes at Max.
+- **General:** Accessibility and Claude Code status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
+- **Usage:** calls, tokens and the API list-price equivalent per day.
 
 ## Shortcuts
 
@@ -88,7 +98,8 @@ On first launch, allow Retext in System Settings → Privacy & Security → Acce
 
 ## Privacy
 
-- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. They go to Claude Code, which sends them to Anthropic under your account. Retext calls nothing else.
+- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. They go to Claude Code, which sends them to Anthropic under your account.
+- **Update check:** the only network request Retext makes itself. Once a day at launch, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`co.hleb.retext`).
 - **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings.
 - **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard about 0.7 seconds later. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
 
@@ -103,7 +114,7 @@ On first launch, allow Retext in System Settings → Privacy & Security → Acce
 
 1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
 2. Delete `~/Applications/Retext.app`.
-3. Delete `~/Library/Application Support/Retext` to remove settings, history and usage.
+3. Delete `~/Library/Application Support/Retext` to remove settings, history and usage, and run `defaults delete co.hleb.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
 
    ```sh
