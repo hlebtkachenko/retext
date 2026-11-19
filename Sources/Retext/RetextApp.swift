@@ -35,6 +35,7 @@ struct RetextApp: App {
             if !state.claudeFound {
                 Button("Claude Code not found…", systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
             }
+            Button("Welcome…") { WelcomeWindow.shared.show() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         }
@@ -66,9 +67,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
-                SettingsView.initialPane = SettingsView.Pane.allCases.first { $0.rawValue.lowercased().hasPrefix(pane) } ?? .actions
+                // The case name (styles, words) or the start of the title (app, protected).
+                SettingsView.initialPane = SettingsView.Pane.allCases.first { "\($0)" == pane || $0.rawValue.lowercased().hasPrefix(pane) } ?? .actions
                 SettingsWindow.shared.show()
                 print("window \(SettingsWindow.shared.window?.windowNumber ?? 0)")  // for screencapture -l
+                fflush(stdout)
+                return
+            }
+            if state == "welcome" {
+                WelcomeWindow.shared.isDemo = true
+                WelcomeWindow.shared.show()
+                print("window \(WelcomeWindow.shared.window?.windowNumber ?? 0)")
                 fflush(stdout)
                 return
             }
@@ -94,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         }
         if Hotkeys.electronOnSwitch, let app = NSWorkspace.shared.frontmostApplication { SelectionIO.enableElectronAccessibility(app) }
+        if !AppState.shared.settings.onboarded { WelcomeWindow.shared.show() }
     }
 
     /// Opening Retext while it runs (Finder, Spotlight) shows Settings, the way back when the menu-bar icon is hidden.
