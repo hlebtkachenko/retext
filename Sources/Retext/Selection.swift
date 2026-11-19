@@ -36,12 +36,12 @@ enum SelectionIO {
     }
 
     /// Whether the source app still has the same text selected. Unknown counts as unchanged.
-    /// Compares Accessibility with Accessibility: ⌘C can render the same selection differently (Mail gives a signature
-    /// image's file name, AX an attachment character). Whitespace is ignored.
-    /// Asks the source app, not the system-wide focus, which can be Retext's own instruction field.
+    /// Compares Accessibility with Accessibility when the read had it: ⌘C can render the same selection differently
+    /// (Mail gives a signature image's file name, AX an attachment character); else with the copied text.
+    /// Whitespace is ignored. Asks the source app, not the system-wide focus, which can be Retext's own instruction field.
     static func stillSelected(_ selection: Selection) -> Bool {
-        guard let text = selection.axText, !text.isEmpty,
-              let now = focusedElement(of: selection.app).flatMap(selectedText), !now.isEmpty else { return true }
+        let text = selection.axText.flatMap { $0.isEmpty ? nil : $0 } ?? selection.text
+        guard let now = focusedElement(of: selection.app).flatMap(selectedText), !now.isEmpty else { return true }
         let squash = { (s: String) in s.filter { !$0.isWhitespace && !$0.isNewline } }
         return squash(now) == squash(text)
     }
@@ -107,10 +107,12 @@ enum SelectionIO {
         return AXUIElementCopyAttributeValue(element, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
     }
 
-    /// AXSelectedText, else WebKit's text-marker selection (Mail's message body and Safari pages report only that).
+    /// AXSelectedText, else WebKit's text-marker selection (Mail's message body and Safari pages report only that, or an
+    /// empty AXSelectedText).
     static func selectedText(_ element: AXUIElement) -> String? {
         var value: CFTypeRef?, range: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success, let text = value as? String {
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success, let text = value as? String,
+           !text.isEmpty {
             return text
         }
         guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &range) == .success, let range,

@@ -35,6 +35,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Mail: results are pasted into the message again instead of only copied, and ⌥1…⌥9 work in the message body.
 - A selection that contains an image or other attachment (such as a Mail signature image) is no longer pasted over, which turned the image into its file name: the result is copied instead, and ⌘Z puts the previous clipboard back.
 - ⌥1…⌥9 work on selected text in Safari pages too (the result is copied, since a page can't be edited).
+- ⌥1…⌥9 also work in web views that report an empty Accessibility selection, and a selection changed while Claude Code worked is detected there too, so the result is copied instead of pasted over the wrong text.
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
 - Retext no longer crashes at launch when settings.json holds more than nine actions; only the first nine are kept.
