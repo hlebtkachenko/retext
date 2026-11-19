@@ -146,7 +146,7 @@ VERSION=1.4.0
 
 ## App icon
 
-`Resources/AppIcon.icns`, `docs/images/icon-240.png` (Product Hunt thumbnail) and `docs/images/social-preview.png` (1280x640, GitHub and Open Graph) are a programmatic draft: a blue to violet rounded square with the SF Symbol `character.cursor.ibeam`, rendered by `scripts/make-icon.swift`. Replace them with a designed icon when one exists; keep the file names, and `build.sh` and `scripts/release.sh` pick it up. To re-render the draft:
+`Resources/AppIcon.icns`, `docs/images/icon-240.png` (Product Hunt thumbnail) and `docs/images/social-preview.png` (1280x640, GitHub and Open Graph) are rendered by `scripts/make-icon.swift`: a flat brand-blue (#0F2E66) rounded square with a white R and text cursor. The brand colours are constants at the top of that script. To replace the icon, keep the file names; `build.sh` and `scripts/release.sh` pick it up. To re-render it:
 
 ```bash
 swift scripts/make-icon.swift
