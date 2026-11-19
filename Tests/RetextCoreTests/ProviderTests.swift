@@ -76,6 +76,17 @@ import Testing
         #expect(CustomProviderSettings(baseURL: "not a url").keyAccount == nil)
     }
 
+    @Test func redirectsStayOnTheSameServer() {
+        func allows(_ a: String, _ b: String) -> Bool { OpenAICompatible.allowsRedirect(from: URL(string: a)!, to: URL(string: b)!) }
+        #expect(allows("https://api.example/v1/chat/completions", "https://API.example:443/v2/chat/completions"))
+        #expect(allows("http://localhost:11434/v1", "http://localhost:11434/v1/"))
+        #expect(!allows("https://api.example/v1", "https://evil.example/v1"))
+        #expect(!allows("https://api.example/v1", "http://api.example/v1"))
+        #expect(!allows("http://api.example/v1", "https://api.example/v1"))
+        #expect(!allows("https://api.example/v1", "https://api.example:8443/v1"))
+        #expect(!allows("https://api.example/v1", "https://api.example.evil.example/v1"))
+    }
+
     @Test func messagesNameTheProvider() {
         #expect(ClaudeFailure.notFound.message(for: .chatgpt).hasPrefix("Codex not found"))
         #expect(ClaudeFailure.notLoggedIn.message(for: .custom) == "API key rejected. Check it in Settings → Engine.")

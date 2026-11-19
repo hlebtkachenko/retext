@@ -246,6 +246,17 @@ public enum OpenAICompatible {
         return message ?? String(decoding: data.prefix(300), as: UTF8.self)
     }
 
+    /// Whether to follow a redirect: only to the same scheme, host and port, so the request and its API key never
+    /// reach another server.
+    public static func allowsRedirect(from: URL, to: URL) -> Bool {
+        func origin(_ url: URL) -> String? {
+            guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+            return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
+        }
+        guard let a = origin(from), let b = origin(to) else { return false }
+        return a == b
+    }
+
     /// From the HTTP status and the error body.
     public static func failure(status: Int, body: Data) -> ClaudeFailure {
         let message = errorMessage(body)

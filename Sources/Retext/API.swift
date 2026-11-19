@@ -18,7 +18,7 @@ enum APIRunner {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = seconds
         config.timeoutIntervalForResource = seconds
-        let session = URLSession(configuration: config)
+        let session = URLSession(configuration: config, delegate: SameServerRedirects(), delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
         let data: Data, response: URLResponse
         do {
@@ -29,9 +29,24 @@ enum APIRunner {
             throw ClaudeFailure.other(error.localizedDescription)
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // A refused redirect ends the call with the 3xx response itself.
+        if (300..<400).contains(status), let from = response.url,
+           let location = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Location"),
+           let to = URL(string: location, relativeTo: from)?.absoluteURL, !OpenAICompatible.allowsRedirect(from: from, to: to) {
+            throw ClaudeFailure.other("redirected to another server; check the base URL.")
+        }
         guard (200..<300).contains(status) else { throw OpenAICompatible.failure(status: status, body: data) }
         guard let output = OpenAICompatible.parse(data) else { throw ClaudeFailure.classify(OpenAICompatible.errorMessage(data)) }
         return output
+    }
+}
+
+/// Follows redirects only within the same server (`OpenAICompatible.allowsRedirect`).
+private final class SameServerRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        guard let from = response.url, let to = request.url, OpenAICompatible.allowsRedirect(from: from, to: to) else { return nil }
+        return request
     }
 }
 
