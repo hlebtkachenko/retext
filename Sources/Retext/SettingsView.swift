@@ -718,7 +718,7 @@ private struct GeneralPane: View {
                 Text("Permissions")
             }
             Section {
-                Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: setOpenAtLogin))
+                Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { setOpenAtLogin($0) }))
             } footer: {
                 Text(loginStatusText).foregroundStyle(.secondary)
             }
