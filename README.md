@@ -1,6 +1,6 @@
 # Retext
 
-**Fix grammar, translate and rewrite selected text in any macOS app, in place, with one shortcut.** A native SwiftUI menu-bar app with a Liquid Glass bar, powered by your own [Claude Code](https://code.claude.com/docs/en/overview) CLI.
+**Fix grammar, translate and rewrite selected text in any macOS app, in place, with one shortcut.** A native SwiftUI menu-bar app with a Liquid Glass bar, powered by your own [Claude Code](https://code.claude.com/docs/en/overview) or ChatGPT ([Codex CLI](https://developers.openai.com/codex/cli)) login, or any OpenAI-compatible API.
 
 [![CI](https://github.com/hlebtkachenko/retext/actions/workflows/ci.yml/badge.svg)](https://github.com/hlebtkachenko/retext/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/hlebtkachenko/retext?sort=semver)](https://github.com/hlebtkachenko/retext/releases)
@@ -8,13 +8,13 @@
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 
-Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to your installed [Claude Code](https://code.claude.com/docs/en/overview) CLI (`claude -p`) and pastes the result over the selection. The original font, size and colour are kept.
+Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to the provider you chose (your installed Claude Code CLI by default) and pastes the result over the selection. The original font, size and colour are kept.
 
 ![The Retext bar under a selected sentence in a text document](docs/images/bar.png)
 
 ## Install
 
-Requires macOS 26+, Claude Code installed and logged in (your Claude plan's limits apply), and the Accessibility permission.
+Requires macOS 26+, the Accessibility permission, and one provider: Claude Code installed and logged in (the default), the Codex CLI signed in with ChatGPT, or an OpenAI-compatible API. See [Providers](#providers).
 
 The DMG and the Homebrew cask start with Retext 1.4.0; until it is released, [build from source](#build-from-source).
 
@@ -28,7 +28,7 @@ Or with Homebrew:
 brew install --cask hlebtkachenko/tap/retext
 ```
 
-On first launch, a welcome window shows whether Retext has the Accessibility permission and has found Claude Code, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
+On first launch, a welcome window shows whether Retext has the Accessibility permission and whether the active provider is ready, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
 
 More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4.0). Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes how a release is built, signed and published. To build it yourself, see [Build from source](#build-from-source).
 
@@ -38,7 +38,7 @@ More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4
 - **Free instructions:** type "shorter", "more formal" or "as a bullet list" into the bar and press Return.
 - **App styles:** optional extra guidance for a given app, for example "formal" for Mail. None by default.
 - **Protected words:** names and terms that are never changed or translated.
-- **Quality levels:** Medium (Claude Haiku, fast), High (Claude Sonnet, a deeper native rewrite) and Max (Claude Opus, the most polished, slowest), through the Claude Code `haiku`, `sonnet` and `opus` aliases. Every bar starts at the default level from Settings → Engine (Medium unless you change it); ↑ and ↓ in the bar change it for that run. ⌥1…⌥9 run at the default level.
+- **Quality levels:** Medium (Claude Haiku, fast), High (Claude Sonnet, a deeper native rewrite) and Max (Claude Opus, the most polished, slowest), through the Claude Code `haiku`, `sonnet` and `opus` aliases; with ChatGPT or a custom API the levels map to that provider's models. Every bar starts at the default level from Settings → Engine (Medium unless you change it); ↑ and ↓ in the bar change it for that run. ⌥1…⌥9 run at the default level.
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
@@ -53,9 +53,9 @@ More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4
 | **What** | AI writing assistant for selected text: grammar and spelling fixes, translation, free-form rewrites ("shorter", "more formal") |
 | **Where** | Any macOS app with selectable text: Mail, Notes, Pages, Safari, Slack, VS Code, Telegram and more; read-only text is copied instead |
 | **How** | Select text, press ⌥Space (bar) or ⌥1…⌥9 (direct action); the result replaces the selection with its original formatting |
-| **Engine** | Your installed Claude Code CLI (`claude -p`), three quality levels: Haiku, Sonnet or Opus; no API key handling in the app |
+| **Engine** | Your installed Claude Code CLI (`claude -p`, default), ChatGPT through the Codex CLI (`codex exec`), or an OpenAI-compatible API; three quality levels |
 | **Stack** | Swift 6, SwiftUI, Liquid Glass, AppKit, Accessibility API, CGEvent tap; no third-party dependencies |
-| **Requires** | macOS 26+, Xcode 26+ to build, Claude Code logged in, Accessibility permission |
+| **Requires** | macOS 26+, Xcode 26+ to build, one provider (Claude Code, Codex signed in with ChatGPT, or an API), Accessibility permission |
 | **License** | Apache 2.0 |
 
 
@@ -63,18 +63,26 @@ More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4
 
 - macOS 26 or later.
 - Xcode 26 or later, to build.
-- [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
+- One provider (see [Providers](#providers)). The default is [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
 - The Accessibility permission (System Settings → Privacy & Security → Accessibility). Retext needs it to read the selection and to see its shortcuts.
 
 Retext uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account. The Usage pane shows the list-price equivalent of each call, as reported by `claude -p`.
+
+## Providers
+
+One provider is active at a time; pick it in Settings → Engine. Medium, High and Max map to that provider's models, and ↑ and ↓ in the bar work the same for all of them.
+
+- **Claude Code** (default): `claude -p` with the `haiku`, `sonnet` and `opus` aliases. Uses your Claude Code login.
+- **ChatGPT (Codex):** `codex exec` from the [Codex CLI](https://developers.openai.com/codex/cli) (`npm install -g @openai/codex`), signed in with `codex login` using your ChatGPT account. Usage counts against your plan's Codex limits. Retext never reads or stores your OpenAI credentials: it runs Codex with a private `CODEX_HOME` (`~/Library/Application Support/Retext/codex-home`) that holds only a link to Codex's own `auth.json`, so your Codex config, `AGENTS.md`, MCP servers and skills stay out of the run, and Codex's tools, web search and plugins are turned off. Built-in models: Medium `gpt-6-luna` (low effort), High `gpt-5.6-terra` (high), Max `gpt-6-luna` (max). Which models a plan offers changes over time, so each level can be set to another model or effort, picked from `codex debug models`.
+- **Custom API:** any OpenAI-compatible Chat Completions API, such as OpenRouter, Ollama, LM Studio, Gemini, Mistral or Groq (presets in Settings). Enter the base URL, an API key (optional for local servers) and a model per level, with an optional reasoning effort. The key is stored in the macOS Keychain, never in `settings.json`.
 
 ## Settings
 
 - **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions brings back the defaults.
 - **App styles:** pick an app from the running and installed apps and describe the style for it.
 - **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
-- **Engine:** the default quality level, the Claude Code path, and Test Claude Code, which sends one tiny request and shows the version. A run stops after 1 minute at Medium and High, 2 minutes at Max.
-- **General:** Accessibility and Claude Code status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
+- **Engine:** the provider, the default quality level and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
+- **General:** Accessibility and provider status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
 - **Usage:** calls, tokens and the API list-price equivalent per day.
 
 ## Shortcuts
@@ -91,8 +99,9 @@ Retext uses your own Claude Code login: subscription usage counts against your p
 
 ## Privacy
 
-- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. They go to Claude Code, which sends them to Anthropic under your account.
-- **Update check:** the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`co.hleb.retext`).
+- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. With Claude Code they go to Anthropic under your account; with ChatGPT (Codex) they go to OpenAI under your ChatGPT account; with a custom API they go to the base URL you set, with your API key.
+- **API key:** the custom API's key is kept in the macOS Keychain (service `co.hleb.retext`), saved for the base URL's host and sent only to that host; change the host and Retext asks for a key again. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
+- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`co.hleb.retext`).
 - **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings.
 - **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard about 0.7 seconds later. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
 
@@ -107,7 +116,7 @@ Retext uses your own Claude Code login: subscription usage counts against your p
 
 1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
 2. Delete `Retext.app` from `/Applications` (DMG and Homebrew installs) or `~/Applications` (`./build.sh` installs).
-3. Delete `~/Library/Application Support/Retext` to remove settings, history and usage, and run `defaults delete co.hleb.retext` to remove the update-check state.
+3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `co.hleb.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete co.hleb.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
 
    ```sh
@@ -124,15 +133,15 @@ With Homebrew, do step 1, then run `brew uninstall --zap --cask retext`, which q
 
 ## FAQ
 
-**Does it work offline?** No. Every request goes through Claude Code to Anthropic. Results you've seen recently are served from the local cache.
+**Does it work offline?** Only with a local server (Ollama or LM Studio) as the custom API. Otherwise requests go to Anthropic or OpenAI, or to the API you set. Results you've seen recently are served from the local cache.
 
-**Does it cost anything?** The app is free. Requests count against your Claude plan's limits, or are billed to your API account if Claude Code uses an API key.
+**Does it cost anything?** The app is free. Requests count against your Claude or ChatGPT plan's limits, or are billed by the API you use.
 
 **Which languages?** Any language Claude handles. The default third action translates into your Mac's language when that isn't English.
 
 **Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
 
-**Can I use another model or provider?** Retext calls `claude -p` with the `haiku`, `sonnet` and `opus` aliases (Medium, High and Max), so whatever your Claude Code is configured for applies. Pick the default level in Settings → Engine, or change it for one run with ↑ and ↓ in the bar.
+**Can I use another model or provider?** Yes: ChatGPT through the Codex CLI, or any OpenAI-compatible API (see [Providers](#providers)). With Claude Code, Retext uses the `haiku`, `sonnet` and `opus` aliases (Medium, High and Max). Pick the default level in Settings → Engine, or change it for one run with ↑ and ↓ in the bar.
 
 ## Build from source
 
@@ -173,4 +182,4 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Fo
 
 [Apache License 2.0](LICENSE).
 
-Retext calls your installed Claude Code CLI with your own login and never reads or stores credentials. Not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic.
+Retext calls your installed Claude Code or Codex CLI with your own login and never reads or stores their credentials; a custom API key stays in your Keychain. Not affiliated with or endorsed by Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.

@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- Providers: besides Claude Code, Retext can run on ChatGPT through the Codex CLI (your ChatGPT login; Retext never stores OpenAI credentials) or on any OpenAI-compatible API (OpenRouter, Ollama, LM Studio, Gemini, Mistral, Groq and others), with the API key in the macOS Keychain. Pick one in Settings → Engine; Medium, High and Max map to its models, and ChatGPT models and efforts can be changed per level. The welcome window, Settings → General and the menu show whether the active provider is ready.
 - An app icon.
 - A signed and notarized DMG download and a Homebrew cask (`brew install --cask hlebtkachenko/tap/retext`), from 1.4.0.
 - A landing page.
