@@ -47,6 +47,14 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var menuShortcut = MenuShortcut.optionSpace
     /// Path to the `claude` executable; empty = find it automatically.
     public var claudePath = ""
+    /// The active provider; Medium, High and Max map to its models.
+    public var provider = Provider.claude
+    /// Path to the `codex` executable; empty = find it automatically.
+    public var codexPath = ""
+    /// Per-level overrides of the built-in ChatGPT models; a missing or empty model uses the built-in one.
+    public var chatGPTModels: [Level: ProviderModel] = [:]
+    /// The OpenAI-compatible API (base URL and models; the key is in the Keychain).
+    public var custom = CustomProviderSettings()
     /// Off: no results are written to history.json and the cache isn't used.
     public var keepHistory = true
     /// On: AXManualAccessibility is set on every app switch, so ⌥N sees Electron selections before the first bar.
@@ -77,6 +85,10 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         protectedWords = try c.decodeIfPresent([String].self, forKey: .protectedWords) ?? d.protectedWords
         menuShortcut = (try? c.decodeIfPresent(MenuShortcut.self, forKey: .menuShortcut)) ?? d.menuShortcut
         claudePath = (try? c.decodeIfPresent(String.self, forKey: .claudePath)) ?? d.claudePath
+        provider = (try? c.decodeIfPresent(Provider.self, forKey: .provider)) ?? d.provider
+        codexPath = (try? c.decodeIfPresent(String.self, forKey: .codexPath)) ?? d.codexPath
+        chatGPTModels = (try? c.decodeIfPresent([Level: ProviderModel].self, forKey: .chatGPTModels)) ?? d.chatGPTModels
+        custom = (try? c.decodeIfPresent(CustomProviderSettings.self, forKey: .custom)) ?? d.custom
         keepHistory = (try? c.decodeIfPresent(Bool.self, forKey: .keepHistory)) ?? d.keepHistory
         electronSupport = (try? c.decodeIfPresent(Bool.self, forKey: .electronSupport)) ?? d.electronSupport
         showMenuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon)) ?? d.showMenuBarIcon

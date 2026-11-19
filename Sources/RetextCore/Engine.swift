@@ -68,8 +68,10 @@ public enum Level: String, Codable, CaseIterable, Sendable {
 /// One thing to do with the selection: a saved action or a free instruction typed into the bar.
 public struct Job: Sendable {
     public let title: String
+    /// Where the job runs; `model` and `effort` are that provider's.
+    public let provider: Provider
     public let model: String
-    /// `claude -p --effort` value.
+    /// Reasoning effort ("" = the model's default).
     public let effort: String
     public let system: String
     /// nil for a typed instruction.
@@ -77,8 +79,10 @@ public struct Job: Sendable {
     /// An app style applies; it may ask for a layout.
     public let styled: Bool
 
-    public init(title: String, model: String, effort: String, system: String, kind: ActionKind? = nil, styled: Bool = false) {
+    public init(title: String, provider: Provider = .claude, model: String, effort: String, system: String, kind: ActionKind? = nil,
+                styled: Bool = false) {
         self.title = title
+        self.provider = provider
         self.model = model
         self.effort = effort
         self.system = system
@@ -123,21 +127,35 @@ public enum Engine {
     }
 
     public static func job(for action: CustomAction, level: Level, text: String, settings: RetextSettings, bundleID: String?) -> Job {
-        Job(title: action.title, model: level.model, effort: level.effort,
+        let m = settings.model(for: level)
+        return Job(title: action.title, provider: settings.provider, model: m.model, effort: m.effort,
             system: systemPrompt(action.prompt, addOn: level.addOn, style: settings.style(for: bundleID), protectedWords: settings.protectedWords),
             kind: action.kind, styled: settings.style(for: bundleID) != nil)
     }
 
     public static func job(instruction: String, level: Level, settings: RetextSettings, bundleID: String?) -> Job {
-        Job(title: instruction, model: level.model, effort: level.effort,
+        let m = settings.model(for: level)
+        return Job(title: instruction, provider: settings.provider, model: m.model, effort: m.effort,
             system: systemPrompt(instructionTask(instruction), addOn: level.addOn, style: settings.style(for: bundleID),
                                  protectedWords: settings.protectedWords))
     }
 
-    /// SHA-256 over model, effort, prompt version, full system prompt and text.
-    public static func cacheKey(model: String, effort: String, system: String, text: String) -> String {
-        let joined = [model, effort, promptVersion, system, text].joined(separator: "\u{1F}")
-        return SHA256.hash(data: Data(joined.utf8)).map { String(format: "%02x", $0) }.joined()
+    /// SHA-256 over provider (with the base URL for Custom), model, effort, prompt version, full system prompt and text.
+    /// Claude keeps its old keys (no provider part), so its cache survives the update.
+    public static func cacheKey(provider: String = "", model: String, effort: String, system: String, text: String) -> String {
+        let joined = (provider.isEmpty ? [] : [provider]) + [model, effort, promptVersion, system, text]
+        let joinedText = joined.joined(separator: "\u{1F}")
+        return SHA256.hash(data: Data(joinedText.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The job's cache key; `baseURL` (Custom only) keeps two servers with the same model name apart.
+    public static func cacheKey(_ job: Job, baseURL: String = "", text: String) -> String {
+        let provider = switch job.provider {
+        case .claude: ""
+        case .chatgpt: "chatgpt"
+        case .custom: "custom \(baseURL.trimmingCharacters(in: .whitespacesAndNewlines))"
+        }
+        return cacheKey(provider: provider, model: job.model, effort: job.effort, system: job.system, text: text)
     }
 
     /// Trimmed, with runs of whitespace collapsed to one space: the no-change check compares these.
@@ -188,15 +206,26 @@ public enum ClaudeFailure: Error, Equatable, Sendable {
         return .other(line.count > 80 ? line.prefix(79) + "…" : line)
     }
 
-    public var message: String {
-        switch self {
-        case .notFound: "Claude Code not found. Install it or set its path in Settings → Engine."
-        case .notLoggedIn: "Claude Code isn't logged in. Run claude in Terminal and log in."
-        case .limit: "Claude usage limit reached. Try again later."
-        case .unknownModel: "Claude Code doesn't know this model. Update Claude Code."
-        case .extraText: "Claude added text that isn't a fix. Your text is unchanged."
-        case .other(""): "Claude didn't answer. Your text is unchanged."
-        case .other(let excerpt): "Claude failed: \(excerpt)"
+    public var message: String { message(for: .claude) }
+
+    /// What the bubble and the Test button say, in the provider's terms.
+    public func message(for provider: Provider) -> String {
+        let who = provider.shortTitle
+        switch (self, provider) {
+        case (.notFound, .claude): return "Claude Code not found. Install it or set its path in Settings → Engine."
+        case (.notFound, .chatgpt): return "Codex not found. Install the Codex CLI or set its path in Settings → Engine."
+        case (.notFound, .custom): return "Custom API isn't set up. Enter its base URL and models in Settings → Engine."
+        case (.notLoggedIn, .claude): return "Claude Code isn't logged in. Run claude in Terminal and log in."
+        case (.notLoggedIn, .chatgpt): return "Codex isn't logged in. Run codex login in Terminal and sign in with ChatGPT."
+        case (.notLoggedIn, .custom): return "API key rejected. Check it in Settings → Engine."
+        case (.limit, .custom): return "The API's rate limit was reached. Try again later."
+        case (.limit, _): return "\(who) usage limit reached. Try again later."
+        case (.unknownModel, .claude): return "Claude Code doesn't know this model. Update Claude Code."
+        case (.unknownModel, .chatgpt): return "Your ChatGPT plan doesn't offer this model. Pick another in Settings → Engine."
+        case (.unknownModel, .custom): return "The API doesn't know this model. Check the models in Settings → Engine."
+        case (.extraText, _): return "\(who) added text that isn't a fix. Your text is unchanged."
+        case (.other(""), _): return "\(who) didn't answer. Your text is unchanged."
+        case (.other(let excerpt), _): return "\(who) failed: \(excerpt)"
         }
     }
 }
@@ -212,6 +241,14 @@ public struct ClaudeOutput: Decodable, Sendable {
     public let total_cost_usd: Double?
     public let usage: Usage?
     public let is_error: Bool?
+
+    /// For the other providers' answers, so usage and history record them the same way.
+    public init(result: String, inputTokens: Int, outputTokens: Int, costUSD: Double = 0) {
+        self.result = result
+        total_cost_usd = costUSD
+        usage = Usage(input_tokens: inputTokens, output_tokens: outputTokens)
+        is_error = false
+    }
 
     public var inputTokens: Int { usage?.input_tokens ?? 0 }
     public var outputTokens: Int { usage?.output_tokens ?? 0 }
