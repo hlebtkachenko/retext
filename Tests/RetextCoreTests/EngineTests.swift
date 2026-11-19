@@ -43,7 +43,7 @@ import Testing
         let action = settings.actions[0]
         func key() -> String {
             let job = Engine.job(for: action, level: .medium, text: "helo", settings: settings, bundleID: "com.apple.mail")
-            return Engine.cacheKey(model: job.model, system: job.system, text: "helo")
+            return Engine.cacheKey(model: job.model, effort: job.effort, system: job.system, text: "helo")
         }
         let base = key()
         #expect(base == key())
@@ -54,10 +54,11 @@ import Testing
         #expect(key() != styled)
     }
 
-    @Test func changesWithModelAndText() {
-        let a = Engine.cacheKey(model: Model.haiku, system: "s", text: "t")
-        #expect(a != Engine.cacheKey(model: Model.sonnet, system: "s", text: "t"))
-        #expect(a != Engine.cacheKey(model: Model.haiku, system: "s", text: "t "))
+    @Test func changesWithModelEffortAndText() {
+        let a = Engine.cacheKey(model: Model.haiku, effort: "low", system: "s", text: "t")
+        #expect(a != Engine.cacheKey(model: Model.sonnet, effort: "low", system: "s", text: "t"))
+        #expect(a != Engine.cacheKey(model: Model.haiku, effort: "medium", system: "s", text: "t"))
+        #expect(a != Engine.cacheKey(model: Model.haiku, effort: "low", system: "s", text: "t "))
         #expect(a.count == 64)
     }
 }

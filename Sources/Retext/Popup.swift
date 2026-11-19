@@ -268,12 +268,12 @@ final class PopupController {
         }
     }
 
-    /// The cached result when model, prompt and text match an entry in the history; otherwise Claude's answer after
+    /// The cached result when model, effort, prompt and text match an entry in the history; otherwise Claude's answer after
     /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
     /// With "Keep history" off, neither the cache nor the history is touched.
     private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
-        let key = Engine.cacheKey(model: job.model, system: job.system, text: selection.text)
+        let key = Engine.cacheKey(model: job.model, effort: job.effort, system: job.system, text: selection.text)
         let keep = state.settings.keepHistory
         if keep, let hit = state.history.lookup(key) {
             state.usage.recordHit()
