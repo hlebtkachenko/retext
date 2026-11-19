@@ -54,11 +54,14 @@ func glyphs() -> (letter: CGPath, cursor: CGPath) {
     let ink = letter.boundingBoxOfPath
     let capHeight = CTFontGetCapHeight(font)
 
-    // The I-beam: a thin stem with short bars at the cap height and the baseline, much lighter than the R,
-    // so it reads as a text cursor and not as a serif capital I.
-    let stem = capHeight * 0.075
-    let bar = capHeight * 0.065
-    let beamWidth = capHeight * 0.36
+    // The I-beam: a thin stem with short bars just above the cap height and just below the baseline, so the whole R
+    // fits between them, much lighter than the R so it reads as a text cursor and not as a serif capital I.
+    // Its proportions are the original 0.075 / 0.065 / 0.36 cursor scaled until the bars clear the R by `clearance`.
+    let clearance = capHeight * 0.03
+    let scale = (1 + 2 * 0.03) / (1 - 2 * 0.065)
+    let stem = capHeight * 0.075 * scale
+    let bar = capHeight * 0.065 * scale
+    let beamWidth = capHeight * 0.36 * scale
     let gap = capHeight * 0.12
     let total = ink.width + gap + beamWidth
 
@@ -70,9 +73,12 @@ func glyphs() -> (letter: CGPath, cursor: CGPath) {
     // Three non-overlapping rectangles, so the glass layer has no inner seams.
     let beamX = originX + ink.maxX + gap
     let cursor = CGMutablePath()
-    cursor.addRect(CGRect(x: beamX + (beamWidth - stem) / 2, y: originY + bar, width: stem, height: capHeight - 2 * bar))
-    cursor.addRect(CGRect(x: beamX, y: originY, width: beamWidth, height: bar))
-    cursor.addRect(CGRect(x: beamX, y: originY + capHeight - bar, width: beamWidth, height: bar))
+    // The cursor reaches equally above and below the R, so the group's vertical centre stays the R's.
+    let bottom = originY - clearance - bar
+    let top = originY + capHeight + clearance
+    cursor.addRect(CGRect(x: beamX + (beamWidth - stem) / 2, y: bottom + bar, width: stem, height: top - bottom - bar))
+    cursor.addRect(CGRect(x: beamX, y: bottom, width: beamWidth, height: bar))
+    cursor.addRect(CGRect(x: beamX, y: top, width: beamWidth, height: bar))
     return (placedLetter, cursor)
 }
 

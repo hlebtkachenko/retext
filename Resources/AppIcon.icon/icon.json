@@ -8,7 +8,8 @@
         {
           "glass" : true,
           "image-name" : "Cursor.svg",
-          "name" : "Cursor"
+          "name" : "Cursor",
+          "opacity" : 0.8
         },
         {
           "glass" : true,
