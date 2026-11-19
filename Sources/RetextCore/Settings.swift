@@ -122,6 +122,8 @@ public struct RetextSettings: Codable, Equatable, Sendable {
             return RetextSettings()
         }
         settings.migrate()
+        // The Add button stops at nine, but a hand-edited file can hold more; only ⌥1…⌥9 exist.
+        settings.actions = Array(settings.actions.prefix(maxActions))
         return settings
     }
 

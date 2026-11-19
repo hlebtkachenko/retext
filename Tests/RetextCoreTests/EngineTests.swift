@@ -124,6 +124,12 @@ import Testing
         #expect(loaded.appStyles.isEmpty)
     }
 
+    @Test func loadKeepsTheFirstNineActions() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-many-\(UUID()).json")
+        RetextSettings(actions: (1...11).map { CustomAction(title: "\($0)", symbol: "x", prompt: "p\($0)", kind: .other) }).save(to: url)
+        #expect(RetextSettings.load(from: url).actions.map(\.title) == (1...9).map(String.init))
+    }
+
     @Test func missingFileGivesDefaults() {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-missing-\(UUID()).json")
         let loaded = RetextSettings.load(from: url)

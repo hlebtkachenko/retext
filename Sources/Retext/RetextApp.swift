@@ -12,7 +12,7 @@ struct RetextApp: App {
             // Clicking an action runs it on the selection in the app in front, like its ⌥N shortcut.
             ForEach(Array(state.settings.actions.enumerated()), id: \.element.id) { index, action in
                 Button { delegate.controller.trigger(index) } label: { Label(action.title, systemImage: action.symbol) }
-                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option)
+                    .keyboardShortcut(index < 9 ? KeyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option) : nil)
             }
             Divider()
             Menu("Recent (click to copy)") {
