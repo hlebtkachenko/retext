@@ -36,7 +36,7 @@ final class ClaudeRunner {
         return loginShellPath ?? candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// "2.1.284" from `claude --version`, or nil when it can't be run.
+    /// "2.1.284" from `claude --version`, or nil when it can't be run; stopped after 5 s.
     nonisolated static func version(claudePath: String) async -> String? {
         await Task.detached {
             guard let path = executable(override: claudePath) else { return nil }
@@ -48,8 +48,11 @@ final class ClaudeRunner {
             p.standardError = FileHandle.nullDevice
             p.standardInput = FileHandle.nullDevice
             guard (try? p.run()) != nil else { return nil }
+            let timeout = DispatchWorkItem { p.terminate() }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: timeout)
             let data = out.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
+            timeout.cancel()
             return String(decoding: data, as: UTF8.self).split(whereSeparator: \.isWhitespace).first.map(String.init)
         }.value
     }

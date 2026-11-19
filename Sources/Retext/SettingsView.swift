@@ -584,7 +584,11 @@ private struct GeneralPane: View {
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {
             Button("Replace Settings", role: .destructive) {
-                if let pendingImport { replaceSettings(with: pendingImport) }
+                // The Claude Code path belongs to this Mac, not to the exported file.
+                if var pendingImport {
+                    pendingImport.claudePath = state.settings.claudePath
+                    replaceSettings(with: pendingImport)
+                }
                 pendingImport = nil
             }
         } message: {
