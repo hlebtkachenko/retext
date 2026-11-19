@@ -16,7 +16,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Reset Prompt puts back the built-in prompt of a Grammar or Translate action, and Restore Default Actions brings back the default actions.
 - Test Claude Code in Settings → Engine sends one tiny request and shows the Claude Code version, or what went wrong.
 - Paste a list of protected words, one per line or separated by commas; the add field also takes several terms separated by commas.
-- Update check: once a day at launch Retext asks GitHub for the latest release and shows "Update available" in the menu when there is a newer one. Turn it off with "Check for updates" in Settings → General.
+- Update check: at most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows "Update available" in the menu when there is a newer one. Turn it off with "Check for updates" in Settings → General.
 - Settings → General has an About section with the version and a link to GitHub.
 
 ### Changed

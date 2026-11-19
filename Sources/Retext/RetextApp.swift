@@ -109,6 +109,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if !AppState.shared.settings.onboarded { WelcomeWindow.shared.show() }
         AppState.shared.update = UpdateChecker.available
         UpdateChecker.checkIfDue()
+        // A Mac that sleeps instead of quitting would otherwise check only once. The network is often not back right
+        // at wake, and a failed check is retried only at the next launch or wake, so wait a little first.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(30))
+                UpdateChecker.checkIfDue()
+            }
+        }
     }
 
     /// Opening Retext while it runs (Finder, Spotlight) shows Settings, the way back when the menu-bar icon is hidden.

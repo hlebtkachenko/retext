@@ -1,8 +1,8 @@
 import Foundation
 import RetextCore
 
-/// Asks GitHub for the latest release at most once a day, at launch, and remembers it so a later launch the same
-/// day still shows "Update available". Nothing is downloaded: the menu item opens the release page.
+/// Asks GitHub for the latest release at most once a day, at launch and on wake, and remembers it so a later launch
+/// the same day still shows "Update available". Nothing is downloaded: the menu item opens the release page.
 @MainActor
 enum UpdateChecker {
     static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String

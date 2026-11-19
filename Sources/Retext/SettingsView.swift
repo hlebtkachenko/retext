@@ -537,7 +537,7 @@ private struct GeneralPane: View {
             } header: {
                 Text("Updates")
             } footer: {
-                Text("Once a day at launch, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. This is the only network request Retext makes itself.")
+                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. This is the only network request Retext makes itself.")
                     .foregroundStyle(.secondary)
             }
             Section {

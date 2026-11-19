@@ -58,7 +58,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var defaultLevel = Level.medium
     /// The welcome window was shown. False only for a new install: a settings file without the key is an upgrade.
     public var onboarded = false
-    /// Once a day at launch, ask GitHub for the latest release and offer it in the menu.
+    /// At most once a day, at launch and on wake, ask GitHub for the latest release and offer it in the menu.
     public var checkForUpdates = true
 
     public init(actions: [CustomAction] = RetextSettings.defaultActions,
