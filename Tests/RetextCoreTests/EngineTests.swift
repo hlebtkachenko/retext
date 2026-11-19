@@ -226,11 +226,13 @@ import Testing
     @Test func usageKeepsOnlyRecentDays() {
         var usage = Usage()
         let now = Date()
-        let old = Calendar.current.date(byAdding: .day, value: -Usage.keepDays, to: now)!
-        let edge = Calendar.current.date(byAdding: .day, value: 1 - Usage.keepDays, to: now)!
+        let old = Usage.calendar.date(byAdding: .day, value: -Usage.keepDays, to: now)!
+        let edge = Usage.calendar.date(byAdding: .day, value: 1 - Usage.keepDays, to: now)!
         usage.recordHit(on: old)
         usage.recordHit(on: edge)
         usage.recordHit(on: now)
         #expect(usage.days.keys.sorted() == [Usage.dayKey(edge), Usage.dayKey(now)])
+        // Gregorian keys even on a Mac set to another calendar (Buddhist would give 2569).
+        #expect(Usage.dayKey(Date(timeIntervalSince1970: 1_800_000_000)).hasPrefix("2027-01-"))
     }
 }
