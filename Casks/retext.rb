@@ -20,5 +20,8 @@ cask "retext" do
 
   uninstall quit: "co.hleb.retext"
 
-  zap trash: "~/Library/Application Support/Retext"
+  zap trash: [
+    "~/Library/Application Support/Retext",
+    "~/Library/Preferences/co.hleb.retext.plist",
+  ]
 end

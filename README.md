@@ -16,6 +16,8 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 
 Requires macOS 26+, Claude Code installed and logged in (your Claude plan's limits apply), and the Accessibility permission.
 
+The DMG and the Homebrew cask start with Retext 1.4.0; until it is released, [build from source](#build-from-source).
+
 1. Download `Retext-VERSION.dmg` from the [latest release](https://github.com/hlebtkachenko/retext/releases/latest). It is signed with a Developer ID and notarized by Apple.
 2. Open the DMG and drag Retext to Applications.
 3. Open Retext and grant the Accessibility permission when asked.
@@ -28,7 +30,7 @@ brew install --cask hlebtkachenko/tap/retext
 
 On first launch, a welcome window shows whether Retext has the Accessibility permission and has found Claude Code, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
 
-More: the [landing page](https://hlebtkachenko.github.io/retext/). Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes how a release is built, signed and published. To build it yourself, see [Build from source](#build-from-source).
+More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4.0). Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes how a release is built, signed and published. To build it yourself, see [Build from source](#build-from-source).
 
 ## Features
 
@@ -104,13 +106,15 @@ Retext uses your own Claude Code login: subscription usage counts against your p
 ## Uninstall
 
 1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
-2. Delete `~/Applications/Retext.app`.
+2. Delete `Retext.app` from `/Applications` (DMG and Homebrew installs) or `~/Applications` (`./build.sh` installs).
 3. Delete `~/Library/Application Support/Retext` to remove settings, history and usage, and run `defaults delete co.hleb.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
 
    ```sh
    tccutil reset Accessibility co.hleb.retext
    ```
+
+With Homebrew, do step 1, then run `brew uninstall --zap --cask retext`, which quits Retext and removes the app, its settings, history, usage and preferences; then do step 4.
 
 ## How it compares
 
