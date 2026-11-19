@@ -35,9 +35,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Swift version
+      - name: Swift and Xcode versions
         if: steps.existing.outputs.skip != 'true'
-        run: swift --version
+        run: |
+          swift --version
+          xcodebuild -version
 
       - name: Import the Developer ID certificate into a temporary keychain
         if: steps.existing.outputs.skip != 'true'

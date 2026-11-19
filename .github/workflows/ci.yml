@@ -10,8 +10,18 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
-      - name: Swift version
-        run: swift --version
+      - name: Swift and Xcode versions
+        run: |
+          swift --version
+          xcodebuild -version
+      - name: Compile the icon
+        # The same actool command as build.sh: the Icon Composer document needs Xcode 26 or later.
+        run: |
+          icon="$RUNNER_TEMP/icon"
+          mkdir -p "$icon"
+          xcrun actool Resources/AppIcon.icon --compile "$icon" --platform macosx --minimum-deployment-target 26.0 \
+              --app-icon AppIcon --output-partial-info-plist "$icon/partial.plist" >/dev/null
+          [[ -s "$icon/Assets.car" ]] || { echo "actool did not compile Resources/AppIcon.icon (needs Xcode 26 or later)." >&2; exit 1; }
       - name: Build
         run: swift build
       - name: Test
