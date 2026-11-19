@@ -1,0 +1,35 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.05882,0.18039,0.40000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "Cursor.svg",
+          "name" : "Cursor"
+        },
+        {
+          "glass" : true,
+          "image-name" : "R.svg",
+          "name" : "R"
+        }
+      ],
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

@@ -54,6 +54,13 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin/Retext" "$app/Contents/MacOS/Retext"
 cp Info.plist "$app/Contents/Info.plist"
 cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+# The Liquid Glass icon, compiled from the Icon Composer document (see build.sh).
+icon="$stage/icon"
+mkdir "$icon"
+xcrun actool Resources/AppIcon.icon --compile "$icon" --platform macosx --minimum-deployment-target 26.0 \
+    --app-icon AppIcon --output-partial-info-plist "$icon/partial.plist" >/dev/null
+[[ -s "$icon/Assets.car" ]] || { echo "actool did not compile Resources/AppIcon.icon (needs Xcode 26 or later)." >&2; exit 1; }
+cp "$icon/Assets.car" "$app/Contents/Resources/Assets.car"
 codesign --force --options runtime --timestamp --sign "$identity" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 

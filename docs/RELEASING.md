@@ -137,13 +137,15 @@ VERSION=1.4.0
 
 ## App icon
 
-`Resources/AppIcon.icns`, `docs/images/icon-240.png` (Product Hunt thumbnail) and `docs/images/social-preview.png` (1280x640, GitHub and Open Graph) are rendered by `scripts/make-icon.swift`: a flat brand-blue (#0F2E66) rounded square with a white R and text cursor. The brand colours are constants at the top of that script. To replace the icon, keep the file names; `build.sh` and `scripts/release.sh` pick it up. To re-render it:
+The icon is a Liquid Glass layered icon: the Icon Composer document `Resources/AppIcon.icon`. Its `icon.json` sets the brand-blue (#0F2E66) fill and one glass group (specular highlights, shadow, light translucency) holding two white layers, `Assets/R.svg` (SF Pro Bold R) and `Assets/Cursor.svg` (text cursor). `build.sh` and `scripts/release.sh` compile it with `xcrun actool` into `Contents/Resources/Assets.car` (`CFBundleIconName`), and fail the build if actool can't (it needs Xcode 26 or later). You can open and tune the document in Icon Composer (`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`).
+
+`scripts/make-icon.swift` writes the two SVG layers, compiles the document, and from the system's glass render writes `Resources/AppIcon.icns` (the `CFBundleIconFile` fallback), `docs/images/icon-240.png` (Product Hunt thumbnail) and `docs/images/social-preview.png` (1280x640, GitHub and Open Graph). The brand colours are constants at the top of that script. Re-run it after changing the glyphs or `icon.json`:
 
 ```bash
 swift scripts/make-icon.swift
 ```
 
-Expected: `Wrote .../Resources/AppIcon.icns and docs/images/icon-240.png, social-preview.png`.
+Expected: `Wrote .../Resources/AppIcon.icon/Assets/R.svg, Cursor.svg, .../Resources/AppIcon.icns and docs/images/icon-240.png, social-preview.png`.
 
 ## What the release script does
 
