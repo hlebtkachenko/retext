@@ -65,9 +65,9 @@ import Testing
 
 @Suite struct LayoutCheckTests {
     @Test func oneLineInputStaysOneLine() {
-        let output = "Dobrý den, pane Nováku,\n\nposílám Vám návrh smlouvy."
-        #expect(Engine.checkLayout(input: "Dobrý den pane Nováku, posílám vám návrh smlouvy.", output: output, kind: .grammar)
-                == "Dobrý den, pane Nováku, posílám Vám návrh smlouvy.")
+        let output = "Dobrý den, pane Svobodo,\n\nposílám Vám návrh smlouvy."
+        #expect(Engine.checkLayout(input: "Dobrý den pane Svobodo, posílám vám návrh smlouvy.", output: output, kind: .grammar)
+                == "Dobrý den, pane Svobodo, posílám Vám návrh smlouvy.")
         #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\nposílám to.", kind: .translate) == "Ahoj, posílám to.")
     }
 

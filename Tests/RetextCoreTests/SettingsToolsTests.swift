@@ -19,14 +19,14 @@ import Testing
 
 @Suite struct ProtectedWordListTests {
     @Test func splitsAtCommasAndLineBreaksTrimsAndDedupes() {
-        #expect(RetextSettings.terms(in: "Retext, Claude Code\nAfframe\r\n, ,Retext\n\nHAPD ") == ["Retext", "Claude Code", "Afframe", "HAPD"])
+        #expect(RetextSettings.terms(in: "Retext, Claude Code\nAcme\r\n, ,Retext\n\nGlobex ") == ["Retext", "Claude Code", "Acme", "Globex"])
         #expect(RetextSettings.terms(in: " \n, ").isEmpty)
     }
 
     @Test func addsOnlyNewTermsInOrder() {
         var settings = RetextSettings(protectedWords: ["Retext"])
-        settings.addProtectedWords("Claude, Retext\nPrague")
-        #expect(settings.protectedWords == ["Retext", "Claude", "Prague"])
+        settings.addProtectedWords("Claude, Retext\nGlobex")
+        #expect(settings.protectedWords == ["Retext", "Claude", "Globex"])
     }
 }
 
