@@ -69,7 +69,7 @@ public struct UsageDay: Codable, Equatable, Sendable {
     public var summary: String {
         let models = callsByModel.map { "\($0.name) \($0.calls)" }.joined(separator: ", ")
         return "Today: \(models.isEmpty ? "0 calls" : models), \(cacheHits) cached, "
-            + "\(inputTokens + outputTokens) tokens, ≈ $\(String(format: "%.2f", costUSD)) list price"
+            + "\(inputTokens + outputTokens) tokens, ≈ $\(String(format: "%.2f", costUSD)) Claude Code list price"
     }
 }
 
