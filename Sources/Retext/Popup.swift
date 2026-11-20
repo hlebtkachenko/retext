@@ -60,8 +60,11 @@ struct InstructionField: NSViewRepresentable {
 }
 
 struct PopupView: View {
+    enum PreviewChoice { case replace, discard, copy }
+
     @ObservedObject var model: PopupModel
     let pick: (Int) -> Void
+    let choose: (PreviewChoice) -> Void
     @Namespace private var glass
 
     var body: some View {
@@ -98,17 +101,27 @@ struct PopupView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 260)
-            .accessibilityLabel("Result: \(segments.filter { $0.kind != .deleted }.map(\.text).joined())")
+            .accessibilityLabel(Self.spoken(segments))
             HStack(spacing: 14) {
-                Text("↩ Replace")
-                Text("esc Discard")
-                Text("⌘C Copy")
+                // Not focusable, so Return and Space stay with the panel's key handling.
+                Button("↩ Replace") { choose(.replace) }
+                Button("esc Discard") { choose(.discard) }
+                Button("⌘C Copy") { choose(.copy) }
             }
+            .buttonStyle(.plain)
+            .focusable(false)
             .font(.callout)
             .foregroundStyle(.secondary)
         }
         .padding(14)
         .frame(width: 440)
+    }
+
+    /// "Result with 2 changes: …": a change is a run of removed and added text between unchanged text.
+    static func spoken(_ segments: [TextDiff.Segment]) -> String {
+        let changes = segments.indices.filter { segments[$0].kind != .equal && ($0 == 0 || segments[$0 - 1].kind == .equal) }.count
+        let text = segments.filter { $0.kind != .deleted }.map(\.text).joined()
+        return "Result with \(changes) \(changes == 1 ? "change" : "changes"): \(text)"
     }
 
     static func marked(_ segments: [TextDiff.Segment]) -> AttributedString {
@@ -494,7 +507,13 @@ final class PopupController {
         panel.becomesKeyOnlyIfNeeded = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: PopupView(model: model) { [weak self] in self?.run($0) })
+        let host = NSHostingView(rootView: PopupView(model: model, pick: { [weak self] in self?.run($0) }, choose: { [weak self] choice in
+            switch choice {
+            case .replace: self?.confirmPreview()
+            case .discard: self?.cancel()
+            case .copy: self?.copyPreview()
+            }
+        }))
         host.sizingOptions = [.intrinsicContentSize]
         panel.contentView = host
         self.panel = panel
