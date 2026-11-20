@@ -5,7 +5,7 @@ import Foundation
 public enum Identity {
     public static let bundleID = "dev.hapd.retext"
     public static let repository = "hlebtkachenko/retext"
-    /// The Keychain service the custom API keys were saved under before 1.5.0; read once and moved.
+    /// The Keychain service the custom API keys were saved under in 1.4.0 and earlier; read once and moved.
     public static let legacyKeychainService = "co.hleb.retext"
 
     /// `owner/name` when it looks like a GitHub repository, else the default, so a malformed key can't build a strange URL.
