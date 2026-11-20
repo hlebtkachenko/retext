@@ -76,7 +76,9 @@ struct RetextApp: App {
                 alert.messageText = "Couldn't check for updates."
                 alert.informativeText = reason
             }
-            // A menu-bar app is not active after a menu click; the alert must come to the front.
+            // A menu-bar app is not active after a menu click; the alert must come to the front, and stay visible
+            // when another app is clicked (an alert hides on deactivation, and runModal would keep waiting).
+            alert.window.hidesOnDeactivate = false
             NSApp.activate()
             let response = alert.runModal()
             if case .available(let release) = result, response == .alertFirstButtonReturn,
