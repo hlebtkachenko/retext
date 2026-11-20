@@ -24,16 +24,21 @@ private final class FakeKeychain {
     var corruptOnSave = false
     var deletes: [String] = []
     var reads: [String] = []
+    var saves = 0
+    /// Services whose items exist but can't be read (access denied at the prompt).
+    var denied: Set<String> = []
     /// Runs once on the first legacy read: another writer (Settings → Save) while the read waits on a prompt.
     var onLegacyRead: (() -> Void)?
 
-    func read(_ service: String, _ account: String) -> String? {
+    func read(_ service: String, _ account: String) -> KeychainRead {
         reads.append(service)
         if service == "old", let hook = onLegacyRead { onLegacyRead = nil; hook() }
-        return items["\(service)|\(account)"]
+        if denied.contains(service) { return .unavailable }
+        return items["\(service)|\(account)"].map(KeychainRead.found) ?? .notFound
     }
     /// Add-only, like the real migration save: an existing item is never overwritten.
     func save(_ key: String, _ service: String, _ account: String) -> Bool {
+        saves += 1
         guard saveWorks, items["\(service)|\(account)"] == nil else { return false }
         items["\(service)|\(account)"] = corruptOnSave ? key + "x" : key
         return true
@@ -90,6 +95,27 @@ private final class FakeKeychain {
         k.corruptOnSave = true
         #expect(k.key() == "k0")
         #expect(k.items["old|acct"] == "k0")
+        #expect(k.deletes.isEmpty)
+    }
+
+    @Test func deniedCurrentReadPromptsOnceAndLeavesTheLegacyItem() {
+        let k = FakeKeychain()
+        k.items = ["new|acct": "k1", "old|acct": "k0"]
+        k.denied = ["new"]
+        #expect(k.key() == nil)
+        #expect(k.reads == ["new"])
+        #expect(k.saves == 0)
+        #expect(k.deletes.isEmpty)
+        #expect(k.items == ["new|acct": "k1", "old|acct": "k0"])
+    }
+
+    @Test func deniedLegacyReadReturnsNil() {
+        let k = FakeKeychain()
+        k.items = ["old|acct": "k0"]
+        k.denied = ["old"]
+        #expect(k.key() == nil)
+        #expect(k.reads == ["new", "old"])
+        #expect(k.saves == 0)
         #expect(k.deletes.isEmpty)
     }
 
