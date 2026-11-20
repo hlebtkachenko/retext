@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return replaces the selection, Esc discards the result, ⌘C copies it.
+- Example prompts in the Actions editor; click one to use it.
+
+### Changed
+- The bundle id is now `dev.hapd.retext` (was `co.hleb.retext`), and the custom API key's Keychain service follows it: a key saved by an earlier version is moved there on first use and the old item deleted. macOS ties the Accessibility permission and the login item to the bundle id, so after updating, allow Retext in Accessibility again and turn "Open at login" on again once if you used it.
+- The prompt field in the Actions editor is bigger, and its placeholder no longer names one provider.
+- Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
+
 ## [1.4.0] - 2026-11-20
 
 ### Added
@@ -70,6 +81,7 @@ First public release.
 - Settings for the bar shortcut (⌥Space or ⌃⌥Space), open at login, history, Electron app support and the Claude Code path.
 - Clear error messages when Claude Code is missing, not logged in, rate-limited or doesn't know a model.
 
+[Unreleased]: https://github.com/hlebtkachenko/retext/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.4.0
 [1.3.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.3.0
 [1.2.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.2.0
