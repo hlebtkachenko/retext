@@ -40,10 +40,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
 struct SettingsView: View {
     enum Pane: String, CaseIterable, Identifiable {
-        case actions = "Actions", styles = "App styles", words = "Protected words", engine = "Engine", general = "General", usage = "Usage"
+        case overview = "Overview", actions = "Actions", styles = "App styles", words = "Protected words", engine = "Engine", general = "General", usage = "Usage"
         var id: Self { self }
         var symbol: String {
             switch self {
+            case .overview: "info.circle"
             case .actions: "list.bullet"
             case .styles: "app.badge"
             case .words: "lock"
@@ -55,7 +56,7 @@ struct SettingsView: View {
     }
 
     @ObservedObject private var state = AppState.shared
-    static var initialPane = Pane.actions
+    static var initialPane = Pane.overview
     /// `--demo settings <pane> <extra>`: the word after the pane opens a dialog or expands a row, for screenshots.
     static let demoExtra: String? = CommandLine.arguments.firstIndex(of: "--demo").flatMap { i in
         CommandLine.arguments.dropFirst(i + 1).first == "settings" ? CommandLine.arguments.dropFirst(i + 3).first : nil
@@ -70,7 +71,8 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(190)
         } detail: {
             Group {
-                switch pane ?? .actions {
+                switch pane ?? .overview {
+                case .overview: OverviewPane()
                 case .actions: ActionsPane(actions: $state.settings.actions)
                 case .styles: StylesPane(styles: $state.settings.appStyles)
                 case .words: WordsPane(settings: $state.settings)
@@ -80,7 +82,7 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle((pane ?? .actions).rawValue)
+            .navigationTitle((pane ?? .overview).rawValue)
         }
     }
 }
@@ -746,17 +748,8 @@ private struct GeneralPane: View {
     @State private var pendingImport: RetextSettings?
     @State private var backupError: String?
 
-    private static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-
     var body: some View {
         Form {
-            Section {
-                AccessibilityRow()
-                ProviderRow()
-                Button("Show Welcome Window…") { WelcomeWindow.shared.show() }
-            } header: {
-                Text("Permissions")
-            }
             Section {
                 Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { setOpenAtLogin($0) }))
             } footer: {
@@ -794,14 +787,6 @@ private struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Toggle("Check for updates", isOn: $state.settings.checkForUpdates)
-            } header: {
-                Text("Updates")
-            } footer: {
-                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. Apart from the custom API, when you choose it, this is the only network request Retext makes itself.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
                 HStack {
                     Button("Export Settings…", action: export)
                     Button("Import Settings…", action: chooseImport)
@@ -822,14 +807,6 @@ private struct GeneralPane: View {
             } footer: {
                 Text("Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away. Off: Retext asks only when you use a shortcut, and the first ⌥N in such an app may pass through.")
                     .foregroundStyle(.secondary)
-            }
-            Section {
-                LabeledContent("Version", value: Self.version ?? "Development build")
-                Link("Retext on GitHub", destination: Identity.pageURL(repository: UpdateChecker.repository))
-            } header: {
-                Text("About")
-            } footer: {
-                Text("Not affiliated with Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.").foregroundStyle(.secondary)
             }
         }
         .onAppear {

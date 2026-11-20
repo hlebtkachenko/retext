@@ -18,7 +18,7 @@ enum AppWindows {
     }
 }
 
-/// Shown once on first launch (`RetextSettings.onboarded`), and from the menu or Settings → General later.
+/// Shown once on first launch (`RetextSettings.onboarded`), and from the menu or Settings → Overview later.
 @MainActor
 final class WelcomeWindow: NSObject, NSWindowDelegate {
     static let shared = WelcomeWindow()
@@ -84,7 +84,7 @@ struct WelcomeView: View {
     }
 }
 
-// MARK: Permission rows (Welcome and Settings → General)
+// MARK: Permission rows (Welcome and Settings → Overview)
 
 /// Live Accessibility status, polled while visible, since macOS sends no notification when it is granted.
 struct AccessibilityRow: View {
