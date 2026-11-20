@@ -35,6 +35,7 @@ import Testing
         var settings = RetextSettings(protectedWords: ["Retext"])
         settings.defaultLevel = .high
         settings.checkForUpdates = false
+        settings.previewBeforeReplace = true
         let back = try RetextSettings.imported(from: settings.encoded())
         #expect(back == settings)
     }
@@ -56,6 +57,7 @@ import Testing
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"actions":[]}"#.utf8)).onboarded == true)
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"onboarded":false}"#.utf8)).onboarded == false)
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data("{}".utf8)).checkForUpdates == true)
+        #expect(try JSONDecoder().decode(RetextSettings.self, from: Data("{}".utf8)).previewBeforeReplace == false)
     }
 
     @Test func upgradersSkipTheWelcomeWindow() {

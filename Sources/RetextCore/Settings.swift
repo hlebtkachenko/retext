@@ -68,6 +68,8 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var onboarded = false
     /// At most once a day, at launch and on wake, ask GitHub for the latest release and offer it in the menu.
     public var checkForUpdates = true
+    /// On: an editable selection's result is shown with its changes marked first; Return replaces, Esc discards.
+    public var previewBeforeReplace = false
 
     public init(actions: [CustomAction] = RetextSettings.defaultActions,
                 appStyles: [AppStyle] = [],
@@ -95,6 +97,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         defaultLevel = (try? c.decodeIfPresent(Level.self, forKey: .defaultLevel)) ?? d.defaultLevel
         onboarded = (try? c.decodeIfPresent(Bool.self, forKey: .onboarded)) ?? true
         checkForUpdates = (try? c.decodeIfPresent(Bool.self, forKey: .checkForUpdates)) ?? d.checkForUpdates
+        previewBeforeReplace = (try? c.decodeIfPresent(Bool.self, forKey: .previewBeforeReplace)) ?? d.previewBeforeReplace
     }
 
     public func style(for bundleID: String?) -> String? {

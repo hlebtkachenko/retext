@@ -736,6 +736,12 @@ private struct GeneralPane: View {
                 Text("Choose ⌃⌥Space if another app uses ⌥Space. macOS can also use ⌃⌥Space to switch input sources; turn that off in Keyboard Shortcuts if you pick it. Actions stay on ⌥1…⌥9.").foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Preview before replacing", isOn: $state.settings.previewBeforeReplace)
+            } footer: {
+                Text("Shows the result with its changes marked before it replaces your text: added words highlighted, removed words struck through. Return replaces, Esc discards, ⌘C copies the result instead. Off: the result replaces the selection right away. Text that can't be edited is copied either way.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Keep history", isOn: $state.settings.keepHistory)
                 LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
                     Button("Clear History…", role: .destructive) { confirmClear = true }
