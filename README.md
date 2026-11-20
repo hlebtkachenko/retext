@@ -129,8 +129,8 @@ With Homebrew, do step 1, then run `brew uninstall --zap --cask retext`, which q
 
 ## How it compares
 
-- **Apple Writing Tools:** built in and on-device, but limited to Apple Intelligence languages and regions, with a fixed set of actions. Retext works in any language Claude handles, with your own actions, protected words and per-app styles.
-- **Grammarly and similar services:** separate accounts and subscriptions. Retext is a small open-source app that reuses the Claude Code login you already have and adds nothing to your pages.
+- **Apple Writing Tools:** built in and on-device, but limited to Apple Intelligence languages and regions, with a fixed set of actions. Retext works in any language your provider's model handles, with your own actions, protected words and per-app styles.
+- **Grammarly and similar services:** separate accounts and subscriptions. Retext is a small open-source app that reuses the Claude Code or ChatGPT login you already have (or your own API key) and adds nothing to your pages.
 - **Launcher AI commands (Raycast, Alfred):** broad and powerful, with AI features usually on a paid plan. Retext does one job: rewrite the selection in place, keeping font, size and colour.
 
 ## FAQ
@@ -139,7 +139,7 @@ With Homebrew, do step 1, then run `brew uninstall --zap --cask retext`, which q
 
 **Does it cost anything?** The app is free. Requests count against your Claude or ChatGPT plan's limits, or are billed by the API you use.
 
-**Which languages?** Any language Claude handles. The default third action translates into your Mac's language when that isn't English.
+**Which languages?** Any language your provider's model handles. The default third action translates into your Mac's language when that isn't English.
 
 **Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
 

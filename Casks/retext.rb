@@ -6,7 +6,7 @@ cask "retext" do
 
   url "https://github.com/hlebtkachenko/retext/releases/download/v#{version}/Retext-#{version}.dmg"
   name "Retext"
-  desc "Fix, translate and rewrite selected text in any app with Claude Code"
+  desc "Fix, translate and rewrite selected text in any app with your own AI provider"
   homepage "https://hlebtkachenko.github.io/retext/"
 
   livecheck do
