@@ -1,7 +1,7 @@
-# Template for hlebtkachenko/homebrew-tap (Casks/retext.rb). Per release, set version and sha256
-# from build/Retext-VERSION.dmg.sha256 or the release asset: see docs/RELEASING.md.
+# Template for hlebtkachenko/homebrew-tap (Casks/retext.rb), not a published cask: the signed release is planned.
+# Per release, the sed in docs/RELEASING.md sets version and sha256 from the release asset.
 cask "retext" do
-  version "1.3.0"
+  version "REPLACE_WITH_VERSION"
   sha256 "REPLACE_WITH_SHA256_OF_THE_RELEASE_DMG"
 
   url "https://github.com/hlebtkachenko/retext/releases/download/v#{version}/Retext-#{version}.dmg"
