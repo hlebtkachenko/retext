@@ -8,7 +8,7 @@ Key facts:
 - Engine: one active provider. Claude Code: `claude -p` with tools, MCP and user settings disabled. ChatGPT: `codex exec` with tools off and a private CODEX_HOME. Custom: OpenAI-compatible `/chat/completions`, key in the macOS Keychain. Three quality levels map to the provider's models: Medium (Claude `haiku`, default), High (`sonnet`, extra instructions) and Max (`opus`, extra instructions); Up/Down in the bar change the level for one run.
 - Works in any app with selectable text via the macOS Accessibility API and a CGEvent tap; read-only text (web pages, PDFs) is copied to the clipboard instead of pasted.
 - Local data: ~/Library/Application Support/Retext/{settings,history,usage}.json and codex-home/ (private Codex home: a symlink to Codex's auth.json plus Codex's own state); the custom API key in the macOS Keychain. No telemetry. Text goes only to the chosen provider (Claude Code to Anthropic, Codex to OpenAI, or the custom API's URL); apart from a custom API, the only request Retext makes itself is an optional daily update check to api.github.com.
-- Install: download the signed, notarized DMG from the latest GitHub release, or `brew install --cask hlebtkachenko/tap/retext` (from 1.4.0).
+- Install: build from source (below); GitHub releases have no download yet. A signed DMG and a Homebrew cask are planned for a later release.
 - Update check: at most once a day, at launch and when the Mac wakes, Retext asks the GitHub releases API for the latest version and shows "Update available" in the menu; it can be turned off in Settings → General.
 - Build from source: `./build.sh` (Xcode 26+). No third-party dependencies.
 - Not affiliated with Anthropic or OpenAI.

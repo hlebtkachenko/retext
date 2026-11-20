@@ -31,10 +31,10 @@
 - `Sources/Retext/ProviderRunner.swift`: dispatch to the active provider's runner, and `ProviderStatus` (local readiness check for the menu, welcome window and General).
 - `Resources/AppIcon.icon`: the Liquid Glass app icon (Icon Composer format: solid brand fill, R and cursor layers with glass). `build.sh` and `scripts/release.sh` compile it with `actool` into `Assets.car` (needs Xcode 26 or later) and fail if that step fails. `Resources/AppIcon.icns` is the full-size fallback rendered from it.
 - `scripts/make-icon.swift`: writes the icon's glyph SVGs, renders `AppIcon.icns` from the compiled glass icon and the launch images in `docs/images/`.
-- `scripts/release.sh`: builds a universal app, signs it with Developer ID, notarizes and staples it, and packs it into a signed, notarized DMG (see `docs/RELEASING.md`).
-- `.github/workflows/release.yml`: runs `scripts/release.sh` on a pushed `vX.Y.Z` tag and attaches the DMG to the GitHub release; skips the whole run when the release already has `Retext-VERSION.dmg`, so published assets are never overwritten.
-- `Casks/retext.rb`: template of the Homebrew cask for the `hlebtkachenko/tap` tap.
-- `docs/index.html`: the landing page (GitHub Pages).
+- `scripts/release.sh` (planned signed release, not used yet): builds a universal app, signs it with Developer ID, notarizes and staples it, and packs it into a signed, notarized DMG (see `docs/RELEASING.md`).
+- `.github/workflows/release.yml` (not used yet): run by hand for a tag (`workflow_dispatch`), runs `scripts/release.sh` and attaches the DMG to the GitHub release; skips the whole run when the release already has `Retext-VERSION.dmg`, so published assets are never overwritten.
+- `Casks/retext.rb`: template of the Homebrew cask for the `hlebtkachenko/tap` tap (planned, not published yet).
+- `docs/index.html`: the landing page (GitHub Pages, not published yet).
 - `eval/`: prompt eval set for the quality levels and prompts; see `eval/README.md`.
 
 ## Decisions
@@ -54,4 +54,4 @@
 - Copy instead of paste when the selection holds an image: pasting rich text from Claude's plain answer would drop the image or turn it into its file name; a copy keeps the original intact.
 - Update check over a bundled updater (Sparkle): no dependency and no background downloads; one daily GET that the user can turn off, and the menu item opens the release page.
 - Update-check state in `UserDefaults`, not settings.json: it is app state, not a setting, and must not travel with an exported settings file.
-- Distribution as a Developer ID signed, notarized DMG plus a Homebrew tap, not the Mac App Store: the event tap and Accessibility don't fit the sandbox, and the app shells out to `claude`.
+- Planned distribution as a Developer ID signed, notarized DMG plus a Homebrew tap (for now, build from source), not the Mac App Store: the event tap and Accessibility don't fit the sandbox, and the app shells out to `claude`.

@@ -7,8 +7,6 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Added
 - Providers: besides Claude Code, Retext can run on ChatGPT through the Codex CLI (your ChatGPT login; Retext never stores OpenAI credentials) or on any OpenAI-compatible API (OpenRouter, Ollama, LM Studio, Gemini, Mistral, Groq and others), with the API key in the macOS Keychain. Pick one in Settings → Engine; Medium, High and Max map to its models, and ChatGPT models and efforts can be changed per level. The welcome window, Settings → General and the menu show whether the active provider is ready.
 - An app icon.
-- A signed and notarized DMG download and a Homebrew cask (`brew install --cask hlebtkachenko/tap/retext`), from 1.4.0.
-- A landing page.
 - Quality levels Medium (Claude Haiku), High (Claude Sonnet) and Max (Claude Opus). High and Max also add extra instructions. Pick the default level in Settings → Engine; ↑ and ↓ in the bar change it for that run, shown in a chip at the end of the bar.
 - "Show in menu bar" in Settings → General hides the menu-bar icon (useful when it sits behind the notch). With it off, open Retext again from Spotlight or Finder to get to Settings.
 - A welcome window on first launch checks the Accessibility permission and the active provider and has a sample text to try Retext on. Open it again from the menu (Welcome…) or Settings → General.
@@ -72,5 +70,6 @@ First public release.
 - Settings for the bar shortcut (⌥Space or ⌃⌥Space), open at login, history, Electron app support and the Claude Code path.
 - Clear error messages when Claude Code is missing, not logged in, rate-limited or doesn't know a model.
 
+[Unreleased]: https://github.com/hlebtkachenko/retext/compare/v1.3.0...HEAD
 [1.3.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.3.0
 [1.2.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.2.0

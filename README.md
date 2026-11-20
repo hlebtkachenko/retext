@@ -16,21 +16,11 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 
 Requires macOS 26+, the Accessibility permission, and one provider: Claude Code installed and logged in (the default), the Codex CLI signed in with ChatGPT, or an OpenAI-compatible API. See [Providers](#providers).
 
-The DMG and the Homebrew cask start with Retext 1.4.0; until it is released, [build from source](#build-from-source).
-
-1. Download `Retext-VERSION.dmg` from the [latest release](https://github.com/hlebtkachenko/retext/releases/latest). It is signed with a Developer ID and notarized by Apple.
-2. Open the DMG and drag Retext to Applications.
-3. Open Retext and grant the Accessibility permission when asked.
-
-Or with Homebrew:
-
-```sh
-brew install --cask hlebtkachenko/tap/retext
-```
+Install Retext by [building it from source](#build-from-source): `./build.sh` puts it in `~/Applications` and starts it. Releases are tags with release notes on GitHub, without a download. A signed, notarized DMG and a Homebrew cask are planned for a later release.
 
 On first launch, a welcome window shows whether Retext has the Accessibility permission and whether the active provider is ready, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
 
-More: the [landing page](https://hlebtkachenko.github.io/retext/) (live from 1.4.0). Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes how a release is built, signed and published. To build it yourself, see [Build from source](#build-from-source).
+Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed release (not used yet).
 
 ## Features
 
@@ -117,15 +107,13 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 ## Uninstall
 
 1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
-2. Delete `Retext.app` from `/Applications` (DMG and Homebrew installs) or `~/Applications` (`./build.sh` installs).
+2. Delete `Retext.app` from `~/Applications` (where `./build.sh` installs it).
 3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `co.hleb.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete co.hleb.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
 
    ```sh
    tccutil reset Accessibility co.hleb.retext
    ```
-
-With Homebrew, do step 1, then run `brew uninstall --zap --cask retext`, which quits Retext and removes the app, its settings, history, usage and preferences; then do step 4.
 
 ## How it compares
 
