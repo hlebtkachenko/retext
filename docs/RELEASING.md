@@ -5,11 +5,12 @@
 
 A signed release is a universal `Retext-VERSION.dmg`, signed with a Developer ID Application certificate (hardened runtime, secure timestamp), notarized by Apple and stapled, attached to a GitHub release. `scripts/release.sh` does the work; `.github/workflows/release.yml` runs it when started by hand for an existing `vX.Y.Z` tag.
 
-Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, taken from the `origin` remote, so a fork works unchanged even with an `upstream` remote) and `OWNER`; set them once per shell:
+Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, taken from the `origin` remote, so a fork works unchanged even with an `upstream` remote), `OWNER` and `BUNDLE_ID` (the `CFBundleIdentifier` in `Info.plist`); set them once per shell:
 
 ```bash
 REPO=$(git remote get-url origin | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')
 OWNER=${REPO%/*}
+BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 ```
 
 Never commit a signing identity's name, a `.p12`, a password or a team's credentials. Identities are passed by SHA-1 hash in environment variables.
@@ -126,9 +127,10 @@ TAP=../homebrew-tap
    echo "$SHA"
    sed -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" \
        -e "s#hlebtkachenko/retext#$REPO#g" -e "s#^  homepage \".*\"#  homepage \"https://$OWNER.github.io/${REPO#*/}/\"#" \
+       -e "s/dev\.hapd\.retext/$BUNDLE_ID/g" \
        Casks/retext.rb > "$TAP/Casks/retext.rb"
    ```
-   Expected: a 64-character hex hash, and the tap's `Casks/retext.rb` shows the new version and hash, with this repository's download URL and Pages homepage.
+   Expected: a 64-character hex hash, and the tap's `Casks/retext.rb` shows the new version and hash, with this repository's download URL, Pages homepage and bundle id (in `uninstall quit:` and the preferences `zap` path; the `co.hleb.retext` line stays, it is upstream's old bundle id).
 
 2. Publish, then audit and install from the tap.
    ```bash
