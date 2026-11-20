@@ -25,18 +25,64 @@ enum UpdateChecker {
         let defaults = UserDefaults.standard
         guard AppState.shared.settings.checkForUpdates, let current = currentVersion else { return }
         if let last = defaults.object(forKey: checkedKey) as? Date, Date().timeIntervalSince(last) < 24 * 60 * 60 { return }
+        Task { if case .success(let release) = await fetch(current: current) { remember(release) } }
+    }
+
+    /// "Check for Updates…": asks now, whatever the setting and the last check, and remembers the answer like
+    /// `checkIfDue`, so the menu's "Update available" item follows it.
+    static func checkNow() async -> UpdateCheckResult {
+        guard let current = currentVersion else { return .failed("This build has no version number.") }
+        switch await fetch(current: current) {
+        case .failure(let failure):
+            return .failed(failure.reason)
+        case .success(let release):
+            remember(release)
+            if let update = available { return .available(update) }
+            // Newer, but its page is not on GitHub: never offered.
+            if Version.isNewer(release.version, than: current) { return .failed("The latest release's page is not on github.com.") }
+            return .upToDate(current)
+        }
+    }
+
+    private static func fetch(current: String) async -> Result<Release, UpdateCheckFailure> {
         var request = URLRequest(url: latestURL, timeoutInterval: 15)
         // Only the app name and version; the ephemeral session adds no cookies or cache.
         request.setValue("Retext/\(current)", forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        Task {
-            guard let (data, response) = try? await URLSession(configuration: .ephemeral).data(for: request),
-                  (response as? HTTPURLResponse)?.statusCode == 200,
-                  let release = try? JSONDecoder().decode(Release.self, from: data) else { return }
-            defaults.set(Date(), forKey: checkedKey)
-            defaults.set(release.version, forKey: versionKey)
-            defaults.set(release.html_url, forKey: pageKey)
-            AppState.shared.update = available
+        let data: Data, response: URLResponse
+        do {
+            (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        } catch {
+            return .failure(UpdateCheckFailure(reason: error.localizedDescription))
         }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // 404: the repository has no release yet.
+        guard status == 200 else { return .failure(UpdateCheckFailure(reason: status == 404 ? "No release found on GitHub." : "GitHub answered \(status).")) }
+        guard let release = try? JSONDecoder().decode(Release.self, from: data) else {
+            return .failure(UpdateCheckFailure(reason: "GitHub's answer could not be read."))
+        }
+        return .success(release)
     }
+
+    private static func remember(_ release: Release) {
+        let defaults = UserDefaults.standard
+        defaults.set(Date(), forKey: checkedKey)
+        defaults.set(release.version, forKey: versionKey)
+        defaults.set(release.html_url, forKey: pageKey)
+        AppState.shared.update = available
+    }
+}
+
+/// What "Check for Updates…" reports.
+enum UpdateCheckResult: Sendable {
+    /// The current version.
+    case upToDate(String)
+    /// A newer release whose page is on https://github.com/.
+    case available(Release)
+    /// Why the check failed, for the alert.
+    case failed(String)
+}
+
+struct UpdateCheckFailure: Error, Sendable {
+    let reason: String
 }
