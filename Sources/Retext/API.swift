@@ -53,7 +53,7 @@ private final class SameServerRedirects: NSObject, URLSessionTaskDelegate, Senda
 
 /// The custom API keys in the login Keychain: generic passwords, one per server (`CustomProviderSettings.keyAccount`),
 /// never written to settings.json, logs or the UI. The service is the bundle id; keys saved under the legacy service
-/// move to it on first read (`KeychainMigration`).
+/// move to it on first read (`KeychainMigration`, add-only).
 enum Keychain {
     static let service = Bundle.main.bundleIdentifier ?? Identity.bundleID
     private static let legacy = Identity.legacyKeychainService
@@ -64,7 +64,7 @@ enum Keychain {
 
     static func apiKey(account: String) -> String? {
         KeychainMigration.key(account: account, service: service, read: read,
-                              save: { key, service, account in save(key, base(account, service: service)) },
+                              save: { key, service, account in add(key, base(account, service: service)) },
                               delete: { service, account in SecItemDelete(base(account, service: service) as CFDictionary) })
     }
 
@@ -107,13 +107,17 @@ enum Keychain {
     }
 
     private static func save(_ key: String, _ base: [String: Any]) -> Bool {
-        let data = Data(key.utf8)
-        let status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        let status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: Data(key.utf8)] as CFDictionary)
         if status == errSecSuccess { return true }
-        guard status == errSecItemNotFound else { return false }
-        var add = base
-        add[kSecValueData as String] = data
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        return status == errSecItemNotFound && add(key, base)
+    }
+
+    /// Adds a new item only: an existing one (errSecDuplicateItem) is left alone, so the move never overwrites
+    /// a key saved in Settings while the legacy read waited on a Keychain prompt.
+    private static func add(_ key: String, _ base: [String: Any]) -> Bool {
+        var item = base
+        item[kSecValueData as String] = Data(key.utf8)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
     }
 }

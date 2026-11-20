@@ -24,13 +24,17 @@ private final class FakeKeychain {
     var corruptOnSave = false
     var deletes: [String] = []
     var reads: [String] = []
+    /// Runs once on the first legacy read: another writer (Settings → Save) while the read waits on a prompt.
+    var onLegacyRead: (() -> Void)?
 
     func read(_ service: String, _ account: String) -> String? {
         reads.append(service)
+        if service == "old", let hook = onLegacyRead { onLegacyRead = nil; hook() }
         return items["\(service)|\(account)"]
     }
+    /// Add-only, like the real migration save: an existing item is never overwritten.
     func save(_ key: String, _ service: String, _ account: String) -> Bool {
-        guard saveWorks else { return false }
+        guard saveWorks, items["\(service)|\(account)"] == nil else { return false }
         items["\(service)|\(account)"] = corruptOnSave ? key + "x" : key
         return true
     }
@@ -67,6 +71,16 @@ private final class FakeKeychain {
         k.saveWorks = false
         #expect(k.key() == "k0")
         #expect(k.items == ["old|acct": "k0"])
+        #expect(k.deletes.isEmpty)
+        #expect(k.reads == ["new", "old", "new"])
+    }
+
+    @Test func keySavedDuringTheMoveIsNotOverwritten() {
+        let k = FakeKeychain()
+        k.items = ["old|acct": "k0"]
+        k.onLegacyRead = { k.items["new|acct"] = "k1" }
+        #expect(k.key() == "k1")
+        #expect(k.items == ["new|acct": "k1", "old|acct": "k0"])
         #expect(k.deletes.isEmpty)
     }
 

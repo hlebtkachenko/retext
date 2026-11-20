@@ -28,11 +28,12 @@ public enum Identity {
 /// Moves a custom API key from the legacy Keychain service to the current one. The Keychain calls are passed in,
 /// so the decision is testable; the key itself is never logged.
 public enum KeychainMigration {
-    /// The key for `account`: from `service`, else from `legacyService`. A legacy key is saved under `service`, read back,
-    /// and only then deleted from `legacyService`; when the save or the check fails, the legacy item stays and its key is used.
+    /// The key for `account`: from `service`, else from `legacyService`. A legacy key is added under `service`, read back,
+    /// and only then deleted from `legacyService`. When the add fails (an item already exists, saved meanwhile in Settings,
+    /// or the Keychain refused), the legacy item stays and the current item wins if it can be read.
     /// - Parameters:
     ///   - read: (service, account) -> key
-    ///   - save: (key, service, account) -> success
+    ///   - save: (key, service, account) -> success; must only add, never overwrite an existing item
     ///   - delete: (service, account)
     public static func key(account: String, service: String, legacyService: String = Identity.legacyKeychainService,
                            read: (String, String) -> String?,
@@ -41,7 +42,8 @@ public enum KeychainMigration {
         if let key = read(service, account) { return key }
         // Same service: the legacy item is the only copy, never delete it.
         guard service != legacyService, let legacy = read(legacyService, account) else { return nil }
-        if save(legacy, service, account), read(service, account) == legacy { delete(legacyService, account) }
+        guard save(legacy, service, account) else { return read(service, account) ?? legacy }
+        if read(service, account) == legacy { delete(legacyService, account) }
         return legacy
     }
 }
