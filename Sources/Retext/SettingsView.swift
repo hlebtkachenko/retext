@@ -56,6 +56,10 @@ struct SettingsView: View {
 
     @ObservedObject private var state = AppState.shared
     static var initialPane = Pane.actions
+    /// `--demo settings <pane> <extra>`: the word after the pane opens a dialog or expands a row, for screenshots.
+    static let demoExtra: String? = CommandLine.arguments.firstIndex(of: "--demo").flatMap { i in
+        CommandLine.arguments.dropFirst(i + 1).first == "settings" ? CommandLine.arguments.dropFirst(i + 3).first : nil
+    }
     @State private var pane: Pane? = SettingsView.initialPane
 
     var body: some View {
@@ -803,6 +807,7 @@ private struct GeneralPane: View {
                     Button("Import Settings…", action: chooseImport)
                     Spacer()
                     Button("Reset All Settings to Defaults…", role: .destructive) { confirmReset = true }
+                        .foregroundStyle(.red)
                 }
             } header: {
                 Text("Backup")
@@ -827,7 +832,10 @@ private struct GeneralPane: View {
                 Text("Not affiliated with Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.").foregroundStyle(.secondary)
             }
         }
-        .onAppear { loginStatus = SMAppService.mainApp.status }
+        .onAppear {
+            loginStatus = SMAppService.mainApp.status
+            if SettingsView.demoExtra == "reset" { confirmReset = true }
+        }
         .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { state.history = History() }
         } message: {
@@ -835,9 +843,12 @@ private struct GeneralPane: View {
         }
         .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
             Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
+            // Cancel is the default button, so Return never resets.
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
-            Text("Actions, app styles, protected words and every other setting go back to the defaults. Export them first to keep a copy.")
+            Text("Actions, app styles, protected words, the provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
         }
+        .dialogSeverity(.critical)
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {
             Button("Replace Settings", role: .destructive) {
