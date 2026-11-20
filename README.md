@@ -132,7 +132,7 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
    tccutil reset Accessibility dev.hapd.retext
    ```
 
-Retext 1.4.0 and earlier used the bundle id `co.hleb.retext`. If you ran one of those versions, repeat steps 3 and 4 with `co.hleb.retext`: its Keychain item (left when the newer version never used the key, when the Keychain prompt for it was denied, or when deleting it failed), `defaults delete co.hleb.retext` and `tccutil reset Accessibility co.hleb.retext`.
+Retext 1.4.0 and earlier used the bundle id `co.hleb.retext`. If you ran one of those versions, repeat steps 3 and 4 with `co.hleb.retext`: its Keychain item (left when the newer version never used the key, when the Keychain prompt for it was denied, or when deleting it failed), and `defaults delete co.hleb.retext`. Neither needs the old app. The old Accessibility entry is removed in System Settings → Privacy & Security → Accessibility: select the old Retext entry and click −. `tccutil reset Accessibility co.hleb.retext` works only while the old version is still installed (before updating); after the update it fails with "No such bundle identifier" (OSStatus -10814).
 
 ## How it compares
 
