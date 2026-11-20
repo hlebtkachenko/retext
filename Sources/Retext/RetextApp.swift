@@ -8,7 +8,7 @@ struct RetextApp: App {
     @ObservedObject private var state = AppState.shared
 
     var body: some Scene {
-        MenuBarExtra("Retext", systemImage: "character.cursor.ibeam", isInserted: showIcon) {
+        MenuBarExtra(isInserted: showIcon) {
             // Clicking an action runs it on the selection in the app in front, like its ⌥N shortcut.
             ForEach(Array(state.settings.actions.enumerated()), id: \.element.id) { index, action in
                 Button { delegate.controller.trigger(index) } label: { Label(action.title, systemImage: action.symbol) }
@@ -39,8 +39,50 @@ struct RetextApp: App {
                 Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
             }
             Button("Welcome…") { WelcomeWindow.shared.show() }
+            Button("Check for Updates…") { Self.checkForUpdates() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
+        } label: {
+            Image(nsImage: MenuBarIcon.image)
+        }
+        // The app menu (About Retext, Services, Hide…) shown while Settings or Welcome is open.
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { Self.checkForUpdates() }
+            }
+        }
+    }
+
+    private static var checking = false
+
+    /// "Check for Updates…": asks GitHub now and answers in an alert; a second click while a check runs is ignored.
+    private static func checkForUpdates() {
+        guard !checking else { return }
+        checking = true
+        Task { @MainActor in
+            let result = await UpdateChecker.checkNow()
+            checking = false
+            let alert = NSAlert()
+            switch result {
+            case .upToDate(let current):
+                alert.messageText = "Retext \(current) is up to date."
+            case .available(let release):
+                alert.messageText = "Retext \(release.version) is available."
+                alert.informativeText = "You have \(UpdateChecker.currentVersion ?? "an older version")."
+                alert.addButton(withTitle: "Open Release Page")
+                alert.addButton(withTitle: "Later")
+            case .failed(let reason):
+                alert.alertStyle = .warning
+                alert.messageText = "Couldn't check for updates."
+                alert.informativeText = reason
+            }
+            // A menu-bar app is not active after a menu click; the alert must come to the front.
+            NSApp.activate()
+            let response = alert.runModal()
+            if case .available(let release) = result, response == .alertFirstButtonReturn,
+               release.html_url.hasPrefix("https://github.com/"), let page = URL(string: release.html_url) {
+                NSWorkspace.shared.open(page)
+            }
         }
     }
 
@@ -239,4 +281,48 @@ enum Hotkeys {
         guard let element = SelectionIO.focusedElement(of: app, timeout: 0.1) else { return false }
         return !(SelectionIO.selectedText(element) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+}
+
+/// The menu-bar icon: SF Symbols' character.cursor.ibeam ("A" and a text cursor) with an "R" in place of the "A".
+/// SF Symbols has no "R" variant, so the symbol's cursor is kept and the "R" is SF Pro's glyph scaled to the "A"'s
+/// height, drawn at every scale (crisp at 1x and 2x) as a template the menu bar tints for light and dark.
+@MainActor
+enum MenuBarIcon {
+    static let image: NSImage = {
+        let symbol = NSImage(systemSymbolName: "character.cursor.ibeam", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular))
+        guard let symbol else { return NSImage() }
+        // One point taller, drawn at the top: the menu bar centers this image, while it places the symbol itself half a
+        // point higher (checked side by side).
+        let image = NSImage(size: NSSize(width: symbol.size.width, height: symbol.size.height + 1), flipped: false) { _ in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            let rect = CGRect(x: 0, y: 1, width: symbol.size.width, height: symbol.size.height)
+            // The "A"'s box and where the cursor starts, in points of the 13 pt symbol (16 x 16), measured from its render.
+            let letter = NSRect(x: 1.9, y: 3.05, width: 7.4, height: 9.9), cursorX: CGFloat = 9.5
+            let font = NSFont.systemFont(ofSize: 100, weight: .regular) as CTFont
+            var character: UniChar = 0x52, glyph: CGGlyph = 0  // "R"
+            guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1),
+                  let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return false }
+            let box = path.boundingBoxOfPath, scale = letter.height / box.height
+            // Right-aligned to the "A"'s box keeps the symbol's gap to the cursor; a whole-point left edge keeps the
+            // stem on the pixel grid.
+            let left = (letter.maxX - box.width * scale).rounded()
+            context.saveGState()
+            context.clip(to: CGRect(x: cursorX, y: rect.minY, width: rect.width - cursorX, height: rect.height))
+            symbol.draw(in: rect)
+            context.restoreGState()
+            context.saveGState()
+            defer { context.restoreGState() }
+            context.translateBy(x: left, y: rect.minY + letter.minY)
+            context.scaleBy(x: scale, y: scale)
+            context.translateBy(x: -box.minX, y: -box.minY)
+            context.addPath(path)
+            context.setFillColor(NSColor.black.cgColor)
+            context.fillPath()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Retext"
+        return image
+    }()
 }
