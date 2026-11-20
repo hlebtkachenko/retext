@@ -17,7 +17,8 @@ public enum TextDiff {
     /// Words longer than this are compared character by character: text without spaces (Chinese, Japanese, Thai) is one "word".
     static let longWord = 16
     /// Above this many LCS cells the changed middle is shown as removed, then added, instead of word by word.
-    static let maxCells = 1_000_000
+    /// 16M cells cover a ~1500-word email changed throughout (about 32 MB of UInt16 for a moment).
+    static let maxCells = 16_000_000
 
     /// Equal, deleted and inserted runs in order; equal + deleted text is `old`, equal + inserted text is `new`.
     /// A replacement lists the deleted run before the inserted one.
@@ -28,6 +29,14 @@ public enum TextDiff {
         var suffix = 0
         while suffix < a.count - prefix, suffix < b.count - prefix, a[a.count - 1 - suffix] == b[b.count - 1 - suffix] { suffix += 1 }
         let x = Array(a[prefix..<(a.count - suffix)]), y = Array(b[prefix..<(b.count - suffix)])
+        // The LCS compares integer ids, not strings: millions of comparisons run on the main thread.
+        var ids: [String: Int] = [:]
+        func id(_ token: String) -> Int {
+            if let id = ids[token] { return id }
+            ids[token] = ids.count
+            return ids.count - 1
+        }
+        let xi = x.map(id), yi = y.map(id)
 
         var out: [Segment] = []
         func add(_ kind: Kind, _ text: String) {
@@ -38,17 +47,18 @@ public enum TextDiff {
             x.forEach { add(.deleted, $0) }
             y.forEach { add(.inserted, $0) }
         } else {
-            // lcs[i * w + j] = longest common subsequence of x[i...] and y[j...]
+            // lcs[i * w + j] = longest common subsequence of x[i...] and y[j...]; it is at most min(x, y) <= sqrt(maxCells),
+            // so UInt16 holds it.
             let w = y.count + 1
-            var lcs = [Int](repeating: 0, count: (x.count + 1) * w)
+            var lcs = [UInt16](repeating: 0, count: (x.count + 1) * w)
             for i in stride(from: x.count - 1, through: 0, by: -1) {
                 for j in stride(from: y.count - 1, through: 0, by: -1) {
-                    lcs[i * w + j] = x[i] == y[j] ? lcs[(i + 1) * w + j + 1] + 1 : max(lcs[(i + 1) * w + j], lcs[i * w + j + 1])
+                    lcs[i * w + j] = xi[i] == yi[j] ? lcs[(i + 1) * w + j + 1] + 1 : max(lcs[(i + 1) * w + j], lcs[i * w + j + 1])
                 }
             }
             var i = 0, j = 0
             while i < x.count || j < y.count {
-                if i < x.count, j < y.count, x[i] == y[j] {
+                if i < x.count, j < y.count, xi[i] == yi[j] {
                     add(.equal, x[i]); i += 1; j += 1
                 } else if j == y.count || (i < x.count && lcs[(i + 1) * w + j] >= lcs[i * w + j + 1]) {
                     add(.deleted, x[i]); i += 1

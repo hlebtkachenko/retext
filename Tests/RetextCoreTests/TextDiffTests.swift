@@ -52,9 +52,15 @@ import Testing
         _ = diff("Café 👍🏽 ok", "Cafe 👍 ok")
     }
 
+    @Test func midSizeTextWithEditsNearBothEndsDiffsWordByWord() {
+        let middle = (0..<600).map { "w\($0)" }.joined(separator: " ")
+        let segments = diff("Teh \(middle) endd.", "The \(middle) end.")
+        #expect(segments.map(\.kind) == [.deleted, .inserted, .equal, .deleted, .inserted, .equal])
+    }
+
     @Test func hugeChangeFallsBackToBlocks() {
-        let old = (0..<1200).map { "a\($0)" }.joined(separator: " ")
-        let new = (0..<1200).map { "b\($0)" }.joined(separator: " ")
+        let old = (0..<2500).map { "a\($0)" }.joined(separator: " ")
+        let new = (0..<2500).map { "b\($0)" }.joined(separator: " ")
         let segments = diff(old, new)
         #expect(segments.map(\.kind) == [.deleted, .inserted])
     }
