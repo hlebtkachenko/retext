@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [1.4.0] - 2026-11-20
 
 ### Added
 - Providers: besides Claude Code, Retext can run on ChatGPT through the Codex CLI (your ChatGPT login; Retext never stores OpenAI credentials) or on any OpenAI-compatible API (OpenRouter, Ollama, LM Studio, Gemini, Mistral, Groq and others), with the API key in the macOS Keychain. Pick one in Settings → Engine; Medium, High and Max map to its models, and ChatGPT models and efforts can be changed per level. The welcome window, Settings → General and the menu show whether the active provider is ready.
@@ -70,6 +70,6 @@ First public release.
 - Settings for the bar shortcut (⌥Space or ⌃⌥Space), open at login, history, Electron app support and the Claude Code path.
 - Clear error messages when Claude Code is missing, not logged in, rate-limited or doesn't know a model.
 
-[Unreleased]: https://github.com/hlebtkachenko/retext/compare/v1.3.0...HEAD
+[1.4.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.4.0
 [1.3.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.3.0
 [1.2.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.2.0
