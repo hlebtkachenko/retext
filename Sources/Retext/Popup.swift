@@ -208,6 +208,8 @@ final class PopupController {
     private var anchor: CGRect?
     /// The previewed result and the selection it would replace; nil once replaced, copied or discarded.
     private var pending: (text: String, selection: Selection)?
+    /// Discards the preview when another app comes to the front.
+    private var activation: NSObjectProtocol?
 
     /// ⌥Space opens the menu (or closes it); ⌥1…⌥9 pass an action index and run it straight away.
     func trigger(_ action: Int? = nil) {
@@ -309,6 +311,8 @@ final class PopupController {
             defer { if runID == id { work = nil } }
             do {
                 let result = try await result(of: job, timeout: timeout, for: selection)
+                // A cache hit returns without a cancellation check; after Esc nothing may show, copy or paste.
+                try Task.checkCancellation()
                 if Engine.isUnchanged(input: selection.text, output: result) {
                     return flash(.message("No changes needed", isError: false, symbol: "checkmark.circle"), for: 1.5)
                 }
@@ -334,13 +338,23 @@ final class PopupController {
     }
 
     /// Shows the result with its changes marked and waits: Return replaces, Esc discards, ⌘C copies. No timer closes it.
+    /// Shown only while the selection's app is still in front; otherwise the result is copied, so the preview never
+    /// takes the keyboard from another app. Switching apps while it shows discards it.
     private func preview(_ text: String, for selection: Selection) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == selection.app.processIdentifier else {
+            return copy(text, note: "Selection changed. Copied.")
+        }
         hideTask?.cancel()
         pending = (text, selection)
         model.phase = .preview(TextDiff.words(old: selection.text, new: text))
         fit()
         // Key again, in case a click elsewhere took the keyboard while the provider worked.
         panel?.makeKeyAndOrderFront(nil)
+        // One observer is enough: it acts only while a preview is pending, and close() removes it.
+        if activation == nil { activation = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if self?.pending != nil { self?.close() } }
+        } }
     }
 
     /// Return in the preview: the same replace as without it, after checking the selection is still there.
@@ -352,8 +366,17 @@ final class PopupController {
         let id = runID
         work = Task {
             defer { if runID == id { work = nil } }
+            // Wait (up to 1 s) for Return to come up while the panel still takes the keys, so a held Return
+            // doesn't repeat into the source app after the paste re-activates it.
+            var waited = 0
+            while Self.returnIsDown, waited < 50 { try? await Task.sleep(for: .milliseconds(20)); waited += 1 }
+            guard !Task.isCancelled else { return }
             await replace(pending.selection, with: pending.text)
         }
+    }
+
+    private static var returnIsDown: Bool {
+        [kVK_Return, kVK_ANSI_KeypadEnter].contains { CGEventSource.keyState(.combinedSessionState, key: CGKeyCode($0)) }
     }
 
     private func copyPreview() {
@@ -452,6 +475,8 @@ final class PopupController {
 
     private func close() {
         pending = nil
+        if let activation { NSWorkspace.shared.notificationCenter.removeObserver(activation) }
+        activation = nil
         Hotkeys.undo = nil
         removeMonitors()
         guard let panel, panel.isVisible else { return }
@@ -520,9 +545,14 @@ final class PopupController {
         guard event.window === panel else { return false }
         let key = Int(event.keyCode)
         if key == kVK_Escape { cancel(); return true }
-        if pending != nil {
+        if case .preview = model.phase {
+            // After Return, pending is nil but the panel keeps the keys until the replace: swallow repeats.
+            guard pending != nil else { return true }
             if key == kVK_Return || key == kVK_ANSI_KeypadEnter { confirmPreview() }
-            if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "c" { copyPreview() }
+            // The key code works on any layout (Cyrillic); the character keeps ⌘C where C sits elsewhere (Dvorak).
+            if event.modifierFlags.contains(.command), key == kVK_ANSI_C || event.charactersIgnoringModifiers?.lowercased() == "c" {
+                copyPreview()
+            }
             return true
         }
         guard model.phase == .menu, !event.modifierFlags.contains(.command) else { return false }
