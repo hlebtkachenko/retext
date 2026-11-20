@@ -2,25 +2,38 @@ import Foundation
 import Testing
 @testable import RetextCore
 
-@Suite struct RoutingTests {
-    let grammar = CustomAction(title: "Fix", symbol: "x", prompt: "p", kind: .grammar)
+@Suite struct LevelTests {
+    let grammar = CustomAction(title: "Fix", symbol: "x", prompt: "Fix it.", kind: .grammar)
 
-    @Test func autoUsesSonnetForEveryKind() {
-        for kind in ActionKind.allCases {
-            #expect(Engine.model(for: CustomAction(title: "T", symbol: "x", prompt: "p", kind: kind)) == Model.sonnet)
+    @Test func levelsMapToModelEffortAndAddOn() {
+        #expect(Level.allCases.map(\.model) == [Model.haiku, Model.sonnet, Model.opus])
+        #expect(Level.allCases.map(\.effort) == ["low", "medium", "medium"])
+        #expect(Level.allCases.map(\.addOn) == [nil, Engine.highAddOn, Engine.maxAddOn])
+        #expect(Level.allCases.map(\.title) == ["Medium", "High", "Max"])
+    }
+
+    @Test func stepsClampAndNextWraps() {
+        #expect(Level.medium.stepped(by: -1) == .medium && Level.medium.stepped(by: 1) == .high)
+        #expect(Level.max.stepped(by: 1) == .max && Level.max.stepped(by: -1) == .high)
+        #expect(Level.medium.next == .high && Level.max.next == .medium)
+    }
+
+    @Test func mediumKeepsTodaysPrompt() {
+        let job = Engine.job(for: grammar, level: .medium, text: "x", settings: RetextSettings(), bundleID: nil)
+        #expect(job.model == Model.haiku && job.effort == "low")
+        #expect(job.system == Engine.systemPrompt("Fix it.", style: nil, protectedWords: []))
+        #expect(!job.system.contains(Engine.highAddOn) && !job.system.contains(Engine.maxAddOn))
+    }
+
+    @Test func highAndMaxAddTheirBlockAfterTheTask() {
+        for level in [Level.high, .max] {
+            let job = Engine.job(for: grammar, level: level, text: "x", settings: RetextSettings(), bundleID: nil)
+            #expect(job.model == level.model && job.effort == level.effort)
+            #expect(job.system.hasPrefix("Fix it.\n\n\(level.addOn!)\n\n"))
+            let typed = Engine.job(instruction: "shorter", level: level, settings: RetextSettings(), bundleID: nil)
+            #expect(typed.model == level.model && typed.system.contains(level.addOn!))
         }
-    }
-
-    @Test func explicitModelOverrides() {
-        var action = grammar
-        action.model = .haiku
-        #expect(Engine.model(for: action) == Model.haiku)
-        action.model = .sonnet
-        #expect(Engine.model(for: action) == Model.sonnet)
-    }
-
-    @Test func freeInstructionUsesSonnet() {
-        #expect(Engine.job(instruction: "shorter", settings: RetextSettings(), bundleID: nil).model == Model.sonnet)
+        #expect(!Engine.job(for: grammar, level: .high, text: "x", settings: RetextSettings(), bundleID: nil).system.contains(Engine.maxAddOn))
     }
 }
 
@@ -29,8 +42,8 @@ import Testing
         var settings = RetextSettings(appStyles: [], protectedWords: ["Acme"])
         let action = settings.actions[0]
         func key() -> String {
-            let job = Engine.job(for: action, text: "helo", settings: settings, bundleID: "com.apple.mail")
-            return Engine.cacheKey(model: job.model, system: job.system, text: "helo")
+            let job = Engine.job(for: action, level: .medium, text: "helo", settings: settings, bundleID: "com.apple.mail")
+            return Engine.cacheKey(provider: "claude", model: job.model, effort: job.effort, system: job.system, text: "helo")
         }
         let base = key()
         #expect(base == key())
@@ -41,19 +54,20 @@ import Testing
         #expect(key() != styled)
     }
 
-    @Test func changesWithModelAndText() {
-        let a = Engine.cacheKey(model: Model.haiku, system: "s", text: "t")
-        #expect(a != Engine.cacheKey(model: Model.sonnet, system: "s", text: "t"))
-        #expect(a != Engine.cacheKey(model: Model.haiku, system: "s", text: "t "))
+    @Test func changesWithModelEffortAndText() {
+        let a = Engine.cacheKey(provider: "claude", model: Model.haiku, effort: "low", system: "s", text: "t")
+        #expect(a != Engine.cacheKey(provider: "claude", model: Model.sonnet, effort: "low", system: "s", text: "t"))
+        #expect(a != Engine.cacheKey(provider: "claude", model: Model.haiku, effort: "medium", system: "s", text: "t"))
+        #expect(a != Engine.cacheKey(provider: "claude", model: Model.haiku, effort: "low", system: "s", text: "t "))
         #expect(a.count == 64)
     }
 }
 
 @Suite struct LayoutCheckTests {
     @Test func oneLineInputStaysOneLine() {
-        let output = "Dobrý den, pane Nováku,\n\nposílám Vám návrh smlouvy."
-        #expect(Engine.checkLayout(input: "Dobrý den pane Nováku, posílám vám návrh smlouvy.", output: output, kind: .grammar)
-                == "Dobrý den, pane Nováku, posílám Vám návrh smlouvy.")
+        let output = "Dobrý den, pane Svobodo,\n\nposílám Vám návrh smlouvy."
+        #expect(Engine.checkLayout(input: "Dobrý den pane Svobodo, posílám vám návrh smlouvy.", output: output, kind: .grammar)
+                == "Dobrý den, pane Svobodo, posílám Vám návrh smlouvy.")
         #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\nposílám to.", kind: .translate) == "Ahoj, posílám to.")
     }
 
@@ -62,8 +76,8 @@ import Testing
         #expect(Engine.checkLayout(input: "a, b, c", output: "- a\n- b\n- c", kind: nil) == "- a\n- b\n- c")
         #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\n\nposílám to.", kind: .translate, styled: true) == "Ahoj,\n\nposílám to.")
         let mail = RetextSettings(appStyles: [AppStyle(bundleID: "com.apple.mail", style: "formal")])
-        #expect(Engine.job(for: mail.actions[0], text: "x", settings: mail, bundleID: "com.apple.mail").styled)
-        #expect(!Engine.job(for: mail.actions[0], text: "x", settings: mail, bundleID: nil).styled)
+        #expect(Engine.job(for: mail.actions[0], level: .medium, text: "x", settings: mail, bundleID: "com.apple.mail").styled)
+        #expect(!Engine.job(for: mail.actions[0], level: .medium, text: "x", settings: mail, bundleID: nil).styled)
     }
 
     @Test func grammarWithExtraTextIsRejected() {
@@ -87,8 +101,9 @@ import Testing
 @Suite struct SettingsTests {
     @Test func roundTrip() throws {
         var settings = RetextSettings()
-        settings.actions.append(CustomAction(title: "Shorter", symbol: "scissors", prompt: "Make it shorter.", kind: .other, model: .haiku))
+        settings.actions.append(CustomAction(title: "Shorter", symbol: "scissors", prompt: "Make it shorter.", kind: .other))
         settings.menuShortcut = .controlOptionSpace
+        settings.defaultLevel = .high
         let decoded = try JSONDecoder().decode(RetextSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded == settings)
     }
@@ -100,8 +115,10 @@ import Testing
         let partial = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"haikuThreshold": 100, "protectedWords": []}"#.utf8))
         #expect(empty.menuShortcut == .optionSpace)
         #expect(empty.keepHistory && empty.electronSupport && empty.showMenuBarIcon)
-        let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper"}"#.utf8))
+        #expect(empty.defaultLevel == .medium)
+        let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper", "defaultLevel": "ultra"}"#.utf8))
         #expect(unknown.menuShortcut == .optionSpace)
+        #expect(unknown.defaultLevel == .medium)
         #expect(partial.protectedWords.isEmpty)
         #expect(partial.actions.count == RetextSettings.defaultActions.count)
     }
@@ -122,6 +139,19 @@ import Testing
         let loaded = RetextSettings.load(from: url)
         #expect(loaded.actions.map(\.prompt) == [RetextSettings.grammarPrompt, RetextSettings.translatePrompt("Czech"), "Make it shorter."])
         #expect(loaded.appStyles.isEmpty)
+    }
+
+    @Test func oldPerActionModelKeyStillLoads() throws {
+        let json = #"{"actions": [{"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB5", "title": "Shorter", "symbol": "x", "kind": "other", "model": "haiku", "prompt": "Make it shorter."}]}"#
+        let loaded = try JSONDecoder().decode(RetextSettings.self, from: Data(json.utf8))
+        #expect(loaded.actions.map(\.title) == ["Shorter"])
+        #expect(loaded.defaultLevel == .medium)
+    }
+
+    @Test func loadKeepsTheFirstNineActions() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-many-\(UUID()).json")
+        RetextSettings(actions: (1...11).map { CustomAction(title: "\($0)", symbol: "x", prompt: "p\($0)", kind: .other) }).save(to: url)
+        #expect(RetextSettings.load(from: url).actions.map(\.title) == (1...9).map(String.init))
     }
 
     @Test func missingFileGivesDefaults() {
@@ -213,7 +243,8 @@ import Testing
         #expect(today.inputTokens == 20 && today.outputTokens == 4)
         #expect(today.cacheHits == 1)
         #expect(today.costUSD == 1.0)
-        #expect(Model.shortName("claude-sonnet-5-5") == "Sonnet" && Model.shortName("opus") == "opus")
+        #expect(Model.shortName("claude-sonnet-5-5") == "Sonnet" && Model.shortName("opus") == "Opus")
+        #expect(Model.shortName("claude-opus-5-5") == "Opus" && Model.shortName("other-model") == "other-model")
         usage.recordCall(model: "claude-haiku-4-5-20251001", output: output)
         usage.recordCall(model: Model.haiku, output: output)
         #expect(usage.today.callsByModel.map(\.name) == ["Haiku", "Sonnet"])
@@ -221,5 +252,18 @@ import Testing
         #expect(usage.today.summary.hasPrefix("Today: Haiku 2, Sonnet 2,"))
         let decoded = try JSONDecoder().decode(Usage.self, from: JSONEncoder().encode(usage))
         #expect(decoded == usage)
+    }
+
+    @Test func usageKeepsOnlyRecentDays() {
+        var usage = Usage()
+        let now = Date()
+        let old = Usage.calendar.date(byAdding: .day, value: -Usage.keepDays, to: now)!
+        let edge = Usage.calendar.date(byAdding: .day, value: 1 - Usage.keepDays, to: now)!
+        usage.recordHit(on: old)
+        usage.recordHit(on: edge)
+        usage.recordHit(on: now)
+        #expect(usage.days.keys.sorted() == [Usage.dayKey(edge), Usage.dayKey(now)])
+        // Gregorian keys even on a Mac set to another calendar (Buddhist would give 2569).
+        #expect(Usage.dayKey(Date(timeIntervalSince1970: 1_800_000_000)).hasPrefix("2027-01-"))
     }
 }

@@ -8,9 +8,16 @@ cd "$(dirname "$0")"
 identity="${RETEXT_SIGN_IDENTITY:-$(cat .sign-identity 2>/dev/null || echo -)}"
 swift build -c release
 app=build/Retext.app
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build/release/Retext "$app/Contents/MacOS/Retext"
 cp Info.plist "$app/Contents/Info.plist"
+cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+# The Liquid Glass icon: compile the Icon Composer document into a fresh directory, so a stale Assets.car can't ship.
+icon=$(mktemp -d "${TMPDIR:-/tmp}/retext-icon.XXXXXX")
+xcrun actool Resources/AppIcon.icon --compile "$icon" --platform macosx --minimum-deployment-target 26.0 \
+    --app-icon AppIcon --output-partial-info-plist "$icon/partial.plist" >/dev/null
+[[ -s "$icon/Assets.car" ]] || { echo "actool did not compile Resources/AppIcon.icon (needs Xcode 26 or later)." >&2; exit 1; }
+cp "$icon/Assets.car" "$app/Contents/Resources/Assets.car"
 codesign --force --options runtime --sign "$identity" "$app"
 
 [[ "${1:-}" == "--no-install" ]] && exit 0

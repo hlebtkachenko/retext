@@ -17,6 +17,8 @@ final class PopupModel: ObservableObject {
     /// nil = the instruction field; otherwise the highlighted action button.
     @Published var selected: Int?
     @Published var instruction = ""
+    /// This run's level: the default level each time the bar opens; Up/Down change it.
+    @Published var level = Level.medium
     @Published var above = false
     weak var field: NSTextField?
 }
@@ -102,8 +104,29 @@ struct PopupView: View {
                 .buttonStyle(.plain)
                 .onHover { if $0, model.instruction.isEmpty { model.selected = index } }
             }
+            levelChip
         }
         .padding(4)
+    }
+
+    /// The run's level; Up/Down step it, a click cycles it. Sized for the widest title so the capsule never clips.
+    private var levelChip: some View {
+        Button { model.level = model.level.next } label: {
+            HStack(spacing: 2) {
+                ZStack(alignment: .trailing) {
+                    ForEach(Level.allCases, id: \.self) { Text($0.title).opacity($0 == model.level ? 1 : 0) }
+                }
+                Image(systemName: "chevron.up.chevron.down").imageScale(.small)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .help("Level: ↑/↓ to change")
+        .accessibilityLabel("Level \(model.level.title)")
     }
 
     private func status(_ text: String, hint: String? = nil, @ViewBuilder icon: () -> some View) -> some View {
@@ -131,10 +154,11 @@ final class PopupController {
     private static let gap: CGFloat = 8      // space between the selection and the glass
 
     private let model = PopupModel()
-    private let runner = ClaudeRunner()
     private var panel: KeyPanel?
     private var selection: Selection?
     private var work: Task<Void, Never>?
+    /// Identifies the run that owns `work`.
+    private var runID = 0
     private var hideTask: Task<Void, Never>?
     private var monitors: [Any] = []
     private var anchor: CGRect?
@@ -153,9 +177,10 @@ final class PopupController {
             }
             self.selection = selection
             model.actions = AppState.shared.settings.actions
-            guard action ?? 0 < model.actions.count else { return }
+            if let action, action >= model.actions.count { return }
             model.selected = nil
             model.instruction = ""
+            model.level = AppState.shared.settings.defaultLevel
             model.phase = action.map { _ in .working("Working…") } ?? .menu
             show(near: selection.rect)
             if let action { run(action) }
@@ -164,10 +189,11 @@ final class PopupController {
 
     func demo(_ state: String) {
         model.actions = AppState.shared.settings.actions
+        model.level = CommandLine.arguments.last.flatMap(Level.init(rawValue:)) ?? AppState.shared.settings.defaultLevel
         model.phase = switch state {
         case "working": .working("Translating to Czech…")
         case "done": .done
-        case "error": .message("Claude didn't answer. Your text is unchanged.", isError: true)
+        case "error": .message(ClaudeFailure.other("").message(for: AppState.shared.settings.provider), isError: true)
         case "empty": .message("Select text first", isError: false)
         case "nochange": .message("No changes needed", isError: false, symbol: "checkmark.circle")
         default: .menu
@@ -188,14 +214,16 @@ final class PopupController {
         let action = model.actions[index]
         let settings = AppState.shared.settings
         model.selected = index
-        execute(Engine.job(for: action, text: selection.text, settings: settings, bundleID: selection.app.bundleIdentifier),
+        execute(Engine.job(for: action, level: model.level, text: selection.text, settings: settings,
+                           bundleID: selection.app.bundleIdentifier),
                 progress: progress(for: action))
     }
 
     private func runInstruction() {
         let instruction = model.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let selection, !instruction.isEmpty else { return }
-        execute(Engine.job(instruction: instruction, settings: AppState.shared.settings, bundleID: selection.app.bundleIdentifier),
+        execute(Engine.job(instruction: instruction, level: model.level, settings: AppState.shared.settings,
+                           bundleID: selection.app.bundleIdentifier),
                 progress: "Working…")
     }
 
@@ -210,19 +238,22 @@ final class PopupController {
     private func execute(_ job: Job, progress: String) {
         guard let selection, work == nil else { return }
         hideTask?.cancel()
-        model.phase = .working(progress)
+        model.phase = .working(model.level == .medium ? progress : "\(progress) · \(model.level.title)")
         fit()
+        runID &+= 1
+        let id = runID
+        let timeout = model.level.timeout
         work = Task {
-            defer { work = nil }
-            let timeout = Task { try await Task.sleep(for: .seconds(60)); runner.cancel() }
-            defer { timeout.cancel() }
+            // After Esc and a fast re-trigger, `work` already belongs to the next run.
+            defer { if runID == id { work = nil } }
             do {
-                let result = try await result(of: job, for: selection)
+                let result = try await result(of: job, timeout: timeout, for: selection)
                 if Engine.isUnchanged(input: selection.text, output: result) {
                     return flash(.message("No changes needed", isError: false, symbol: "checkmark.circle"), for: 1.5)
                 }
                 let final = keepOuterWhitespace(of: selection.text, around: result)
                 if !selection.editable { return copy(final, note: "Copied to clipboard") }
+                if selection.hasAttachment { return copy(final, note: "Selection has an image, copied instead") }
                 if !SelectionIO.stillSelected(selection) { return copy(final, note: "Selection changed. Copied.") }
                 panel?.orderOut(nil)
                 await SelectionIO.replace(in: selection.app, with: final, attributes: selection.attributes)
@@ -230,24 +261,24 @@ final class PopupController {
             } catch {
                 guard !Task.isCancelled, model.phase != .menu, panel?.isVisible == true else { return }
                 let failure = error as? ClaudeFailure ?? .other("")
-                if failure == .notFound { AppState.shared.claudeFound = false }
-                flash(.message(failure.message, isError: true), for: failure == .other("") ? 3 : 5)
+                if failure == .notFound || failure == .notLoggedIn { AppState.shared.checkProvider() }
+                flash(.message(failure.message(for: job.provider), isError: true), for: failure == .other("") ? 3 : 5)
             }
         }
     }
 
-    /// The cached result when model, prompt and text match an entry in the history; otherwise Claude's answer after
+    /// The cached result when provider, model, effort, prompt and text match an entry in the history; otherwise the answer after
     /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
     /// With "Keep history" off, neither the cache nor the history is touched.
-    private func result(of job: Job, for selection: Selection) async throws -> String {
+    private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
-        let key = Engine.cacheKey(model: job.model, system: job.system, text: selection.text)
+        let key = Engine.cacheKey(job, baseURL: state.settings.custom.baseURL, text: selection.text)
         let keep = state.settings.keepHistory
         if keep, let hit = state.history.lookup(key) {
             state.usage.recordHit()
             return hit.output
         }
-        let output = try await runner.run(job, text: selection.text, claudePath: state.settings.claudePath)
+        let output = try await ProviderRunner.run(job, text: selection.text, settings: state.settings, timeout: timeout)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
         guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
@@ -260,8 +291,9 @@ final class PopupController {
     /// For text that can't be edited in place: copy the result; while the bubble shows, ⌘Z brings the old clipboard back.
     private func copy(_ text: String, note: String) {
         let restore = SelectionIO.copyRestorable(text)
-        Hotkeys.undo = restore.map { restore in
-            { [weak self] in
+        Hotkeys.undo = nil
+        if let restore {
+            Hotkeys.undo = { [weak self] in
                 restore()
                 self?.flash(.message("Previous clipboard restored", isError: false, symbol: "arrow.uturn.backward"), for: 1.2)
             }
@@ -270,7 +302,6 @@ final class PopupController {
     }
 
     private func cancel() {
-        runner.cancel()
         work?.cancel()
         work = nil
         close()
@@ -387,12 +418,19 @@ final class PopupController {
     }
 
     /// The field keeps first responder throughout; a highlighted button is model state only, so typing always lands in the field.
+    /// Only the bar's own keys: a local monitor also sees keys meant for Settings or the welcome window.
     private func handle(_ event: NSEvent) -> Bool {
+        guard event.window === panel else { return false }
         let key = Int(event.keyCode)
         if key == kVK_Escape { cancel(); return true }
         guard model.phase == .menu, !event.modifierFlags.contains(.command) else { return false }
         let count = model.actions.count
         let isReturn = key == kVK_Return || key == kVK_ANSI_KeypadEnter
+        // Up/Down step the level wherever the highlight is; swallowing them keeps the field's cursor still.
+        if key == kVK_UpArrow || key == kVK_DownArrow {
+            model.level = model.level.stepped(by: key == kVK_UpArrow ? 1 : -1)
+            return true
+        }
         guard let selected = model.selected else {
             let empty = model.instruction.isEmpty
             switch key {

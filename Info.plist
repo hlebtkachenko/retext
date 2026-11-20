@@ -5,6 +5,8 @@
     <key>CFBundleIdentifier</key><string>co.hleb.retext</string>
     <key>CFBundleName</key><string>Retext</string>
     <key>CFBundleExecutable</key><string>Retext</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleIconName</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.3.0</string>
     <key>CFBundleVersion</key><string>4</string>

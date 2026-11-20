@@ -22,10 +22,10 @@ body:
     validations:
       required: true
   - type: input
-    id: claude
+    id: provider
     attributes:
-      label: Claude Code version
-      description: Output of `claude --version`
+      label: Provider and its version
+      description: Claude Code (`claude --version`), ChatGPT (`codex --version`), or the custom API and model
   - type: input
     id: retext
     attributes:

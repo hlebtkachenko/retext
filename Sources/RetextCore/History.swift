@@ -74,12 +74,16 @@ public struct UsageDay: Codable, Equatable, Sendable {
 }
 
 public struct Usage: Codable, Equatable, Sendable {
+    /// Days kept in usage.json; older ones are dropped when a new call or hit is recorded.
+    public static let keepDays = 90
+    /// Gregorian in the local time zone, whatever calendar the Mac uses, so day keys sort by date.
+    public static let calendar = Calendar(identifier: .gregorian)
     public var days: [String: UsageDay] = [:]
 
     public init() {}
 
     public static func dayKey(_ date: Date = Date()) -> String {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
@@ -92,10 +96,19 @@ public struct Usage: Codable, Equatable, Sendable {
         day.outputTokens += output.outputTokens
         day.costUSD += output.costUSD
         days[Self.dayKey(date)] = day
+        prune(now: date)
     }
 
     public mutating func recordHit(on date: Date = Date()) {
         days[Self.dayKey(date), default: UsageDay()].cacheHits += 1
+        prune(now: date)
+    }
+
+    /// Keys are yyyy-MM-dd, so string order is date order.
+    private mutating func prune(now: Date) {
+        guard let start = Self.calendar.date(byAdding: .day, value: 1 - Self.keepDays, to: now) else { return }
+        let cutoff = Self.dayKey(start)
+        days = days.filter { $0.key >= cutoff }
     }
 
     public static func load(from url: URL) -> Usage {

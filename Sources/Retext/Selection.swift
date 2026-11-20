@@ -8,29 +8,39 @@ struct Selection {
     let attributes: [NSAttributedString.Key: Any]?
     /// False for read-only text (web pages, PDFs, received mail): the result is copied, not pasted.
     let editable: Bool
+    /// The selection as Accessibility reported it at read time; nil when the app doesn't report it.
+    let axText: String?
+    /// The selection holds an image or other attachment (a Mail signature image): pasting plain text over it would
+    /// turn the image into its file name, so the result is copied instead.
+    let hasAttachment: Bool
     /// Selection bounds in AX coordinates (origin at top-left of the primary screen), when the app reports them.
     let rect: CGRect?
 }
 
 /// Reads and replaces the selected text in the frontmost app through Accessibility, with a clipboard fallback.
 enum SelectionIO {
+    /// Main actor, like `replace`: AppKit, the pasteboard and the ⌘C event stay on main; the waits are async sleeps.
+    @MainActor
     static func read() async -> Selection? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         enableElectronAccessibility(app)
         let element = focusedElement(of: app)
+        let axText = element.flatMap(selectedText)
         let copied = await copyViaClipboard()
         var text = copied?.text
-        if text?.isEmpty ?? true { text = element.flatMap(selectedText) }
+        if text?.isEmpty ?? true { text = axText }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let attachment = copied?.hasAttachment == true || axText?.contains(attachmentCharacter) == true
         return Selection(app: app, text: text, attributes: copied?.attributes, editable: element.map(isEditable) ?? true,
-                         rect: element.flatMap(bounds))
+                         axText: axText, hasAttachment: attachment, rect: element.flatMap(bounds))
     }
 
     /// Whether the source app still has the same text selected. Unknown counts as unchanged.
-    /// Whitespace is ignored because AX and the clipboard can differ in line endings.
-    /// Asks the source app, not the system-wide focus, which can be Retext's own instruction field.
+    /// Compares Accessibility with Accessibility when the read had it: ⌘C can render the same selection differently
+    /// (Mail gives a signature image's file name, AX an attachment character); else with the copied text.
+    /// Whitespace is ignored. Asks the source app, not the system-wide focus, which can be Retext's own instruction field.
     static func stillSelected(_ selection: Selection) -> Bool {
-        let text = selection.text
+        let text = selection.axText.flatMap { $0.isEmpty ? nil : $0 } ?? selection.text
         guard let now = focusedElement(of: selection.app).flatMap(selectedText), !now.isEmpty else { return true }
         let squash = { (s: String) in s.filter { !$0.isWhitespace && !$0.isNewline } }
         return squash(now) == squash(text)
@@ -38,6 +48,8 @@ enum SelectionIO {
 
     /// Pastes `text` over the selection. With `attributes` it goes in as rich text in the original style,
     /// so apps like Mail keep the font instead of falling back to their default.
+    /// Main actor: `attributes` is not Sendable, and the caller is on main.
+    @MainActor
     static func replace(in app: NSRunningApplication, with text: String, attributes: [NSAttributedString.Key: Any]?) async {
         let saved = snapshot()
         let pb = NSPasteboard.general
@@ -66,6 +78,9 @@ enum SelectionIO {
         return saved.allSatisfy(\.isEmpty) ? nil : { restore(saved) }
     }
 
+    /// U+FFFC OBJECT REPLACEMENT CHARACTER: how Accessibility and plain text mark an inline image or attachment.
+    private static let attachmentCharacter: Character = "\u{FFFC}"
+
     // MARK: Accessibility
 
     /// The app's focused element. The timeout applies to the app and to the element, so a hung app can't
@@ -87,12 +102,22 @@ enum SelectionIO {
         if let role = role as? String, [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role) { return true }
         var settable = DarwinBoolean(false)
         if AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success, settable.boolValue { return true }
+        // Mail's message body is an AXWebArea with a settable value; a read-only web page's value isn't settable.
+        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue { return true }
         return AXUIElementCopyAttributeValue(element, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
     }
 
+    /// AXSelectedText, else WebKit's text-marker selection (Mail's message body and Safari pages report only that, or an
+    /// empty AXSelectedText).
     static func selectedText(_ element: AXUIElement) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success else { return nil }
+        var value: CFTypeRef?, range: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success, let text = value as? String,
+           !text.isEmpty {
+            return text
+        }
+        guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &range) == .success, let range,
+              AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, range, &value) == .success
+        else { return nil }
         return value as? String
     }
 
@@ -165,7 +190,8 @@ enum SelectionIO {
         })
     }
 
-    private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?)? {
+    @MainActor
+    private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?, hasAttachment: Bool)? {
         let saved = snapshot()
         let before = NSPasteboard.general.changeCount
         press(kVK_ANSI_C)
@@ -174,15 +200,14 @@ enum SelectionIO {
         }
         guard NSPasteboard.general.changeCount != before else { return nil }
         let pb = NSPasteboard.general
-        var attributes: [NSAttributedString.Key: Any]?
-        if let data = pb.data(forType: .rtf), let rich = NSAttributedString(rtf: data, documentAttributes: nil), rich.length > 0 {
-            attributes = rich.attributes(at: 0, effectiveRange: nil)
-        } else if let data = pb.data(forType: .rtfd), let rich = NSAttributedString(rtfd: data, documentAttributes: nil), rich.length > 0 {
-            attributes = rich.attributes(at: 0, effectiveRange: nil)
-        }
+        let rtf = pb.data(forType: .rtf).flatMap { NSAttributedString(rtf: $0, documentAttributes: nil) }
+        let rtfd = pb.data(forType: .rtfd).flatMap { NSAttributedString(rtfd: $0, documentAttributes: nil) }
+        let attributes = [rtf, rtfd].compactMap { $0 }.first { $0.length > 0 }?.attributes(at: 0, effectiveRange: nil)
         let text = pb.string(forType: .string)
+        let hasAttachment = rtf?.containsAttachments == true || rtfd?.containsAttachments == true
+            || text?.contains(attachmentCharacter) == true
         restore(saved)
-        return (text, attributes)
+        return (text, attributes, hasAttachment)
     }
 
     private static func press(_ key: Int) {

@@ -4,13 +4,13 @@ Thanks for helping. Retext is a small, dependency-free macOS app; changes that k
 
 ## Before you start
 
-- **Bugs:** open an issue with the bug template: macOS version, Claude Code version (`claude --version`), the app you were in, and what happened.
+- **Bugs:** open an issue with the bug template: macOS version, the provider and its version (`claude --version`, `codex --version`, or the custom API), the app you were in, and what happened.
 - **Features:** open an issue first for anything larger than a small fix, so we can agree on the shape before you build it.
 - **Security issues:** don't open a public issue; see [SECURITY.md](SECURITY.md).
 
 ## Development
 
-Requirements: macOS 26+, Xcode 26+, and Claude Code installed and logged in (for end-to-end checks).
+Requirements: macOS 26+, Xcode 26+, and one provider set up (for end-to-end checks): Claude Code or the Codex CLI logged in, or an OpenAI-compatible API.
 
 ```sh
 swift build          # debug build

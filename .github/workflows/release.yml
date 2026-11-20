@@ -1,0 +1,105 @@
+name: Release
+
+# Planned signed release, not used yet. Run by hand once the signing secrets are set:
+#   gh workflow run release.yml -f tag=vX.Y.Z
+# Builds, signs, notarizes and staples the DMG for an existing tag vX.Y.Z and attaches it to the GitHub release.
+# Skips everything when the release already has the DMG, so a re-run never replaces a published asset.
+# Required secrets and the per-release steps: docs/RELEASING.md.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, vX.Y.Z
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag }}
+
+concurrency:
+  group: release-${{ inputs.tag }}
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Skip when the release already has the DMG
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like vX.Y.Z, got: $TAG" >&2; exit 1; }
+          version="${TAG#v}"
+          if gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "Retext-$version.dmg"; then
+            echo "Release $TAG already has Retext-$version.dmg; delete that asset first to rebuild it."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.existing.outputs.skip != 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Swift and Xcode versions
+        if: steps.existing.outputs.skip != 'true'
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Import the Developer ID certificate into a temporary keychain
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          keychain_password=$(openssl rand -base64 24)
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          base64 --decode <<<"$MACOS_CERT_P12_BASE64" > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/Developer ID Application/ {print $2; exit}')
+          [[ -n "$identity" ]] || { echo "No Developer ID Application identity in MACOS_CERT_P12_BASE64" >&2; exit 1; }
+          echo "RETEXT_RELEASE_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "RETEXT_NOTARY_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Store notarytool credentials
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials retext-notary --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --keychain "$RETEXT_NOTARY_KEYCHAIN"
+          echo "RETEXT_NOTARY_PROFILE=retext-notary" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize and staple the DMG
+        if: steps.existing.outputs.skip != 'true'
+        run: scripts/release.sh "${TAG#v}"
+
+      - name: Upload the DMG to the GitHub release
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="$TAG"
+          version="${tag#v}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --verify-tag --title "Retext $version" --generate-notes
+          gh release upload "$tag" "build/Retext-$version.dmg" "build/Retext-$version.dmg.sha256"
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: |
+          if [[ -n "${RETEXT_NOTARY_KEYCHAIN:-}" ]]; then security delete-keychain "$RETEXT_NOTARY_KEYCHAIN" || true; fi

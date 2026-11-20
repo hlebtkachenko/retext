@@ -1,26 +1,37 @@
 # Retext
 
-**Fix grammar, translate and rewrite selected text in any macOS app, in place, with one shortcut.** A native SwiftUI menu-bar app with a Liquid Glass bar, powered by your own [Claude Code](https://code.claude.com/docs/en/overview) CLI.
+**Fix grammar, translate and rewrite selected text in any macOS app, in place, with one shortcut.** A native SwiftUI menu-bar app with a Liquid Glass bar, powered by your own [Claude Code](https://code.claude.com/docs/en/overview) or ChatGPT ([Codex CLI](https://developers.openai.com/codex/cli)) login, or any OpenAI-compatible API.
 
 [![CI](https://github.com/hlebtkachenko/retext/actions/workflows/ci.yml/badge.svg)](https://github.com/hlebtkachenko/retext/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/hlebtkachenko/retext?sort=semver)](https://github.com/hlebtkachenko/retext/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
-[![SwiftUI + Liquid Glass](https://img.shields.io/badge/UI-SwiftUI%20%2B%20Liquid%20Glass-purple.svg)](#)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to your installed [Claude Code](https://code.claude.com/docs/en/overview) CLI (`claude -p`) and pastes the result over the selection. The original font, size and colour are kept.
+Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to the provider you chose (your installed Claude Code CLI by default) and pastes the result over the selection. The original font, size and colour are kept.
 
 ![The Retext bar under a selected sentence in a text document](docs/images/bar.png)
+
+## Install
+
+Requires macOS 26+, Xcode 26+ to build, the Accessibility permission, and one provider: Claude Code installed and logged in (the default), the Codex CLI signed in with ChatGPT, or an OpenAI-compatible API. See [Providers](#providers).
+
+Install Retext by [building it from source](#build-from-source): `./build.sh` puts it in `~/Applications` and starts it. Releases are tags with release notes on GitHub, without a built app. A signed, notarized DMG and a Homebrew cask are planned for a later release.
+
+On first launch, a welcome window shows whether Retext has the Accessibility permission and whether the active provider is ready, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → General later.
+
+Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed release (not used yet).
+
+## Features
 
 - **Actions:** Fix grammar and English, plus a translation into your Mac's language when that isn't English. You can edit them or add your own, up to 9. ⌥1…⌥9 run them directly while text is selected.
 - **Free instructions:** type "shorter", "more formal" or "as a bullet list" into the bar and press Return.
 - **App styles:** optional extra guidance for a given app, for example "formal" for Mail. None by default.
 - **Protected words:** names and terms that are never changed or translated.
-- **Model:** Claude Sonnet through the Claude Code `sonnet` alias. You can switch an action to Haiku (`haiku` alias).
+- **Quality levels:** Medium (Claude Haiku, fast), High (Claude Sonnet, a deeper native rewrite) and Max (Claude Opus, the most polished, slowest), through the Claude Code `haiku`, `sonnet` and `opus` aliases; with ChatGPT or a custom API the levels map to that provider's models. Every bar starts at the default level from Settings → Engine (Medium unless you change it); ↑ and ↓ in the bar change it for that run. ⌥1…⌥9 run at the default level.
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
+- **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
 - **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
 
 ![Retext settings: the Actions pane](docs/images/settings.png)
@@ -32,9 +43,9 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 | **What** | AI writing assistant for selected text: grammar and spelling fixes, translation, free-form rewrites ("shorter", "more formal") |
 | **Where** | Any macOS app with selectable text: Mail, Notes, Pages, Safari, Slack, VS Code, Telegram and more; read-only text is copied instead |
 | **How** | Select text, press ⌥Space (bar) or ⌥1…⌥9 (direct action); the result replaces the selection with its original formatting |
-| **Engine** | Your installed Claude Code CLI (`claude -p`), Claude Sonnet (Haiku per action if you choose); no API key handling in the app |
+| **Engine** | Your installed Claude Code CLI (`claude -p`, default), ChatGPT through the Codex CLI (`codex exec`), or an OpenAI-compatible API; three quality levels |
 | **Stack** | Swift 6, SwiftUI, Liquid Glass, AppKit, Accessibility API, CGEvent tap; no third-party dependencies |
-| **Requires** | macOS 26+, Xcode 26+ to build, Claude Code logged in, Accessibility permission |
+| **Requires** | macOS 26+, Xcode 26+ to build, one provider (Claude Code, Codex signed in with ChatGPT, or an API), Accessibility permission |
 | **License** | Apache 2.0 |
 
 
@@ -42,12 +53,87 @@ Retext is a macOS menu-bar app for rewriting selected text in place. Select text
 
 - macOS 26 or later.
 - Xcode 26 or later, to build.
-- [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
+- One provider (see [Providers](#providers)). The default is [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
 - The Accessibility permission (System Settings → Privacy & Security → Accessibility). Retext needs it to read the selection and to see its shortcuts.
 
 Retext uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account. The Usage pane shows the list-price equivalent of each call, as reported by `claude -p`.
 
-## Build and install
+## Providers
+
+One provider is active at a time; pick it in Settings → Engine. Medium, High and Max map to that provider's models, and ↑ and ↓ in the bar work the same for all of them.
+
+- **Claude Code** (default): `claude -p` with the `haiku`, `sonnet` and `opus` aliases. Uses your Claude Code login.
+- **ChatGPT (Codex):** `codex exec` from the [Codex CLI](https://developers.openai.com/codex/cli) (`npm install -g @openai/codex`), signed in with `codex login` using your ChatGPT account. Retext needs Codex's file credential store (the default), not the system keyring. Usage counts against your plan's Codex limits. Retext never reads or stores your OpenAI credentials: it runs Codex with a private `CODEX_HOME` (`~/Library/Application Support/Retext/codex-home`). Retext puts only a symlink to Codex's own `auth.json` (and an empty working folder) there, so your Codex config, `AGENTS.md` and MCP servers stay out of the run; Codex keeps its own state and log files in that folder, but no conversation, since it runs with `--ephemeral`. Since Retext's Codex runs with its own home, a token refresh there and in your own Codex at the same moment can sign one of them out; run `codex login` again if that happens. Codex runs in a read-only sandbox with its shell and web tools and plugins off and no skills, so it can't run commands or change files. Built-in models: Medium `gpt-6-luna` (low effort), High `gpt-5.6-terra` (high), Max `gpt-6-luna` (max). Which models a plan offers changes over time, so each level can be set to another model or effort, picked from `codex debug models`.
+- **Custom API:** any OpenAI-compatible Chat Completions API, such as OpenRouter, Ollama, LM Studio, Gemini, Mistral or Groq (presets in Settings). Enter the base URL, an API key (optional for servers on this Mac or the local network) and a model per level, with an optional reasoning effort. The key is stored in the macOS Keychain, never in `settings.json`.
+
+## Settings
+
+- **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions brings back the defaults.
+- **App styles:** pick an app from the running and installed apps and describe the style for it.
+- **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
+- **Engine:** the provider, the default quality level and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
+- **General:** Accessibility and provider status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
+- **Usage:** calls, tokens and the API list-price equivalent per day.
+
+## Shortcuts
+
+| Keys | What it does |
+| --- | --- |
+| ⌥Space | Opens the bar for the selected text, or closes it. You can switch to ⌃⌥Space in Settings → General. |
+| ⌥1…⌥9 | Runs action 1…9 on the selected text, with or without the bar. They are taken only while text is selected, so layouts that type characters with ⌥digit keep working. |
+| Return | Runs the typed instruction, or the highlighted action. |
+| ← / → / Tab | Move between the field and the action buttons (← and → only while the field is empty). |
+| ↑ / ↓ | Raise or lower the quality level (Medium, High, Max) for this run. |
+| Esc | Cancels a running request or closes the bar. |
+| ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back. |
+
+## Privacy
+
+- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. With Claude Code they go to Anthropic under your account; with ChatGPT (Codex) they go to OpenAI under your ChatGPT account; with a custom API they go to the base URL you set, with your API key.
+- **API key:** the custom API's key is kept in the macOS Keychain (service `co.hleb.retext`), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
+- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`co.hleb.retext`).
+- **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings; a `settings.json` that can't be read is kept as `settings.json.invalid`. `codex-home/` is the private Codex home described under [Providers](#providers). The custom API key is the only item Retext keeps in the Keychain.
+- **Conversations:** neither CLI saves the conversation: `claude` runs with `--no-session-persistence`, `codex` with `--ephemeral`.
+- **CLI settings:** Retext's runs don't load your Claude Code `settings.json` (including its `env` block) or your Codex `config.toml`, so a telemetry opt-out set there may not apply to them; set such an opt-out in the environment Retext is started with. The CLIs get that environment, not your shell profile's.
+- **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard about 0.7 seconds later. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
+
+
+## Known conflicts
+
+- **⌥Space:** Retext always takes ⌥Space, before other apps' hotkeys for the same combo. On some keyboard layouts ⌥Space types a non-breaking space, and some launchers use it too. If that matters to you, switch to ⌃⌥Space in Settings → General. macOS can use ⌃⌥Space for "Select next source in Input menu" (System Settings → Keyboard → Keyboard Shortcuts → Input Sources); Retext takes it first, so turn that shortcut off if you rely on it.
+- **Menu-bar icon:** on a Mac with a notch, a crowded menu bar can hide the icon behind it. Turn off Settings → General → "Show in menu bar" to drop it; the shortcuts keep working, and opening Retext again from Spotlight or Finder brings up Settings.
+- **Electron apps** (Slack, VS Code, Claude and others) build their accessibility tree only when asked. With "Improve Electron app support" on (the default), Retext asks every app you switch to, so ⌥1…⌥9 work there right away. Turn it off to ask only when you use a shortcut; the first ⌥N in such an app may then pass through. Electron and web apps often report no selection position, so the bar opens under the text field or at the mouse pointer.
+
+## Uninstall
+
+1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
+2. Delete `Retext.app` from `~/Applications` (where `./build.sh` installs it).
+3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `co.hleb.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete co.hleb.retext` to remove the update-check state.
+4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
+
+   ```sh
+   tccutil reset Accessibility co.hleb.retext
+   ```
+
+## How it compares
+
+- **Apple Writing Tools:** built in and on-device, but limited to Apple Intelligence languages and regions, with a fixed set of actions. Retext works in any language your provider's model handles, with your own actions, protected words and per-app styles.
+- **Grammarly and similar services:** separate accounts and subscriptions. Retext is a small open-source app that reuses the Claude Code or ChatGPT login you already have (or your own API key) and adds nothing to your pages.
+- **Launcher AI commands (Raycast, Alfred):** broad and powerful, with AI features usually on a paid plan. Retext does one job: rewrite the selection in place, keeping font, size and colour.
+
+## FAQ
+
+**Does it work offline?** Only with a local server (Ollama or LM Studio) as the custom API. Otherwise requests go to Anthropic or OpenAI, or to the API you set. Results you've seen recently are served from the local cache.
+
+**Does it cost anything?** The app is free. Requests count against your Claude or ChatGPT plan's limits, or are billed by the API you use.
+
+**Which languages?** Any language your provider's model handles. The default third action translates into your Mac's language when that isn't English.
+
+**Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
+
+**Can I use another model or provider?** Yes: ChatGPT through the Codex CLI, or any OpenAI-compatible API (see [Providers](#providers)). With Claude Code, Retext uses the `haiku`, `sonnet` and `opus` aliases (Medium, High and Max). Pick the default level in Settings → Engine, or change it for one run with ↑ and ↓ in the bar.
+
+## Build from source
 
 ```sh
 git clone https://github.com/hlebtkachenko/retext.git
@@ -72,61 +158,6 @@ security find-identity -v -p codesigning
 > [!WARNING]
 > macOS ties the Accessibility grant to the app's signature. An ad-hoc build gets a new signature on every rebuild, so after each `./build.sh` you have to remove Retext from the Accessibility list and allow it again. Sign with a stable identity (a free Apple Development certificate from Xcode is enough) to keep the grant.
 
-On first launch, allow Retext in System Settings → Privacy & Security → Accessibility. The shortcuts start working without a relaunch.
-
-## Shortcuts
-
-| Keys | What it does |
-| --- | --- |
-| ⌥Space | Opens the bar for the selected text, or closes it. You can switch to ⌃⌥Space in Settings → General. |
-| ⌥1…⌥9 | Runs action 1…9 on the selected text, with or without the bar. They are taken only while text is selected, so layouts that type characters with ⌥digit keep working. |
-| Return | Runs the typed instruction, or the highlighted action. |
-| ← / → / Tab | Move between the field and the action buttons (← and → only while the field is empty). |
-| Esc | Cancels a running request or closes the bar. |
-| ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back. |
-
-## Privacy
-
-- **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. They go to Claude Code, which sends them to Anthropic under your account. Retext calls nothing else.
-- **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings.
-- **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard about 0.7 seconds later. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
-
-
-## Known conflicts
-
-- **⌥Space:** Retext always takes ⌥Space, before other apps' hotkeys for the same combo. On some keyboard layouts ⌥Space types a non-breaking space, and some launchers use it too. If that matters to you, switch to ⌃⌥Space in Settings → General. macOS can use ⌃⌥Space for "Select next source in Input menu" (System Settings → Keyboard → Keyboard Shortcuts → Input Sources); Retext takes it first, so turn that shortcut off if you rely on it.
-- **Menu-bar icon:** on a Mac with a notch, a crowded menu bar can hide the icon behind it. Turn off Settings → General → "Show in menu bar" to drop it; the shortcuts keep working, and opening Retext again from Spotlight or Finder brings up Settings.
-- **Electron apps** (Slack, VS Code, Claude and others) build their accessibility tree only when asked. With "Improve Electron app support" on (the default), Retext asks every app you switch to, so ⌥1…⌥9 work there right away. Turn it off to ask only when you use a shortcut; the first ⌥N in such an app may then pass through. Electron and web apps often report no selection position, so the bar opens under the text field or at the mouse pointer.
-
-## Uninstall
-
-1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
-2. Delete `~/Applications/Retext.app`.
-3. Delete `~/Library/Application Support/Retext` to remove settings, history and usage.
-4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
-
-   ```sh
-   tccutil reset Accessibility co.hleb.retext
-   ```
-
-## How it compares
-
-- **Apple Writing Tools:** built in and on-device, but limited to Apple Intelligence languages and regions, with a fixed set of actions. Retext works in any language Claude handles, with your own actions, protected words and per-app styles.
-- **Grammarly and similar services:** separate accounts and subscriptions. Retext is a small open-source app that reuses the Claude Code login you already have and adds nothing to your pages.
-- **Launcher AI commands (Raycast, Alfred):** broad and powerful, with AI features usually on a paid plan. Retext does one job: rewrite the selection in place, keeping font, size and colour.
-
-## FAQ
-
-**Does it work offline?** No. Every request goes through Claude Code to Anthropic. Results you've seen recently are served from the local cache.
-
-**Does it cost anything?** The app is free. Requests count against your Claude plan's limits, or are billed to your API account if Claude Code uses an API key.
-
-**Which languages?** Any language Claude handles. The default third action translates into your Mac's language when that isn't English.
-
-**Why the Accessibility permission?** To read the selection, find where to show the bar, catch the shortcuts and paste the result. Retext doesn't record keystrokes; the event tap only reacts to its own shortcuts.
-
-**Can I use another model or provider?** Retext calls `claude -p` with the `haiku` and `sonnet` aliases, so whatever your Claude Code is configured for applies. You can pick the model per action.
-
 ## Contributing
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). For a larger change, open an issue first. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
@@ -141,4 +172,4 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Fo
 
 [Apache License 2.0](LICENSE).
 
-Retext calls your installed Claude Code CLI with your own login and never reads or stores credentials. Not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic.
+Retext calls your installed Claude Code or Codex CLI with your own login and never reads or stores their credentials; a custom API key stays in your Keychain. Not affiliated with or endorsed by Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.
