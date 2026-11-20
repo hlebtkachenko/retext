@@ -778,7 +778,7 @@ private struct GeneralPane: View {
             }
             Section {
                 LabeledContent("Version", value: Self.version ?? "Development build")
-                Link("Retext on GitHub", destination: URL(string: "https://github.com/hlebtkachenko/retext")!)
+                Link("Retext on GitHub", destination: Identity.pageURL(repository: UpdateChecker.repository))
             } header: {
                 Text("About")
             } footer: {

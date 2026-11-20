@@ -52,14 +52,24 @@ private final class SameServerRedirects: NSObject, URLSessionTaskDelegate, Senda
 }
 
 /// The custom API keys in the login Keychain: generic passwords, one per server (`CustomProviderSettings.keyAccount`),
-/// never written to settings.json, logs or the UI.
+/// never written to settings.json, logs or the UI. The service is the bundle id; keys saved under the legacy service
+/// move to it on first read (`KeychainMigration`).
 enum Keychain {
-    private static func base(_ account: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "co.hleb.retext", kSecAttrAccount as String: account]
+    static let service = Bundle.main.bundleIdentifier ?? Identity.bundleID
+    private static let legacy = Identity.legacyKeychainService
+
+    private static func base(_ account: String, service: String = service) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
     }
 
     static func apiKey(account: String) -> String? {
-        var query = base(account)
+        KeychainMigration.key(account: account, service: service, read: read,
+                              save: { key, service, account in save(key, base(account, service: service)) },
+                              delete: { service, account in SecItemDelete(base(account, service: service) as CFDictionary) })
+    }
+
+    private static func read(service: String, account: String) -> String? {
+        var query = base(account, service: service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
@@ -67,23 +77,36 @@ enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Whether a key is saved for the account, without reading it (no Keychain prompt).
+    /// Whether a key is saved for the account (under the current or the legacy service), without reading it
+    /// (no Keychain prompt) and without moving it: the move happens on the first real read.
     static func hasAPIKey(account: String?) -> Bool {
         guard let account else { return false }
-        var query = base(account)
-        query[kSecReturnAttributes as String] = true
-        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+        let services = service == legacy ? [service] : [service, legacy]
+        return services.contains { service in
+            var query = base(account, service: service)
+            query[kSecReturnAttributes as String] = true
+            return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+        }
     }
 
     /// Saves the key, or removes it when `key` is empty. Returns false when the Keychain refused.
+    /// Either way the legacy item for the account goes, so a cleared key can't come back through the move.
     @discardableResult
     static func setAPIKey(_ key: String, account: String) -> Bool {
         let base = base(account)
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let saved: Bool
         if key.isEmpty {
             let status = SecItemDelete(base as CFDictionary)
-            return status == errSecSuccess || status == errSecItemNotFound
+            saved = status == errSecSuccess || status == errSecItemNotFound
+        } else {
+            saved = save(key, base)
         }
+        if saved, service != legacy { SecItemDelete(self.base(account, service: legacy) as CFDictionary) }
+        return saved
+    }
+
+    private static func save(_ key: String, _ base: [String: Any]) -> Bool {
         let data = Data(key.utf8)
         let status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if status == errSecSuccess { return true }

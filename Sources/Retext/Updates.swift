@@ -6,7 +6,9 @@ import RetextCore
 @MainActor
 enum UpdateChecker {
     static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    private static let latestURL = URL(string: "https://api.github.com/repos/hlebtkachenko/retext/releases/latest")!
+    /// `RetextRepository` in Info.plist (`owner/name`), so a fork points the check and the About link at itself.
+    static let repository = Identity.repository(Bundle.main.object(forInfoDictionaryKey: "RetextRepository") as? String)
+    private static let latestURL = Identity.latestReleaseURL(repository: repository)
     private static let checkedKey = "lastUpdateCheck", versionKey = "latestVersion", pageKey = "latestReleasePage"
 
     /// The remembered release when it is newer than this build and its page is on GitHub.

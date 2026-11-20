@@ -18,10 +18,11 @@ cask "retext" do
 
   app "Retext.app"
 
-  uninstall quit: "co.hleb.retext"
+  uninstall quit: "dev.hapd.retext"
 
   zap trash: [
     "~/Library/Application Support/Retext",
+    "~/Library/Preferences/dev.hapd.retext.plist",
     "~/Library/Preferences/co.hleb.retext.plist",
   ]
 end
