@@ -5,10 +5,10 @@
 
 A signed release is a universal `Retext-VERSION.dmg`, signed with a Developer ID Application certificate (hardened runtime, secure timestamp), notarized by Apple and stapled, attached to a GitHub release. `scripts/release.sh` does the work; `.github/workflows/release.yml` runs it when started by hand for an existing `vX.Y.Z` tag.
 
-Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, so a fork works unchanged) and `OWNER`; set them once per shell:
+Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, taken from the `origin` remote, so a fork works unchanged even with an `upstream` remote) and `OWNER`; set them once per shell:
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+REPO=$(git remote get-url origin | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')
 OWNER=${REPO%/*}
 ```
 
@@ -124,9 +124,11 @@ TAP=../homebrew-tap
    ```bash
    SHA=$(curl -fsL "https://github.com/$REPO/releases/download/v$VERSION/Retext-$VERSION.dmg.sha256" | cut -d' ' -f1)
    echo "$SHA"
-   sed -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/retext.rb > "$TAP/Casks/retext.rb"
+   sed -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" \
+       -e "s#hlebtkachenko/retext#$REPO#g" -e "s#^  homepage \".*\"#  homepage \"https://$OWNER.github.io/${REPO#*/}/\"#" \
+       Casks/retext.rb > "$TAP/Casks/retext.rb"
    ```
-   Expected: a 64-character hex hash, and the tap's `Casks/retext.rb` shows the new version and hash.
+   Expected: a 64-character hex hash, and the tap's `Casks/retext.rb` shows the new version and hash, with this repository's download URL and Pages homepage.
 
 2. Publish, then audit and install from the tap.
    ```bash
@@ -149,7 +151,7 @@ Do this once, after the first signed DMG is published.
    ```bash
    gh api -X POST repos/$REPO/pages -f "source[branch]=main" -f "source[path]=/docs"
    ```
-   Expected: after a minute, `https://$OWNER.github.io/retext/` shows the landing page (`docs/index.html`).
+   Expected: after a minute, `https://$OWNER.github.io/${REPO#*/}/` shows the landing page (`docs/index.html`).
 
 3. Repository Settings → General → Social preview → Edit → upload `docs/images/social-preview.png`. GitHub has no API for this.
 

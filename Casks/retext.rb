@@ -1,5 +1,5 @@
-# Template for hlebtkachenko/homebrew-tap (Casks/retext.rb), not a published cask: the signed release is planned.
-# Per release, the sed in docs/RELEASING.md sets version and sha256 from the release asset.
+# Template for the owner's Homebrew tap (<owner>/homebrew-tap, Casks/retext.rb), not a published cask: the signed release is planned.
+# Per release, the sed in docs/RELEASING.md sets version and sha256 from the release asset, and the repository and homepage from REPO.
 cask "retext" do
   version "REPLACE_WITH_VERSION"
   sha256 "REPLACE_WITH_SHA256_OF_THE_RELEASE_DMG"
