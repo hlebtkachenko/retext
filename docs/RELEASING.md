@@ -5,7 +5,12 @@
 
 A signed release is a universal `Retext-VERSION.dmg`, signed with a Developer ID Application certificate (hardened runtime, secure timestamp), notarized by Apple and stapled, attached to a GitHub release. `scripts/release.sh` does the work; `.github/workflows/release.yml` runs it when started by hand for an existing `vX.Y.Z` tag.
 
-Run the commands from the root of this repository.
+Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, so a fork works unchanged) and `OWNER`; set them once per shell:
+
+```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+OWNER=${REPO%/*}
+```
 
 Never commit a signing identity's name, a `.p12`, a password or a team's credentials. Identities are passed by SHA-1 hash in environment variables.
 
@@ -50,23 +55,23 @@ The release workflow needs five repository secrets:
 
 2. Set the secrets. `gh secret set` without a value asks for it, so nothing lands in your shell history.
    ```bash
-   base64 -i ~/Desktop/retext-developer-id.p12 | gh secret set MACOS_CERT_P12_BASE64 --repo hlebtkachenko/retext
-   gh secret set MACOS_CERT_PASSWORD --repo hlebtkachenko/retext
-   gh secret set APPLE_ID --repo hlebtkachenko/retext
-   gh secret set APPLE_TEAM_ID --repo hlebtkachenko/retext
-   gh secret set APPLE_APP_PASSWORD --repo hlebtkachenko/retext
+   base64 -i ~/Desktop/retext-developer-id.p12 | gh secret set MACOS_CERT_P12_BASE64 --repo "$REPO"
+   gh secret set MACOS_CERT_PASSWORD --repo "$REPO"
+   gh secret set APPLE_ID --repo "$REPO"
+   gh secret set APPLE_TEAM_ID --repo "$REPO"
+   gh secret set APPLE_APP_PASSWORD --repo "$REPO"
    ```
-   Expected: `gh secret list --repo hlebtkachenko/retext` lists all five.
+   Expected: `gh secret list --repo "$REPO"` lists all five.
 
 3. Move the `.p12` out of `~/Desktop` into wherever you keep key backups. It holds the private key.
 
 ### Homebrew tap
 
-1. Create the public repository `hlebtkachenko/homebrew-tap` on GitHub and clone it. `TAP` is the folder of the clone; any folder works, set the same one again in [Per release](#per-release).
+1. Create the public repository `$OWNER/homebrew-tap` on GitHub and clone it. `TAP` is the folder of the clone; any folder works, set the same one again in [Per release](#per-release).
    ```bash
    TAP=../homebrew-tap
-   gh repo create hlebtkachenko/homebrew-tap --public --description "Homebrew casks"
-   gh repo clone hlebtkachenko/homebrew-tap "$TAP"
+   gh repo create $OWNER/homebrew-tap --public --description "Homebrew casks"
+   gh repo clone $OWNER/homebrew-tap "$TAP"
    mkdir -p "$TAP/Casks"
    ```
    Expected: an empty clone with a `Casks` folder. Fill it on the first release (see [Update the Homebrew cask](#update-the-homebrew-cask)).
@@ -97,15 +102,15 @@ TAP=../homebrew-tap
    ```bash
    git tag "v$VERSION"
    git push origin "v$VERSION"
-   gh workflow run release.yml --repo hlebtkachenko/retext -f tag="v$VERSION"
+   gh workflow run release.yml --repo "$REPO" -f tag="v$VERSION"
    sleep 10
-   gh run watch --repo hlebtkachenko/retext "$(gh run list --repo hlebtkachenko/retext --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"
+   gh run watch --repo "$REPO" "$(gh run list --repo "$REPO" --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"
    ```
    Expected: the run ends green and the release `v$VERSION` has `Retext-$VERSION.dmg` and `Retext-$VERSION.dmg.sha256`. Edit the generated release notes on GitHub if needed. A re-run skips the build when the release already has the DMG; to rebuild it, delete both assets from the release first.
 
 4. Check what users download.
    ```bash
-   curl -fL -o "/tmp/Retext-$VERSION.dmg" "https://github.com/hlebtkachenko/retext/releases/download/v$VERSION/Retext-$VERSION.dmg"
+   curl -fL -o "/tmp/Retext-$VERSION.dmg" "https://github.com/$REPO/releases/download/v$VERSION/Retext-$VERSION.dmg"
    spctl -a -vvv -t install "/tmp/Retext-$VERSION.dmg"
    xcrun stapler validate "/tmp/Retext-$VERSION.dmg"
    ```
@@ -117,7 +122,7 @@ TAP=../homebrew-tap
 
 1. Put the release's version and SHA-256 into the template and copy it to the tap.
    ```bash
-   SHA=$(curl -fsL "https://github.com/hlebtkachenko/retext/releases/download/v$VERSION/Retext-$VERSION.dmg.sha256" | cut -d' ' -f1)
+   SHA=$(curl -fsL "https://github.com/$REPO/releases/download/v$VERSION/Retext-$VERSION.dmg.sha256" | cut -d' ' -f1)
    echo "$SHA"
    sed -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/retext.rb > "$TAP/Casks/retext.rb"
    ```
@@ -128,23 +133,23 @@ TAP=../homebrew-tap
    git -C "$TAP" add Casks/retext.rb
    git -C "$TAP" commit -m "feat: retext $VERSION"
    git -C "$TAP" push
-   brew tap hlebtkachenko/tap && brew update
-   brew audit --cask --strict --online hlebtkachenko/tap/retext
-   brew install --cask hlebtkachenko/tap/retext
+   brew tap $OWNER/tap && brew update
+   brew audit --cask --strict --online $OWNER/tap/retext
+   brew install --cask $OWNER/tap/retext
    ```
-   Expected: the push succeeds, the audit prints nothing (fix the template and repeat on findings), and the install puts `Retext.app` in `/Applications`. Anyone can then run `brew install --cask hlebtkachenko/tap/retext`.
+   Expected: the push succeeds, the audit prints nothing (fix the template and repeat on findings), and the install puts `Retext.app` in `/Applications`. Anyone can then run `brew install --cask $OWNER/tap/retext`.
 
 ## After the first DMG: GitHub Pages
 
 Do this once, after the first signed DMG is published.
 
-1. In `docs/index.html`, point the hero button at the latest release's DMG and add the `brew install --cask hlebtkachenko/tap/retext` line under it (the `.brew` style is still in the page); update the Install section of `README.md` and `llms.txt` the same way. Commit on `main`.
+1. In `docs/index.html`, point the hero button at the latest release's DMG and add the `brew install --cask $OWNER/tap/retext` line under it (the `.brew` style is still in the page); update the Install section of `README.md` and `llms.txt` the same way. Commit on `main`.
 
 2. Repository Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main`, folder `/docs` → Save. Or:
    ```bash
-   gh api -X POST repos/hlebtkachenko/retext/pages -f "source[branch]=main" -f "source[path]=/docs"
+   gh api -X POST repos/$REPO/pages -f "source[branch]=main" -f "source[path]=/docs"
    ```
-   Expected: after a minute, https://hlebtkachenko.github.io/retext/ shows the landing page (`docs/index.html`).
+   Expected: after a minute, `https://$OWNER.github.io/retext/` shows the landing page (`docs/index.html`).
 
 3. Repository Settings → General → Social preview → Edit → upload `docs/images/social-preview.png`. GitHub has no API for this.
 
