@@ -8,7 +8,7 @@ A signed release is a universal `Retext-VERSION.dmg`, signed with a Developer ID
 Run the commands from the root of this repository. They use `REPO` (owner/name of this repository, taken from the `origin` remote, so a fork works unchanged even with an `upstream` remote), `OWNER` and `BUNDLE_ID` (the `CFBundleIdentifier` in `Info.plist`); set them once per shell:
 
 ```bash
-REPO=$(git remote get-url origin | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')
+REPO=$(git remote get-url origin | sed -E 's#(\.git)?/?$##; s#^.*github\.com[:/]##')
 OWNER=${REPO%/*}
 BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 ```
