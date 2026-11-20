@@ -72,7 +72,7 @@ struct SettingsView: View {
                 case .words: WordsPane(settings: $state.settings)
                 case .engine: EnginePane()
                 case .general: GeneralPane()
-                case .usage: UsagePane(usage: state.usage, history: state.history)
+                case .usage: UsagePane(usage: state.usage, history: state.history, provider: state.settings.provider)
                 }
             }
             .formStyle(.grouped)
@@ -900,6 +900,7 @@ private struct GeneralPane: View {
 private struct UsagePane: View {
     let usage: Usage
     let history: History
+    let provider: Provider
 
     var body: some View {
         Form {
@@ -921,7 +922,7 @@ private struct UsagePane: View {
             } header: {
                 Text("Recent days")
             } footer: {
-                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only. \(EnginePane.billing) \(history.entries.count) results are cached.")
+                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only.\(provider == .claude ? " " + EnginePane.billing : "") \(history.entries.count) results are cached.")
                     .foregroundStyle(.secondary)
             }
         }
