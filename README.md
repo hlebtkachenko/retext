@@ -90,8 +90,8 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 ## Privacy
 
 - **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. With Claude Code they go to Anthropic under your account; with ChatGPT (Codex) they go to OpenAI under your ChatGPT account; with a custom API they go to the base URL you set, with your API key.
-- **API key:** the custom API's key is kept in the macOS Keychain (service `co.hleb.retext`), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
-- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`co.hleb.retext`).
+- **API key:** the custom API's key is kept in the macOS Keychain (service `dev.hapd.retext`; a key saved by 1.4.0 or earlier under `co.hleb.retext` is moved there on first use), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
+- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`dev.hapd.retext`).
 - **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings; a `settings.json` that can't be read is kept as `settings.json.invalid`. `codex-home/` is the private Codex home described under [Providers](#providers). The custom API key is the only item Retext keeps in the Keychain.
 - **Conversations:** neither CLI saves the conversation: `claude` runs with `--no-session-persistence`, `codex` with `--ephemeral`.
 - **CLI settings:** Retext's runs don't load your Claude Code `settings.json` (including its `env` block) or your Codex `config.toml`, so a telemetry opt-out set there may not apply to them; set such an opt-out in the environment Retext is started with. The CLIs get that environment, not your shell profile's.
@@ -108,12 +108,14 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 
 1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
 2. Delete `Retext.app` from `~/Applications` (where `./build.sh` installs it).
-3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `co.hleb.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete co.hleb.retext` to remove the update-check state.
+3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `dev.hapd.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete dev.hapd.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
 
    ```sh
-   tccutil reset Accessibility co.hleb.retext
+   tccutil reset Accessibility dev.hapd.retext
    ```
+
+Retext 1.4.0 and earlier used the bundle id `co.hleb.retext`. If you ran one of those versions, repeat steps 3 and 4 with `co.hleb.retext`: its Keychain item (left only if the newer version never used the key), `defaults delete co.hleb.retext` and `tccutil reset Accessibility co.hleb.retext`.
 
 ## How it compares
 
