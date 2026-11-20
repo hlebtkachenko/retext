@@ -8,6 +8,21 @@
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 
+- **Fix grammar in about 2 seconds:** select text, press ⌥Space, pick Fix grammar (median 2.1 s with Claude Code at Medium in the [eval](eval/README.md)).
+- **Rewrite or translate in place:** the result replaces your selection and keeps its font, size and colour; ⌘Z undoes it.
+- **Any app, one shortcut:** Mail, Notes, Pages, Safari, Slack, VS Code and more; ⌥1…⌥9 run an action straight away.
+- **Your own subscription or provider:** your Claude Code or ChatGPT (Codex CLI) login, or any OpenAI-compatible API. Retext itself is free.
+
+### What leaves your Mac
+
+- **Only the text you run Retext on**, with its instruction, and only when you run it.
+- **Only to the provider you chose:** Claude Code (Anthropic), the Codex CLI (OpenAI) or your own API.
+- **No Retext server, no telemetry, no Retext account.** Settings and history stay on your Mac; a custom API key stays in the Keychain.
+- **Open source** (Apache 2.0), so you can check all of this.
+- **One update check** to GitHub, at most once a day, and you can turn it off.
+
+The CLIs keep their own settings, including their own telemetry. Details: [Privacy](#privacy).
+
 Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to the provider you chose (your installed Claude Code CLI by default) and pastes the result over the selection. The original font, size and colour are kept.
 
 ![The Retext bar under a selected sentence in a text document](docs/images/bar.png)
@@ -32,6 +47,7 @@ Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
+- **Preview (optional):** review changes before they replace your text. With "Preview before replacing" on in Settings → General, the bar shows the result with inserted words highlighted and deleted ones struck through; Return replaces the selection, Esc discards the result, ⌘C copies it.
 - **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
 
 ![Retext settings: the Actions pane](docs/images/settings.png)
@@ -68,11 +84,11 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 
 ## Settings
 
-- **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions brings back the defaults.
+- **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions brings back the defaults. The prompt editor has example prompts you can click to start from.
 - **App styles:** pick an app from the running and installed apps and describe the style for it.
 - **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
 - **Engine:** the provider, the default quality level and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
-- **General:** Accessibility and provider status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
+- **General:** Accessibility and provider status, open at login, menu-bar icon, bar shortcut, preview before replacing (off by default), history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
 - **Usage:** calls and tokens per day, plus the API list-price equivalent for Claude Code calls.
 
 ## Shortcuts
@@ -81,10 +97,11 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 | --- | --- |
 | ⌥Space | Opens the bar for the selected text, or closes it. You can switch to ⌃⌥Space in Settings → General. |
 | ⌥1…⌥9 | Runs action 1…9 on the selected text, with or without the bar. They are taken only while text is selected, so layouts that type characters with ⌥digit keep working. |
-| Return | Runs the typed instruction, or the highlighted action. |
+| Return | Runs the typed instruction, or the highlighted action. In a preview, replaces the selection with the result. |
 | ← / → / Tab | Move between the field and the action buttons (← and → only while the field is empty). |
 | ↑ / ↓ | Raise or lower the quality level (Medium, High, Max) for this run. |
-| Esc | Cancels a running request or closes the bar. |
+| Esc | Cancels a running request or closes the bar. In a preview, discards the result. |
+| ⌘C | In a preview, copies the result without replacing the selection. |
 | ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back. |
 
 ## Privacy
