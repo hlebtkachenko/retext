@@ -56,7 +56,7 @@ Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed
 - One provider (see [Providers](#providers)). The default is [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
 - The Accessibility permission (System Settings → Privacy & Security → Accessibility). Retext needs it to read the selection and to see its shortcuts.
 
-Retext uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account. The Usage pane shows the list-price equivalent of each call, as reported by `claude -p`.
+Each provider runs under your own login or key and its own billing: with Claude Code or Codex, subscription usage counts against your plan's limits (API-key logins are billed to your account); a custom API bills the account its key belongs to. The Usage pane counts calls and tokens for every provider; the list-price equivalent of a call is shown only for Claude Code, which reports it. ChatGPT and custom API calls count tokens only.
 
 ## Providers
 
@@ -73,7 +73,7 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 - **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
 - **Engine:** the provider, the default quality level and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
 - **General:** Accessibility and provider status, open at login, menu-bar icon, bar shortcut, history, the update check, Backup (export, import, reset all settings), Advanced (Electron app support) and About.
-- **Usage:** calls, tokens and the API list-price equivalent per day.
+- **Usage:** calls and tokens per day, plus the API list-price equivalent for Claude Code calls.
 
 ## Shortcuts
 
