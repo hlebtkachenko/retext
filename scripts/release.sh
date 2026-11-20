@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds a universal Retext.app, signs it with Developer ID (hardened runtime, timestamp), notarizes and staples it,
 # packs it into a signed DMG, notarizes and staples the DMG, and verifies the result. See docs/RELEASING.md.
+# Planned signed release, not used yet: current releases are a tag and a GitHub release without assets.
 # Usage: scripts/release.sh VERSION [--skip-notarize]
 #   VERSION must equal CFBundleShortVersionString in Info.plist. --skip-notarize builds an un-notarized DMG for local tests.
 # Environment:
