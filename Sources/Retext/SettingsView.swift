@@ -465,8 +465,13 @@ private struct EnginePane: View {
                 Picker("Default level", selection: $state.settings.defaultLevel) {
                     ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
+                // Name with its description below, the same layout for every level whatever the description's length.
                 ForEach(Level.allCases, id: \.self) { level in
-                    LabeledContent(level.title, value: describe(level))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(level.title)
+                        Text(describe(level)).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             } header: {
                 Text("Quality")
