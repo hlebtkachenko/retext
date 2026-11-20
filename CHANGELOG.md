@@ -6,11 +6,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Added
 - "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return replaces the selection, Esc discards the result, ⌘C copies it.
-- Example prompts in the Actions editor; click one to use it.
+- Example prompts in the Actions editor: clicking one fills an empty prompt or is added to the existing one on a new line.
 
 ### Changed
-- The bundle id is now `dev.hapd.retext` (was `co.hleb.retext`), and the custom API key's Keychain service follows it: a key saved by an earlier version is moved there on first use and the old item deleted. macOS ties the Accessibility permission and the login item to the bundle id, so after updating, allow Retext in Accessibility again and turn "Open at login" on again once if you used it.
+- The bundle id is now `dev.hapd.retext` (was `co.hleb.retext`), and the custom API key's Keychain service follows it: a key saved by an earlier version is moved there on first use and the old item deleted. macOS ties the Accessibility permission and the login item to the bundle id, so after updating, allow Retext in Accessibility again and turn "Open at login" on again once if you used it; `tccutil reset Accessibility co.hleb.retext` removes the old Accessibility entry. The first custom API run after updating may ask for Keychain access to the old item: allow it so Retext can move the key, or enter the key again in Settings → Engine. The preferences domain changes too, so the update-check state starts fresh (settings, history and usage are in Application Support and stay).
 - The prompt field in the Actions editor is bigger, and its placeholder no longer names one provider.
+- The usage price says it is for Claude Code: "Claude Code list price" in the menu's usage line and "API list price (Claude Code)" in Settings → Usage, whose Claude Code billing note now shows only while Claude Code is the active provider. ChatGPT and custom API calls count tokens only.
 - Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
 
 ## [1.4.0] - 2026-11-20

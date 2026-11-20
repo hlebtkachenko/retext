@@ -8,14 +8,14 @@
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 
-- **Fix grammar in about 2 seconds:** select text, press ⌥Space, pick Fix grammar (median 2.1 s with Claude Code at Medium in the [eval](eval/README.md)).
+- **Quick at Medium:** select text, press ⌥Space, pick Fix grammar; the model answers in about 2 seconds (Claude Code at Medium, median 2.1 s over the 32 [eval](eval/README.md) cases, not counting the CLI's start or the paste; [results](eval/results/2026-11-19-142544.md)).
 - **Rewrite or translate in place:** the result replaces your selection and keeps its font, size and colour; ⌘Z undoes it.
 - **Any app, one shortcut:** Mail, Notes, Pages, Safari, Slack, VS Code and more; ⌥1…⌥9 run an action straight away.
 - **Your own subscription or provider:** your Claude Code or ChatGPT (Codex CLI) login, or any OpenAI-compatible API. Retext itself is free.
 
 ### What leaves your Mac
 
-- **Only the text you run Retext on**, with its instruction, and only when you run it.
+- **Only the text you run Retext on**, with its instruction, your protected words and the app's style, and only when you run it.
 - **Only to the provider you chose:** Claude Code (Anthropic), the Codex CLI (OpenAI) or your own API.
 - **No Retext server, no telemetry, no Retext account.** Settings and history stay on your Mac; a custom API key stays in the Keychain.
 - **Open source** (Apache 2.0), so you can check all of this.
@@ -107,7 +107,7 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 ## Privacy
 
 - **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. With Claude Code they go to Anthropic under your account; with ChatGPT (Codex) they go to OpenAI under your ChatGPT account; with a custom API they go to the base URL you set, with your API key.
-- **API key:** the custom API's key is kept in the macOS Keychain (service `dev.hapd.retext`; a key saved by 1.4.0 or earlier under `co.hleb.retext` is moved there on first use), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
+- **API key:** the custom API's key is kept in the macOS Keychain (service `dev.hapd.retext`; a key saved by 1.4.0 or earlier under `co.hleb.retext` is moved there on first use; the first custom API run after updating may ask for Keychain access to that old item: allow it so Retext can move the key, or enter the key again in Settings → Engine), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
 - **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates" in Settings → General. The time of the last check and the latest version found are kept in the app's preferences (`dev.hapd.retext`).
 - **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings; a `settings.json` that can't be read is kept as `settings.json.invalid`. `codex-home/` is the private Codex home described under [Providers](#providers). The custom API key is the only item Retext keeps in the Keychain.
 - **Conversations:** neither CLI saves the conversation: `claude` runs with `--no-session-persistence`, `codex` with `--ephemeral`.
@@ -132,7 +132,7 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
    tccutil reset Accessibility dev.hapd.retext
    ```
 
-Retext 1.4.0 and earlier used the bundle id `co.hleb.retext`. If you ran one of those versions, repeat steps 3 and 4 with `co.hleb.retext`: its Keychain item (left only if the newer version never used the key), `defaults delete co.hleb.retext` and `tccutil reset Accessibility co.hleb.retext`.
+Retext 1.4.0 and earlier used the bundle id `co.hleb.retext`. If you ran one of those versions, repeat steps 3 and 4 with `co.hleb.retext`: its Keychain item (left when the newer version never used the key, when the Keychain prompt for it was denied, or when deleting it failed), `defaults delete co.hleb.retext` and `tccutil reset Accessibility co.hleb.retext`.
 
 ## How it compares
 
