@@ -8,7 +8,7 @@
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 
-- **Quick at Medium:** select text, press ⌥Space, pick Fix grammar; the model answers in about 2 seconds (Claude Code at Medium, median 2.1 s over the 32 [eval](eval/README.md) cases, not counting the CLI's start or the paste; [results](eval/results/2026-11-19-142544.md)).
+- **Quick at Medium:** select text, press ⌥Space, pick Fix grammar; the model answers in about 2 seconds (Claude Code at Medium, median 2.1 s over the 32 mixed [eval](eval/README.md) cases of grammar, translation and instructions, not counting the CLI's start or the paste; [results](eval/results/2026-11-19-142544.md)).
 - **Rewrite or translate in place:** the result replaces your selection and keeps its font, size and colour; ⌘Z undoes it.
 - **Any app, one shortcut:** Mail, Notes, Pages, Safari, Slack, VS Code and more; ⌥1…⌥9 run an action straight away.
 - **Your own subscription or provider:** your Claude Code or ChatGPT (Codex CLI) login, or any OpenAI-compatible API. Retext itself is free.
@@ -47,7 +47,7 @@ Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed
 - **Native output:** translations convey meaning rather than words, and Fix grammar also rewrites phrasing a native speaker wouldn't use. Grammar fixes and translations keep a one-line text on one line.
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
-- **Preview (optional):** review changes before they replace your text. With "Preview before replacing" on in Settings → General, the bar shows the result with inserted words highlighted and deleted ones struck through; Return replaces the selection, Esc discards the result, ⌘C copies it.
+- **Preview (optional):** review changes before they replace your text. With "Preview before replacing" on in Settings → General, the bar shows the result with inserted words highlighted and deleted ones struck through; Return (or Replace) replaces the selection, Esc (or Discard) discards the result, ⌘C (or Copy) copies it. A click elsewhere or a switch to another app discards it; if you switched apps while Retext worked, the result is copied instead.
 - **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu with your actions, Recent results to copy and a daily usage summary.
 
 ![Retext settings: the Actions pane](docs/images/settings.png)

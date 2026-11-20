@@ -5,7 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
-- "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return replaces the selection, Esc discards the result, ⌘C copies it.
+- "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return or the Replace button replaces the selection, Esc or Discard discards the result, ⌘C or Copy copies it. A click elsewhere or a switch to another app discards it; if another app came to the front while Retext worked, the result is copied instead.
 - Example prompts in the Actions editor: clicking one fills an empty prompt or is added to the existing one on a new line.
 
 ### Changed
