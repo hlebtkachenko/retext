@@ -2,6 +2,18 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return or the Replace button replaces the selection, Esc or Discard discards the result, ⌘C or Copy copies it. A click elsewhere or a switch to another app discards it; if another app came to the front while Retext worked, the result is copied instead.
+- Example prompts in the Actions editor: clicking one fills an empty prompt or is added to the existing one on a new line.
+
+### Changed
+- The bundle id is now `dev.hapd.retext` (was `co.hleb.retext`), and the custom API key's Keychain service follows it: a key saved by an earlier version is moved there on first use and the old item deleted. macOS ties the Accessibility permission and the login item to the bundle id, so after updating, allow Retext in Accessibility again and turn "Open at login" on again once if you used it; `tccutil reset Accessibility co.hleb.retext` removes the old Accessibility entry. The first custom API run after updating may ask for Keychain access to the old item: allow it so Retext can move the key, or enter the key again in Settings → Engine. The preferences domain changes too, so the update-check state starts fresh (settings, history and usage are in Application Support and stay).
+- The prompt field in the Actions editor is bigger, and its placeholder no longer names one provider.
+- The usage price says it is for Claude Code: "Claude Code list price" in the menu's usage line and "API list price (Claude Code)" in Settings → Usage, whose Claude Code billing note now shows only while Claude Code is the active provider. ChatGPT and custom API calls count tokens only.
+- Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
+
 ## [1.4.0] - 2026-11-20
 
 ### Added
@@ -34,13 +46,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Mail: results are pasted into the message again instead of only copied, and ⌥1…⌥9 work in the message body.
 - A selection that contains an image or other attachment (such as a Mail signature image) is no longer pasted over, which turned the image into its file name: the result is copied instead, and ⌘Z puts the previous clipboard back.
 - ⌥1…⌥9 work on selected text in Safari pages too (the result is copied, since a page can't be edited).
-- ⌥1…⌥9 also work in web views that report an empty Accessibility selection, and a selection changed while Claude Code worked is detected there too, so the result is copied instead of pasted over the wrong text.
+- ⌥1…⌥9 also work in web views that report an empty Accessibility selection, and a selection changed while the provider worked is detected there too, so the result is copied instead of pasted over the wrong text.
 - Retext no longer quits when Claude Code stops before reading a very large selection.
 - ⌥Space shows the bar again when you have no actions, so you can still type an instruction.
 - Keys typed in Settings or the welcome window while the bar is open no longer run or cancel the bar.
 - Retext no longer crashes at launch when settings.json holds more than nine actions; only the first nine are kept.
 - A settings.json that can't be read is copied to settings.json.invalid before Retext starts with the default settings, and the welcome window doesn't open for it or when only the history and usage files are left.
-- Esc stops Claude Code even right after you start an action, and pressing a shortcut again straight after Esc no longer runs two jobs at once or leaves one that Esc can't stop.
+- Esc stops the running request even right after you start an action, and pressing a shortcut again straight after Esc no longer runs two jobs at once or leaves one that Esc can't stop.
 
 ## [1.3.0] - 2026-10-05
 
@@ -70,6 +82,7 @@ First public release.
 - Settings for the bar shortcut (⌥Space or ⌃⌥Space), open at login, history, Electron app support and the Claude Code path.
 - Clear error messages when Claude Code is missing, not logged in, rate-limited or doesn't know a model.
 
+[Unreleased]: https://github.com/hlebtkachenko/retext/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.4.0
 [1.3.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.3.0
 [1.2.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.2.0

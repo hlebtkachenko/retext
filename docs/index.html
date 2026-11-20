@@ -75,12 +75,21 @@
   .shot figcaption { color: var(--muted); font-size: 0.9375rem; margin-top: 8px; }
 
   section { padding: 0 0 48px; }
+  section.privacy { margin-bottom: 48px; }
   section > h2 { font-size: 1.5rem; margin-bottom: 20px; }
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 32px; }
   .features h3 { font-size: 1.0625rem; margin-bottom: 8px; }
   .features p, section li, section p { color: var(--muted); margin: 0; }
   section ul { margin: 0; padding-left: 20px; }
   section li + li { margin-top: 8px; }
+
+  .privacy {
+    padding: 24px 28px; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .privacy > h2 { margin-bottom: 16px; }
+  .privacy li strong { color: var(--text); }
+  .privacy .fine { margin-top: 16px; font-size: 0.9375rem; }
 
   footer {
     border-top: 1px solid var(--border); padding-top: 24px; padding-bottom: 48px;
@@ -115,32 +124,52 @@
     <h2 id="features">What it does</h2>
     <div class="features">
       <div>
-        <h3>Any app, in place</h3>
-        <p>Mail, Notes, Pages, Safari, Slack, VS Code and more. The result replaces your selection and keeps its font, size and colour. ⌘Z undoes it.</p>
+        <h3>Quick at Medium</h3>
+        <p>Select text, press ⌥Space and pick Fix grammar. With Claude Code at the Medium level the model answers in about 2 seconds: the median over the 32 mixed cases (grammar, translation, instructions) of the <a href="https://github.com/hlebtkachenko/retext/blob/main/eval/results/2026-11-19-142544.md">prompt eval</a>, not counting the CLI's start or the paste.</p>
       </div>
       <div>
-        <h3>Your Claude Code or ChatGPT subscription</h3>
-        <p>Retext runs your installed Claude Code or Codex CLI with your own login, so no API keys are needed. Prefer an API? Any OpenAI-compatible one works, with the key kept in your Keychain.</p>
+        <h3>Rewrite or translate in place</h3>
+        <p>Type "shorter" or "more formal", or translate into your Mac's language. The result replaces your selection and keeps its font, size and colour. ⌘Z undoes it.</p>
       </div>
       <div>
-        <h3>Three quality levels</h3>
-        <p>Medium (Haiku) for quick fixes, High (Sonnet) for a native rewrite, Max (Opus) for the most polished text. ↑ and ↓ switch the level in the bar.</p>
+        <h3>Any app, one shortcut</h3>
+        <p>Mail, Notes, Pages, Safari, Slack, VS Code and more. ⌥Space opens the bar; ⌥1…⌥9 run an action straight away. Read-only text is copied instead.</p>
+      </div>
+      <div>
+        <h3>Your own subscription or provider</h3>
+        <p>Retext runs your installed Claude Code or Codex CLI with your own login, so there is no new account or API key. Prefer an API? Any OpenAI-compatible one works, with the key kept in your Keychain.</p>
       </div>
     </div>
+  </section>
+
+  <section class="privacy" aria-labelledby="privacy">
+    <h2 id="privacy">What leaves your Mac</h2>
+    <ul>
+      <li><strong>Only the text you run Retext on</strong>, with its instruction, your protected words and the app's style, and only when you run it.</li>
+      <li><strong>Only to the provider you chose:</strong> Claude Code (Anthropic), the Codex CLI (OpenAI) or your own API.</li>
+      <li><strong>No Retext server, no telemetry, no Retext account.</strong> Settings and history stay on your Mac; an API key stays in your Keychain.</li>
+      <li><strong>Open source</strong> under the Apache 2.0 license, so you can check all of this.</li>
+      <li><strong>One update check</strong> to GitHub, at most once a day, and you can turn it off.</li>
+    </ul>
+    <p class="fine">Claude Code and Codex keep their own settings, including their own telemetry. <a href="https://github.com/hlebtkachenko/retext#privacy">Privacy details</a></p>
+  </section>
+
+  <section aria-labelledby="more">
+    <h2 id="more">Also</h2>
+    <ul>
+      <li>Review changes before they replace your text, optional: the bar marks inserted and deleted words, Return replaces.</li>
+      <li>Three quality levels: Medium for quick fixes, High for a native rewrite, Max for the most polished text. ↑ and ↓ switch the level in the bar.</li>
+      <li>Your own actions (up to 9), per-app styles and protected words that are never changed.</li>
+    </ul>
   </section>
 
   <section aria-labelledby="requirements">
     <h2 id="requirements">Requirements</h2>
     <ul>
       <li>macOS 26 or later.</li>
-      <li><a href="https://code.claude.com/docs/en/overview">Claude Code</a> installed and logged in (subscription usage counts against your plan's limits), or the Codex CLI signed in with ChatGPT, or an OpenAI-compatible API.</li>
+      <li>One provider: <a href="https://code.claude.com/docs/en/overview">Claude Code</a> installed and logged in, the Codex CLI signed in with ChatGPT, or an OpenAI-compatible API. Each runs under its own login and billing.</li>
       <li>Accessibility permission, so Retext can read the selection and paste the result.</li>
     </ul>
-  </section>
-
-  <section aria-labelledby="privacy">
-    <h2 id="privacy">Privacy</h2>
-    <p>The text you run goes through Claude Code to Anthropic, through Codex to OpenAI, or to the API you set, depending on the provider you pick. Retext has no telemetry, no analytics and no server of its own; settings and history stay on your Mac. Apart from a custom API you set up, its only network request is a daily update check to GitHub, which you can turn off in Settings.</p>
   </section>
 </main>
 <footer>

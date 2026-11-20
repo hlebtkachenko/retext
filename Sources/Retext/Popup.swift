@@ -10,6 +10,8 @@ final class PopupModel: ObservableObject {
         case working(String)
         case done
         case message(String, isError: Bool, hint: String? = nil, symbol: String = "text.cursor")
+        /// The result with its changes marked, before it replaces the selection ("Preview before replacing").
+        case preview([TextDiff.Segment])
     }
 
     @Published var phase = Phase.menu
@@ -58,8 +60,11 @@ struct InstructionField: NSViewRepresentable {
 }
 
 struct PopupView: View {
+    enum PreviewChoice { case replace, discard, copy }
+
     @ObservedObject var model: PopupModel
     let pick: (Int) -> Void
+    let choose: (PreviewChoice) -> Void
     @Namespace private var glass
 
     var body: some View {
@@ -71,15 +76,67 @@ struct PopupView: View {
                 case .done: status("Replaced", hint: "⌘Z to undo") { symbol("checkmark.circle.fill", .green) }
                 case .message(let text, let isError, let hint, let name):
                     status(text, hint: hint) { symbol(isError ? "exclamationmark.triangle.fill" : name, isError ? .orange : .secondary) }
+                case .preview(let segments): preview(segments)
                 }
             }
-            .glassEffect(.regular, in: .capsule)
+            .glassEffect(.regular, in: isPreview ? AnyShape(RoundedRectangle(cornerRadius: 18)) : AnyShape(Capsule()))
             .glassEffectID("pill", in: glass)
         }
         .font(.body)
         .padding(PopupController.margin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.above ? .bottomLeading : .topLeading)
         .animation(.smooth(duration: 0.25), value: model.phase)
+    }
+
+    private var isPreview: Bool {
+        if case .preview = model.phase { true } else { false }
+    }
+
+    /// The result with added words highlighted and removed ones struck through; scrolls past `maxHeight`.
+    private func preview(_ segments: [TextDiff.Segment]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScrollView {
+                Text(Self.marked(segments))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 260)
+            .accessibilityLabel(Self.spoken(segments))
+            HStack(spacing: 14) {
+                // Not focusable, so Return and Space stay with the panel's key handling.
+                Button("↩ Replace") { choose(.replace) }
+                Button("esc Discard") { choose(.discard) }
+                Button("⌘C Copy") { choose(.copy) }
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .frame(width: 440)
+    }
+
+    /// "Result with 2 changes: …": a change is a run of removed and added text between unchanged text.
+    static func spoken(_ segments: [TextDiff.Segment]) -> String {
+        let changes = segments.indices.filter { segments[$0].kind != .equal && ($0 == 0 || segments[$0 - 1].kind == .equal) }.count
+        let text = segments.filter { $0.kind != .deleted }.map(\.text).joined()
+        return "Result with \(changes) \(changes == 1 ? "change" : "changes"): \(text)"
+    }
+
+    static func marked(_ segments: [TextDiff.Segment]) -> AttributedString {
+        segments.reduce(into: AttributedString()) { out, segment in
+            var part = AttributedString(segment.text)
+            switch segment.kind {
+            case .equal: break
+            case .inserted:
+                part.backgroundColor = Color.green.opacity(0.28)
+            case .deleted:
+                part.strikethroughStyle = .single
+                part.foregroundColor = Color.red.opacity(0.8)
+            }
+            out += part
+        }
     }
 
     private var menu: some View {
@@ -162,9 +219,15 @@ final class PopupController {
     private var hideTask: Task<Void, Never>?
     private var monitors: [Any] = []
     private var anchor: CGRect?
+    /// The previewed result and the selection it would replace; nil once replaced, copied or discarded.
+    private var pending: (text: String, selection: Selection)?
+    /// Discards the preview when another app comes to the front.
+    private var activation: NSObjectProtocol?
 
     /// ⌥Space opens the menu (or closes it); ⌥1…⌥9 pass an action index and run it straight away.
     func trigger(_ action: Int? = nil) {
+        // Any Retext shortcut while a preview shows discards it, like Esc.
+        if pending != nil { return close() }
         if panel?.isVisible == true, model.phase == .menu {
             // The menu is open: ⌥N runs on the selection already read; a second ⌘C would hit Retext's own field.
             guard let action else { return close() }
@@ -196,6 +259,8 @@ final class PopupController {
         case "error": .message(ClaudeFailure.other("").message(for: AppState.shared.settings.provider), isError: true)
         case "empty": .message("Select text first", isError: false)
         case "nochange": .message("No changes needed", isError: false, symbol: "checkmark.circle")
+        case "preview": .preview(TextDiff.words(old: Self.demoOriginal(long: CommandLine.arguments.last == "long"),
+                                                new: Self.demoResult(long: CommandLine.arguments.last == "long")))
         default: .menu
         }
         let f = (NSScreen.main ?? NSScreen.screens.first)?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
@@ -203,8 +268,19 @@ final class PopupController {
         if let panel {  // screencapture -R rectangle (top-left origin) for screenshots
             let r = panel.frame
             print("capture \(Int(r.minX)),\(Int(f.maxY - r.maxY)),\(Int(r.width)),\(Int(r.height))")
+            print("window \(panel.windowNumber)")  // for screencapture -l
             fflush(stdout)
         }
+    }
+
+    private static func demoOriginal(long: Bool) -> String {
+        let text = "Hi Anna, thank you for you're message. I will sent the documents tomorow morning, and we can discuss about it on Friday."
+        return long ? Array(repeating: text, count: 12).joined(separator: "\n\n") : text
+    }
+
+    private static func demoResult(long: Bool) -> String {
+        let text = "Hi Anna, thank you for your message. I will send the documents tomorrow morning, and we can discuss it on Friday."
+        return long ? Array(repeating: text, count: 12).joined(separator: "\n\n") : text
     }
 
     // MARK: Flow
@@ -248,6 +324,8 @@ final class PopupController {
             defer { if runID == id { work = nil } }
             do {
                 let result = try await result(of: job, timeout: timeout, for: selection)
+                // A cache hit returns without a cancellation check; after Esc nothing may show, copy or paste.
+                try Task.checkCancellation()
                 if Engine.isUnchanged(input: selection.text, output: result) {
                     return flash(.message("No changes needed", isError: false, symbol: "checkmark.circle"), for: 1.5)
                 }
@@ -255,9 +333,8 @@ final class PopupController {
                 if !selection.editable { return copy(final, note: "Copied to clipboard") }
                 if selection.hasAttachment { return copy(final, note: "Selection has an image, copied instead") }
                 if !SelectionIO.stillSelected(selection) { return copy(final, note: "Selection changed. Copied.") }
-                panel?.orderOut(nil)
-                await SelectionIO.replace(in: selection.app, with: final, attributes: selection.attributes)
-                flash(.done, for: 1.2)
+                if AppState.shared.settings.previewBeforeReplace { return preview(final, for: selection) }
+                await replace(selection, with: final)
             } catch {
                 guard !Task.isCancelled, model.phase != .menu, panel?.isVisible == true else { return }
                 let failure = error as? ClaudeFailure ?? .other("")
@@ -265,6 +342,60 @@ final class PopupController {
                 flash(.message(failure.message(for: job.provider), isError: true), for: failure == .other("") ? 3 : 5)
             }
         }
+    }
+
+    private func replace(_ selection: Selection, with text: String) async {
+        panel?.orderOut(nil)
+        await SelectionIO.replace(in: selection.app, with: text, attributes: selection.attributes)
+        flash(.done, for: 1.2)
+    }
+
+    /// Shows the result with its changes marked and waits: Return replaces, Esc discards, ⌘C copies. No timer closes it.
+    /// Shown only while the selection's app is still in front; otherwise the result is copied, so the preview never
+    /// takes the keyboard from another app. Switching apps while it shows discards it.
+    private func preview(_ text: String, for selection: Selection) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == selection.app.processIdentifier else {
+            return copy(text, note: "Selection changed. Copied.")
+        }
+        hideTask?.cancel()
+        pending = (text, selection)
+        model.phase = .preview(TextDiff.words(old: selection.text, new: text))
+        fit()
+        // Key again, in case a click elsewhere took the keyboard while the provider worked.
+        panel?.makeKeyAndOrderFront(nil)
+        // One observer is enough: it acts only while a preview is pending, and close() removes it.
+        if activation == nil { activation = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if self?.pending != nil { self?.close() } }
+        } }
+    }
+
+    /// Return in the preview: the same replace as without it, after checking the selection is still there.
+    private func confirmPreview() {
+        guard let pending, work == nil else { return }
+        self.pending = nil
+        if !SelectionIO.stillSelected(pending.selection) { return copy(pending.text, note: "Selection changed. Copied.") }
+        runID &+= 1
+        let id = runID
+        work = Task {
+            defer { if runID == id { work = nil } }
+            // Wait (up to 1 s) for Return to come up while the panel still takes the keys, so a held Return
+            // doesn't repeat into the source app after the paste re-activates it.
+            var waited = 0
+            while Self.returnIsDown, waited < 50 { try? await Task.sleep(for: .milliseconds(20)); waited += 1 }
+            guard !Task.isCancelled else { return }
+            await replace(pending.selection, with: pending.text)
+        }
+    }
+
+    private static var returnIsDown: Bool {
+        [kVK_Return, kVK_ANSI_KeypadEnter].contains { CGEventSource.keyState(.combinedSessionState, key: CGKeyCode($0)) }
+    }
+
+    private func copyPreview() {
+        guard let pending else { return }
+        self.pending = nil
+        copy(pending.text, note: "Copied to clipboard")
     }
 
     /// The cached result when provider, model, effort, prompt and text match an entry in the history; otherwise the answer after
@@ -356,6 +487,9 @@ final class PopupController {
     }
 
     private func close() {
+        pending = nil
+        if let activation { NSWorkspace.shared.notificationCenter.removeObserver(activation) }
+        activation = nil
         Hotkeys.undo = nil
         removeMonitors()
         guard let panel, panel.isVisible else { return }
@@ -373,7 +507,13 @@ final class PopupController {
         panel.becomesKeyOnlyIfNeeded = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: PopupView(model: model) { [weak self] in self?.run($0) })
+        let host = NSHostingView(rootView: PopupView(model: model, pick: { [weak self] in self?.run($0) }, choose: { [weak self] choice in
+            switch choice {
+            case .replace: self?.confirmPreview()
+            case .discard: self?.cancel()
+            case .copy: self?.copyPreview()
+            }
+        }))
         host.sizingOptions = [.intrinsicContentSize]
         panel.contentView = host
         self.panel = panel
@@ -408,7 +548,8 @@ final class PopupController {
             (self?.handle(event) ?? false) ? nil : event
         }) { monitors.append(keys) }
         if let clicks = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] _ in
-            Task { @MainActor in if self?.model.phase == .menu { self?.close() } }
+            // A click elsewhere closes the menu and discards a preview.
+            Task { @MainActor in if self?.model.phase == .menu || self?.pending != nil { self?.close() } }
         }) { monitors.append(clicks) }
     }
 
@@ -423,6 +564,16 @@ final class PopupController {
         guard event.window === panel else { return false }
         let key = Int(event.keyCode)
         if key == kVK_Escape { cancel(); return true }
+        if case .preview = model.phase {
+            // After Return, pending is nil but the panel keeps the keys until the replace: swallow repeats.
+            guard pending != nil else { return true }
+            if key == kVK_Return || key == kVK_ANSI_KeypadEnter { confirmPreview() }
+            // The key code works on any layout (Cyrillic); the character keeps ⌘C where C sits elsewhere (Dvorak).
+            if event.modifierFlags.contains(.command), key == kVK_ANSI_C || event.charactersIgnoringModifiers?.lowercased() == "c" {
+                copyPreview()
+            }
+            return true
+        }
         guard model.phase == .menu, !event.modifierFlags.contains(.command) else { return false }
         let count = model.actions.count
         let isReturn = key == kVK_Return || key == kVK_ANSI_KeypadEnter

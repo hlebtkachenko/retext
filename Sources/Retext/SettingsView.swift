@@ -72,7 +72,7 @@ struct SettingsView: View {
                 case .words: WordsPane(settings: $state.settings)
                 case .engine: EnginePane()
                 case .general: GeneralPane()
-                case .usage: UsagePane(usage: state.usage, history: state.history)
+                case .usage: UsagePane(usage: state.usage, history: state.history, provider: state.settings.provider)
                 }
             }
             .formStyle(.grouped)
@@ -110,7 +110,7 @@ private struct ActionsPane: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Action N runs with ⌥N while text is selected, in list order: move an action up or down to change its shortcut. Up to \(RetextSettings.maxActions).")
+                    Text("While text is selected, ⌥1 runs the first action, ⌥2 the second, and so on, in list order: move an action up or down to change its shortcut. Up to \(RetextSettings.maxActions) actions.")
                         .foregroundStyle(.secondary)
                     HStack {
                         Button("Add Action", systemImage: "plus") {
@@ -181,8 +181,21 @@ private struct ActionEditor: View {
                 Text("Translate").tag(ActionKind.translate)
                 Text("Other").tag(ActionKind.other)
             }
-            TextField("Prompt", text: $action.prompt, prompt: Text("What Claude should do with the selected text"), axis: .vertical)
-                .lineLimit(3...8)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Prompt")
+                TextField("Prompt", text: $action.prompt, prompt: Text("What Retext should do with the selected text"), axis: .vertical)
+                    .labelsHidden()
+                    .lineLimit(5...14)
+                    .padding(6)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+                Text("Describe the change in plain words. Click an example to use it:")
+                    .font(.callout).foregroundStyle(.secondary)
+                // One row when it fits, else one example per line.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) { exampleButtons }
+                    VStack(alignment: .leading, spacing: 6) { exampleButtons }
+                }
+            }
             HStack {
                 Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(position == 0)
                 Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(position == count - 1)
@@ -202,6 +215,24 @@ private struct ActionEditor: View {
         } message: {
             Text("Its prompt is lost, and the actions after it move up one shortcut.")
         }
+    }
+
+    private var exampleButtons: some View {
+        ForEach(Self.examples, id: \.self) { example in
+            Button(example) { insert(example) }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .help("Use this prompt")
+        }
+    }
+
+    private static let examples = ["Make it shorter and keep the meaning.", "Rewrite it more politely.", "Rewrite it in a formal business tone."]
+
+    /// An empty prompt becomes the example; otherwise the example is added on a new line.
+    private func insert(_ example: String) {
+        let prompt = action.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        action.prompt = prompt.isEmpty ? example : prompt + "\n" + example
     }
 }
 
@@ -736,6 +767,12 @@ private struct GeneralPane: View {
                 Text("Choose ⌃⌥Space if another app uses ⌥Space. macOS can also use ⌃⌥Space to switch input sources; turn that off in Keyboard Shortcuts if you pick it. Actions stay on ⌥1…⌥9.").foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Preview before replacing", isOn: $state.settings.previewBeforeReplace)
+            } footer: {
+                Text("Shows the result with its changes marked before it replaces your text: added words highlighted, removed words struck through. Return replaces, Esc discards, ⌘C copies the result instead. Off: the result replaces the selection right away. Text that can't be edited is copied either way.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Keep history", isOn: $state.settings.keepHistory)
                 LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
                     Button("Clear History…", role: .destructive) { confirmClear = true }
@@ -778,7 +815,7 @@ private struct GeneralPane: View {
             }
             Section {
                 LabeledContent("Version", value: Self.version ?? "Development build")
-                Link("Retext on GitHub", destination: URL(string: "https://github.com/hlebtkachenko/retext")!)
+                Link("Retext on GitHub", destination: Identity.pageURL(repository: UpdateChecker.repository))
             } header: {
                 Text("About")
             } footer: {
@@ -863,6 +900,7 @@ private struct GeneralPane: View {
 private struct UsagePane: View {
     let usage: Usage
     let history: History
+    let provider: Provider
 
     var body: some View {
         Form {
@@ -875,7 +913,7 @@ private struct UsagePane: View {
                 LabeledContent("Cache hits", value: "\(today.cacheHits)")
                 LabeledContent("Input tokens", value: today.inputTokens.formatted())
                 LabeledContent("Output tokens", value: today.outputTokens.formatted())
-                LabeledContent("≈ API list price", value: today.costUSD.formatted(.currency(code: "USD")))
+                LabeledContent("≈ API list price (Claude Code)", value: today.costUSD.formatted(.currency(code: "USD")))
             }
             Section {
                 ForEach(usage.days.keys.sorted(by: >).prefix(14), id: \.self) { day in
@@ -884,7 +922,7 @@ private struct UsagePane: View {
             } header: {
                 Text("Recent days")
             } footer: {
-                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only. \(EnginePane.billing) \(history.entries.count) results are cached.")
+                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only.\(provider == .claude ? " " + EnginePane.billing : "") \(history.entries.count) results are cached.")
                     .foregroundStyle(.secondary)
             }
         }

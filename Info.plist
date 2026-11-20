@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>co.hleb.retext</string>
+    <key>CFBundleIdentifier</key><string>dev.hapd.retext</string>
     <key>CFBundleName</key><string>Retext</string>
     <key>CFBundleExecutable</key><string>Retext</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
@@ -12,5 +12,6 @@
     <key>CFBundleVersion</key><string>5</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
+    <key>RetextRepository</key><string>hlebtkachenko/retext</string>
 </dict>
 </plist>
