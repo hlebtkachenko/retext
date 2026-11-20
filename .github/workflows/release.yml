@@ -1,17 +1,26 @@
 name: Release
 
-# Builds, signs, notarizes and staples the DMG for a pushed tag vX.Y.Z and attaches it to the GitHub release.
+# Planned signed release, not used yet. Run by hand once the signing secrets are set:
+#   gh workflow run release.yml -f tag=vX.Y.Z
+# Builds, signs, notarizes and staples the DMG for an existing tag vX.Y.Z and attaches it to the GitHub release.
 # Skips everything when the release already has the DMG, so a re-run never replaces a published asset.
 # Required secrets and the per-release steps: docs/RELEASING.md.
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, vX.Y.Z
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+env:
+  TAG: ${{ inputs.tag }}
+
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag }}
 
 jobs:
   release:
@@ -24,15 +33,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          if gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "Retext-$version.dmg"; then
-            echo "Release $GITHUB_REF_NAME already has Retext-$version.dmg; delete that asset first to rebuild it."
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like vX.Y.Z, got: $TAG" >&2; exit 1; }
+          version="${TAG#v}"
+          if gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "Retext-$version.dmg"; then
+            echo "Release $TAG already has Retext-$version.dmg; delete that asset first to rebuild it."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - if: steps.existing.outputs.skip != 'true'
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
 
       - name: Swift and Xcode versions
@@ -74,7 +85,7 @@ jobs:
 
       - name: Build, sign, notarize and staple the DMG
         if: steps.existing.outputs.skip != 'true'
-        run: scripts/release.sh "${GITHUB_REF_NAME#v}"
+        run: scripts/release.sh "${TAG#v}"
 
       - name: Upload the DMG to the GitHub release
         if: steps.existing.outputs.skip != 'true'
@@ -82,7 +93,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tag="$GITHUB_REF_NAME"
+          tag="$TAG"
           version="${tag#v}"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --verify-tag --title "Retext $version" --generate-notes
           gh release upload "$tag" "build/Retext-$version.dmg" "build/Retext-$version.dmg.sha256"
