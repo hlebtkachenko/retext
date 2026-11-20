@@ -68,13 +68,16 @@ enum Keychain {
                               delete: { service, account in SecItemDelete(base(account, service: service) as CFDictionary) })
     }
 
-    private static func read(service: String, account: String) -> String? {
+    /// errSecItemNotFound is the only "no item"; any other failure (denied, cancelled, locked) means the item may exist.
+    private static func read(service: String, account: String) -> KeychainRead {
         var query = base(account, service: service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return .notFound }
+        guard status == errSecSuccess, let data = item as? Data, let key = String(data: data, encoding: .utf8) else { return .unavailable }
+        return .found(key)
     }
 
     /// Whether a key is saved for the account (under the current or the legacy service), without reading it

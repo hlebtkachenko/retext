@@ -25,25 +25,41 @@ public enum Identity {
     }
 }
 
+/// One Keychain read: the key, no such item, or an item that exists but can't be read (access denied, prompt
+/// cancelled, Keychain locked, undecodable data).
+public enum KeychainRead: Equatable, Sendable {
+    case found(String)
+    case notFound
+    case unavailable
+}
+
 /// Moves a custom API key from the legacy Keychain service to the current one. The Keychain calls are passed in,
 /// so the decision is testable; the key itself is never logged.
 public enum KeychainMigration {
     /// The key for `account`: from `service`, else from `legacyService`. A legacy key is added under `service`, read back,
     /// and only then deleted from `legacyService`. When the add fails (an item already exists, saved meanwhile in Settings,
-    /// or the Keychain refused), the legacy item stays and the current item wins if it can be read.
+    /// or the Keychain refused), the legacy item stays and the current item wins if it can be read. When the current item
+    /// exists but can't be read, the result is nil and the legacy item is left alone, so a denied read prompts once.
     /// - Parameters:
-    ///   - read: (service, account) -> key
+    ///   - read: (service, account) -> read result
     ///   - save: (key, service, account) -> success; must only add, never overwrite an existing item
     ///   - delete: (service, account)
     public static func key(account: String, service: String, legacyService: String = Identity.legacyKeychainService,
-                           read: (String, String) -> String?,
+                           read: (String, String) -> KeychainRead,
                            save: (String, String, String) -> Bool,
                            delete: (String, String) -> Void) -> String? {
-        if let key = read(service, account) { return key }
+        switch read(service, account) {
+        case .found(let key): return key
+        case .unavailable: return nil
+        case .notFound: break
+        }
         // Same service: the legacy item is the only copy, never delete it.
-        guard service != legacyService, let legacy = read(legacyService, account) else { return nil }
-        guard save(legacy, service, account) else { return read(service, account) ?? legacy }
-        if read(service, account) == legacy { delete(legacyService, account) }
+        guard service != legacyService, case .found(let legacy) = read(legacyService, account) else { return nil }
+        guard save(legacy, service, account) else {
+            if case .found(let key) = read(service, account) { return key }
+            return legacy
+        }
+        if read(service, account) == .found(legacy) { delete(legacyService, account) }
         return legacy
     }
 }
