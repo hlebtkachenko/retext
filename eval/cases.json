@@ -57,7 +57,7 @@
    "text": "Our company is engaged in development of mobile applications and we search for a partner for long-term cooperation.",
    "note": "develops mobile apps / is engaged in the development of; we are looking for a long-term partner; cooperation -> partnership/collaboration."},
   {"id": "en-formal-email", "kind": "grammar", "group": "formal",
-   "text": "Dear Mr. Smith,\n\nI am writing regarding to our meeting last Tuesday. As we agreed, I send you the updated offer with the prices for the second quarter. Please pay attention that the prices are valid until the end of the month.\n\nI will be glad to answer on any questions.\n\nBest regards,\nJan Svoboda",
+   "text": "Dear Mr. Smith,\n\nI am writing regarding to our meeting last Tuesday. As we agreed, I send you the updated offer with the prices for the second quarter. Please pay attention that the prices are valid until the end of the month.\n\nI will be glad to answer on any questions.\n\nBest regards,\nJane Doe",
    "note": "regarding (no to); I am sending / please find attached; Please note that; happy to answer any questions; keep layout, names, facts (second quarter, end of month)."},
   {"id": "en-control-review", "kind": "grammar", "group": "control",
    "text": "Thanks for the quick turnaround. I've reviewed the draft and left a few comments in the doc; nothing major.",
