@@ -35,7 +35,7 @@ struct InstructionField: NSViewRepresentable {
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .systemFont(ofSize: NSFont.systemFontSize)
-        field.placeholderString = "Edit as"
+        field.placeholderString = "Instruction"
         field.cell?.isScrollable = true
         field.cell?.wraps = false
         field.delegate = context.coordinator
@@ -103,10 +103,21 @@ struct PopupView: View {
             .frame(maxHeight: 260)
             .accessibilityLabel(Self.spoken(segments))
             HStack(spacing: 14) {
-                // Not focusable, so Return and Space stay with the panel's key handling.
-                Button("↩ Replace") { choose(.replace) }
-                Button("esc Discard") { choose(.discard) }
-                Button("⌘C Copy") { choose(.copy) }
+                // Not focusable, so Return and Space stay with the panel's key handling. The key glyphs are visual only.
+                // The default choice: the bar's highlighted-action look, the same whether or not the panel is key.
+                Button { choose(.replace) } label: {
+                    Text("↩ Replace")
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                        .foregroundStyle(.white)
+                        .background(Capsule().fill(Color.accentColor))
+                        .contentShape(Capsule())
+                }
+                .accessibilityLabel("Replace")
+                Button { choose(.discard) } label: { Text("esc Discard") }
+                    .accessibilityLabel("Discard")
+                Button { choose(.copy) } label: { Text("⌘C Copy") }
+                    .accessibilityLabel("Copy")
             }
             .buttonStyle(.plain)
             .focusable(false)
@@ -159,6 +170,7 @@ struct PopupView: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .onHover { if $0, model.instruction.isEmpty { model.selected = index } }
             }
             levelChip
@@ -183,7 +195,15 @@ struct PopupView: View {
         .buttonStyle(.plain)
         .focusable(false)
         .help("Level: ↑/↓ to change")
-        .accessibilityLabel("Level \(model.level.title)")
+        .accessibilityLabel("Level")
+        .accessibilityValue(model.level.title)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: model.level = model.level.stepped(by: 1)
+            case .decrement: model.level = model.level.stepped(by: -1)
+            @unknown default: break
+            }
+        }
     }
 
     private func status(_ text: String, hint: String? = nil, @ViewBuilder icon: () -> some View) -> some View {
@@ -202,7 +222,9 @@ struct PopupView: View {
 }
 
 final class KeyPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    /// `--demo`: never key, so a screenshot run doesn't take the keyboard.
+    var isDemo = false
+    override var canBecomeKey: Bool { !isDemo }
 }
 
 @MainActor
@@ -223,6 +245,10 @@ final class PopupController {
     private var pending: (text: String, selection: Selection)?
     /// Discards the preview when another app comes to the front.
     private var activation: NSObjectProtocol?
+    /// A selection read is in flight: another ⌥Space waits for it instead of starting a second read.
+    private var isReading = false
+    /// `--demo`: the panel never becomes key, so typing stays with the app in front.
+    private var isDemo = false
 
     /// ⌥Space opens the menu (or closes it); ⌥1…⌥9 pass an action index and run it straight away.
     func trigger(_ action: Int? = nil) {
@@ -233,10 +259,16 @@ final class PopupController {
             guard let action else { return close() }
             return run(action)
         }
-        guard work == nil else { return }
+        guard work == nil, !isReading else { return }
+        isReading = true
         Task {
-            guard let selection = await SelectionIO.read() else {
+            let read = await SelectionIO.read()
+            isReading = false
+            guard let selection = read else {
                 return flash(.message("Select text first", isError: false), near: nil, for: 1.5)
+            }
+            if Engine.isTooLong(selection.text) {
+                return flash(.message("Selection too long (over 50,000 characters)", isError: true), near: selection.rect, for: 3)
             }
             self.selection = selection
             model.actions = AppState.shared.settings.actions
@@ -251,6 +283,7 @@ final class PopupController {
     }
 
     func demo(_ state: String) {
+        isDemo = true
         model.actions = AppState.shared.settings.actions
         model.level = CommandLine.arguments.last.flatMap(Level.init(rawValue:)) ?? AppState.shared.settings.defaultLevel
         model.phase = switch state {
@@ -290,7 +323,7 @@ final class PopupController {
         let action = model.actions[index]
         let settings = AppState.shared.settings
         model.selected = index
-        execute(Engine.job(for: action, level: model.level, text: selection.text, settings: settings,
+        execute(Engine.job(for: action, level: model.level, settings: settings,
                            bundleID: selection.app.bundleIdentifier),
                 progress: progress(for: action))
     }
@@ -426,7 +459,7 @@ final class PopupController {
         if let restore {
             Hotkeys.undo = { [weak self] in
                 restore()
-                self?.flash(.message("Previous clipboard restored", isError: false, symbol: "arrow.uturn.backward"), for: 1.2)
+                self?.flash(.message("Clipboard restored", isError: false, symbol: "arrow.uturn.backward"), for: 1.2)
             }
         }
         flash(.message(note, isError: false, hint: restore == nil ? nil : "⌘Z restores previous", symbol: "doc.on.clipboard"), for: 4)
@@ -452,6 +485,7 @@ final class PopupController {
         anchor = rect
         panel.setFrame(frame(near: rect, size: fittingSize()), display: true)
         panel.alphaValue = 1
+        if isDemo { return panel.orderFrontRegardless() }
         panel.makeKeyAndOrderFront(nil)
         if model.phase == .menu, let field = model.field { panel.makeFirstResponder(field) }
         installMonitors()
@@ -476,6 +510,12 @@ final class PopupController {
 
     private func flash(_ phase: PopupModel.Phase, near rect: CGRect? = nil, for seconds: Double) {
         model.phase = phase
+        // VoiceOver doesn't follow the non-key panel: say the outcome and errors aloud.
+        switch phase {
+        case .done: AccessibilityNotification.Announcement("Replaced").post()
+        case .message(let text, true, _, _): AccessibilityNotification.Announcement(text).post()
+        default: break
+        }
         if panel?.isVisible != true { show(near: rect) } else { fit() }
         panel?.orderFrontRegardless()
         hideTask?.cancel()
@@ -500,7 +540,8 @@ final class PopupController {
 
     private func makePanel() -> KeyPanel {
         let panel = KeyPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = .popUpMenu
+        panel.isDemo = isDemo
+        panel.level = isDemo ? .normal : .popUpMenu
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
