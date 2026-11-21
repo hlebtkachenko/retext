@@ -11,16 +11,19 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     /// With a pane, opens on it: the sidebar selection lives in `SettingsNavigation`, so the content is never rebuilt.
     /// The window has a unified toolbar and takes its title and toolbar items from SwiftUI (navigationTitle).
     func show(_ pane: SettingsView.Pane? = nil) {
-        if let pane { SettingsNavigation.shared.pane = pane }
+        if let pane { SettingsNavigation.shared.go(to: pane) }
         if window == nil {
             let host = NSHostingController(rootView: SettingsView())
             host.sceneBridgingOptions = [.title, .toolbars]
             // The window keeps the size set here instead of following the content's ideal size.
             host.sizingOptions = []
-            let w = NSWindow(contentViewController: host)
-            w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            // The toolbar goes on before the content: with .toolbars bridging, SwiftUI fills the window's toolbar with the
+            // view's toolbar items when the hosting controller is attached, and a toolbar set afterwards replaces them.
+            let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                             backing: .buffered, defer: true)
             w.toolbar = NSToolbar(identifier: "settings")
             w.toolbarStyle = .unified
+            w.contentViewController = host
             // A demo window is taller, so one screenshot shows more of a pane.
             w.setContentSize(NSSize(width: 780, height: AppWindows.isDemo ? 900 : 620))
             w.contentMinSize = NSSize(width: 680, height: 460)
@@ -39,11 +42,35 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
-/// The selected Settings pane, shared so the menu, Check for Updates… and a second launch can switch it.
+/// The selected Settings pane, shared so the menu, Check for Updates… and a second launch can switch it, with the
+/// Back and Forward history of the toolbar's navigation buttons.
 @MainActor
 final class SettingsNavigation: ObservableObject {
     static let shared = SettingsNavigation()
+    /// Set it directly only to open a pane without history (a demo); everything else uses `go(to:)`.
     @Published var pane = SettingsView.Pane.about
+    @Published private(set) var backStack: [SettingsView.Pane] = []
+    @Published private(set) var forwardStack: [SettingsView.Pane] = []
+
+    /// Opens `pane` and remembers the current one for Back; a new visit clears Forward, as in a browser.
+    func go(to pane: SettingsView.Pane) {
+        guard pane != self.pane else { return }
+        backStack.append(self.pane)
+        forwardStack.removeAll()
+        self.pane = pane
+    }
+
+    func goBack() {
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(pane)
+        pane = previous
+    }
+
+    func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(pane)
+        pane = next
+    }
 }
 
 struct SettingsView: View {
@@ -95,7 +122,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        let selection = Binding<Pane?>(get: { navigation.pane }, set: { if let pane = $0 { navigation.pane = pane } })
+        let selection = Binding<Pane?>(get: { navigation.pane }, set: { if let pane = $0 { navigation.go(to: pane) } })
         NavigationSplitView {
             List(selection: selection) {
                 Section {
@@ -127,14 +154,28 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            // A hard edge draws a line between the toolbar and the pane, as in NotchPop.
+            .scrollEdgeEffectStyle(.hard, for: .top)
             .navigationTitle(navigation.pane.rawValue)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button { navigation.goBack() } label: { Label("Back", systemImage: "chevron.backward") }
+                    .keyboardShortcut("[", modifiers: .command)
+                    .disabled(navigation.backStack.isEmpty)
+                    .help("Back")
+                Button { navigation.goForward() } label: { Label("Forward", systemImage: "chevron.forward") }
+                    .keyboardShortcut("]", modifiers: .command)
+                    .disabled(navigation.forwardStack.isEmpty)
+                    .help("Forward")
+            }
         }
         .onChange(of: navigation.pane) { _, pane in SettingsWindow.shared.window?.title = pane.rawValue }
     }
 }
 
-/// The sidebar's first row, like the account row of Raycast or NotchPop: the app icon, its name and the version
-/// (or "Update available"); it opens About.
+/// The sidebar's first row, like the account row of Raycast or NotchPop: the app icon, its name and "About"
+/// (or "Update Available"); it opens About.
 private struct AboutSidebarRow: View {
     @ObservedObject private var state = AppState.shared
 
@@ -145,15 +186,17 @@ private struct AboutSidebarRow: View {
                 .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Retext").font(.headline)
-                Text(state.update != nil ? "Update available" : AppVersion.short.map { "Version \($0)" } ?? "About")
+                Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Retext, About")
+        .accessibilityLabel("Retext, \(subtitle)")
     }
+
+    private var subtitle: String { state.update != nil ? "Update Available" : "About" }
 }
 
 /// A white symbol on a tinted rounded square, the sidebar's icon style (as in System Settings).
