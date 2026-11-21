@@ -580,7 +580,7 @@ private struct GeneralPane: View {
             Section {
                 Toggle("Show in menu bar", isOn: $state.settings.showMenuBarIcon)
             } footer: {
-                Text("With the icon off, open Retext again from Spotlight or Finder to get back to Settings.")
+                Text("Off: shortcuts keep working; open Retext again from Spotlight or Finder to get back to Settings.")
                     .foregroundStyle(.secondary)
             }
             Section {
