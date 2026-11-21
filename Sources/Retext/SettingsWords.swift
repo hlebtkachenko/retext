@@ -105,6 +105,12 @@ private struct PasteListSheet: View {
             Text("One word per line, or separated by commas. Words already in the list are skipped.").foregroundStyle(.secondary)
             TextEditor(text: $text)
                 .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color(nsColor: .separatorColor))
+                }
                 .frame(minHeight: 180)
                 .accessibilityLabel("Words")
             HStack {
