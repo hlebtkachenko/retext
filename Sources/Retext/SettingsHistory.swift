@@ -29,15 +29,13 @@ struct HistoryPane: View {
         Form {
             PageDescription(.history)
             Section {
-                Picker("Keep", selection: retention) {
-                    ForEach(HistoryRetention.allCases, id: \.self) { Text($0.title).tag($0) }
+                LabeledContent("Keep") {
+                    PopUpPicker("Keep", selection: retention, options: HistoryRetention.allCases) { $0.title }.fixedSize()
                 }
-                LabeledContent {
-                    Button("Clear History…", role: .destructive) { confirmClear = true }
+                LabeledContent("Clear History") {
+                    Button("Clear…", role: .destructive) { confirmClear = true }
                         .foregroundStyle(.red)
                         .disabled(state.history.entries.isEmpty)
-                } label: {
-                    Text(countText)
                 }
             } footer: {
                 Text(state.settings.historyRetention == .off
@@ -73,11 +71,14 @@ struct HistoryPane: View {
                     }
                 }
             } header: {
-                Text("Results")
+                SectionTitle("History (\(state.history.entries.count))")
             }
             .id("results")
         }
-        .sheet(item: $detail) { HistoryDetail(entry: $0, showChanges: SettingsView.demoExtra == "changes") }
+        .sheet(item: $detail) { entry in
+            HistoryDetail(entry: entry, showChanges: SettingsView.demoExtra == "changes",
+                          delete: { state.history.remove(id: entry.id) })
+        }
         .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { state.history = History() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
@@ -113,11 +114,6 @@ struct HistoryPane: View {
         })
     }
 
-    private var countText: String {
-        let count = state.history.entries.count
-        return count == 1 ? "1 result" : "\(count) results"
-    }
-
     private var confirmTitle: String {
         pendingRetention == .off ? "Turn off history?" : "Keep only the \(pendingRetention?.title.lowercased() ?? "")?"
     }
@@ -149,15 +145,15 @@ struct HistoryPane: View {
 
 // MARK: Row
 
-/// One result: its start, the original's start and what made it. Copy and Delete on the row and in its context menu.
+/// One result: its start, the original's start and what made it; a click opens its details, the context menu copies or deletes.
 private struct HistoryRow: View {
     let entry: HistoryEntry
     let open: () -> Void
     let delete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Button(action: open) {
+        Button(action: open) {
+            HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     // A prefix, so a 50,000-character result never lays out in full for three lines.
                     Text(entry.output.prefix(400)).lineLimit(3)
@@ -165,23 +161,16 @@ private struct HistoryRow: View {
                     Text(entry.metadata).font(.callout).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(entry.title), \(entry.appName)")
-            .accessibilityValue(String(entry.output.prefix(400)))
-            .accessibilityHint("Shows the details")
-            HStack(spacing: 2) {
-                Button("Copy Result", systemImage: "doc.on.doc") { HistoryEntry.copy(entry.output) }.help("Copy Result")
-                Button("Copy Original", systemImage: "text.quote") { HistoryEntry.copy(entry.input) }.help("Copy Original")
-                Button("Delete", systemImage: "trash", action: delete).help("Delete")
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .controlSize(.large)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 4)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(entry.title), \(entry.appName)")
+        .accessibilityValue(String(entry.output.prefix(400)))
+        .accessibilityHint("Shows the details")
         .contextMenu {
             Button("Show Details", action: open)
             Divider()
@@ -220,24 +209,20 @@ extension HistoryEntry {
 private struct HistoryDetail: View {
     let entry: HistoryEntry
     @State var showChanges = false
+    let delete: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(entry.title).font(.title3.bold()).lineLimit(1)
-                Spacer()
-                // Older entries kept only the start of the original: a diff against it would mark nearly everything.
-                Toggle("Show Changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 4)
             Form {
                 Section {
-                    Text(entry.input)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top) {
+                        Text(entry.input)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        CopyButton(title: "Copy Original", text: entry.input)
+                    }
                     if entry.isShortened {
                         Label("Only the start was saved.", systemImage: "info.circle").foregroundStyle(.secondary)
                     }
@@ -245,17 +230,23 @@ private struct HistoryDetail: View {
                     Text("Original")
                 }
                 Section {
-                    // The diff is worked out only when asked for: a long text takes a moment.
-                    let segments = showChanges ? TextDiff.words(old: entry.input, new: entry.output) : nil
-                    Group {
-                        if let segments {
-                            Text(PopupView.marked(segments)).accessibilityLabel(PopupView.spoken(segments))
-                        } else {
-                            Text(entry.output)
+                    HStack(alignment: .top) {
+                        // The diff is worked out only when asked for: a long text takes a moment.
+                        let segments = showChanges ? TextDiff.words(old: entry.input, new: entry.output) : nil
+                        Group {
+                            if let segments {
+                                Text(PopupView.marked(segments)).accessibilityLabel(PopupView.spoken(segments))
+                            } else {
+                                Text(entry.output)
+                            }
                         }
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        CopyButton(title: "Copy Result", text: entry.output)
                     }
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                    // Older entries kept only the start of the original: a diff against it would mark nearly everything.
+                    Toggle("Show Changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
                 } header: {
                     Text("Result")
                 }
@@ -279,8 +270,11 @@ private struct HistoryDetail: View {
             .formStyle(.grouped)
             Divider()
             HStack {
-                Button("Copy Original") { HistoryEntry.copy(entry.input) }
-                Button("Copy Result") { HistoryEntry.copy(entry.output) }
+                Button("Delete", role: .destructive) {
+                    delete()
+                    dismiss()
+                }
+                .foregroundStyle(.red)
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
@@ -290,42 +284,78 @@ private struct HistoryDetail: View {
     }
 }
 
-// MARK: Usage
-
-/// Totals from usage.json: today and the last 7, 30 and 90 days.
-private struct UsageSection: View {
-    let usage: Usage
+/// A borderless copy icon at the end of a text row; shows a checkmark for a moment after copying.
+private struct CopyButton: View {
+    let title: String
+    let text: String
+    @State private var copied = false
 
     var body: some View {
+        Button(title, systemImage: copied ? "checkmark" : "doc.on.doc") {
+            HistoryEntry.copy(text)
+            copied = true
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.borderless)
+        .foregroundStyle(.secondary)
+        .help(title)
+        .accessibilityLabel(title)
+        .task(id: copied) {
+            guard copied else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            copied = false
+        }
+    }
+}
+
+// MARK: Usage
+
+/// Totals from usage.json for the chosen period: today or the last 7, 30 or 90 days.
+private struct UsageSection: View {
+    let usage: Usage
+    /// The period in days; 1 is today.
+    @State private var days = 30
+
+    var body: some View {
+        let total = usage.total(days: days)
+        let tokens = total.inputTokens + total.outputTokens
+        let price = total.costUSD.formatted(.currency(code: "USD"))
         Section {
-            Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 8) {
-                GridRow {
-                    Text("").gridColumnAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Runs")
-                    Text("Tokens")
-                    Text("Price")
-                }
-                .font(.callout).foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-                ForEach([(1, "Today"), (7, "Last 7 days"), (30, "Last 30 days"), (90, "Last 90 days")], id: \.0) { days, title in
-                    let total = usage.total(days: days)
-                    GridRow {
-                        Text(title)
-                        Text(total.runs.formatted())
-                        Text((total.inputTokens + total.outputTokens).formatted())
-                        Text(total.costUSD.formatted(.currency(code: "USD")))
-                    }
-                    .monospacedDigit()
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(title): \(total.runs) runs, \(total.inputTokens + total.outputTokens) tokens, "
-                                        + total.costUSD.formatted(.currency(code: "USD")))
-                }
+            Picker("Period", selection: $days) {
+                ForEach([(1, "Today"), (7, "7 Days"), (30, "30 Days"), (90, "90 Days")], id: \.0) { Text($0.1).tag($0.0) }
             }
+            .pickerStyle(.segmented)
+            HStack(alignment: .top) {
+                StatCell(label: "Runs", value: total.runs.formatted(), spoken: total.runs.formatted())
+                // Compact on screen ("1.2K" in English, like the rest of the UI); VoiceOver reads the full count.
+                StatCell(label: "Tokens", value: tokens.formatted(.number.notation(.compactName).locale(HistoryEntry.english)),
+                         spoken: tokens.formatted())
+                StatCell(label: "Price", value: price, spoken: price)
+            }
+            .padding(.vertical, 4)
         } header: {
-            Text("Usage")
+            SectionTitle("Usage")
         } footer: {
             Text("Price is the Claude Code list price. ChatGPT and custom API runs count tokens only.")
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// One figure of the usage row: a secondary label over a large value.
+private struct StatCell: View {
+    let label: String
+    let value: String
+    let spoken: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.callout).foregroundStyle(.secondary)
+            Text(value).font(.title2.bold()).monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(spoken)
     }
 }
