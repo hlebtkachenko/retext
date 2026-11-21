@@ -1,13 +1,47 @@
 import RetextCore
 import SwiftUI
 
-// MARK: Usage
-
-struct UsagePane: View {
-    let usage: Usage
+/// Recent results kept for the menu and the cache, with the usage counters below.
+struct HistoryPane: View {
+    @ObservedObject private var state = AppState.shared
+    @State private var confirmClear = false
 
     var body: some View {
         Form {
+            Section {
+                // Off or Last 20 for now: History keeps 20 entries whatever the setting.
+                Toggle("Keep history", isOn: Binding(get: { state.settings.historyRetention != .off },
+                                                     set: { state.settings.historyRetention = $0 ? .last20 : .off }))
+                LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
+                    Button("Clear History…", role: .destructive) { confirmClear = true }
+                        .foregroundStyle(.red)
+                        .disabled(state.history.entries.isEmpty)
+                }
+            } header: {
+                Text("History")
+            } footer: {
+                Text("The last \(History.limit) results and the first \(HistoryEntry.inputLimit) characters of each selection are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
+                    .foregroundStyle(.secondary)
+            }
+            UsageSections(usage: state.usage)
+        }
+        .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
+            Button("Clear History", role: .destructive) { state.history = History() }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: {
+            Text("Recent results and the cache are deleted.")
+        }
+    }
+}
+
+// MARK: Usage
+
+/// Today's counters and the recent days, as sections of the History pane's form.
+struct UsageSections: View {
+    let usage: Usage
+
+    var body: some View {
+        Group {
             Section("Today") {
                 let today = usage.today
                 ForEach(today.callsByModel, id: \.name) { model in

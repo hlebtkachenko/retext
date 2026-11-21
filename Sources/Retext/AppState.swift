@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
     @Published var update: Release?
     /// A manual update check (Check Now, Check for Updates…) is running; a second one is not started.
     @Published private(set) var checkingForUpdates = false
-    /// The last manual check's answer, shown in Settings → Overview.
+    /// The last manual check's answer, shown in Settings → About.
     @Published var updateCheckResult: UpdateCheckResult?
     @Published var history: History { didSet { history.save(to: Store.url("history.json")) } }
     @Published var usage: Usage { didSet { usage.save(to: Store.url("usage.json")) } }
@@ -32,13 +32,13 @@ final class AppState: ObservableObject {
         usage = Usage.load(from: Store.url("usage.json"))
     }
 
-    /// "Check for Updates…": opens Settings on Overview, which shows the answer, and checks there.
+    /// "Check for Updates…": opens Settings on About, which shows the answer, and checks there.
     func checkForUpdatesInSettings() {
-        SettingsWindow.shared.show(.overview)
+        SettingsWindow.shared.show(.about)
         checkForUpdatesNow()
     }
 
-    /// Asks GitHub now, unless a manual check is already running. Kept here, not in the Overview pane, so it
+    /// Asks GitHub now, unless a manual check is already running. Kept here, not in the About pane, so it
     /// survives Settings rebuilding its content when it is opened on a pane.
     func checkForUpdatesNow() {
         guard !checkingForUpdates else { return }

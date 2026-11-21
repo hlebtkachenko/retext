@@ -9,7 +9,6 @@ import UniformTypeIdentifiers
 struct GeneralPane: View {
     @ObservedObject private var state = AppState.shared
     @State private var loginStatus = SMAppService.mainApp.status
-    @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var pendingImport: RetextSettings?
     @State private var backupError: String?
@@ -30,9 +29,7 @@ struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Picker("Open the bar with", selection: $state.settings.barShortcut) {
-                    ForEach(BarShortcut.presets, id: \.self) { Text($0.label).tag($0) }
-                }
+                ShortcutField()
             } footer: {
                 Text("Choose ⌃⌥Space if another app uses ⌥Space; macOS may use ⌃⌥Space to switch input sources, which you can turn off in Keyboard Shortcuts.").foregroundStyle(.secondary)
             }
@@ -40,21 +37,6 @@ struct GeneralPane: View {
                 Toggle("Preview before replacing", isOn: $state.settings.previewBeforeReplace)
             } footer: {
                 Text("Text that can't be edited is copied either way.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                // Off or Last 20 for now: History keeps 20 entries whatever the setting.
-                Toggle("Keep history", isOn: Binding(get: { state.settings.historyRetention != .off },
-                                                     set: { state.settings.historyRetention = $0 ? .last20 : .off }))
-                LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
-                    Button("Clear History…", role: .destructive) { confirmClear = true }
-                        .foregroundStyle(.red)
-                        .disabled(state.history.entries.isEmpty)
-                }
-            } header: {
-                Text("History")
-            } footer: {
-                Text("The last \(History.limit) results and the first \(HistoryEntry.inputLimit) characters of each selection are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -93,12 +75,6 @@ struct GeneralPane: View {
         .onAppear {
             loginStatus = SMAppService.mainApp.status
             if SettingsView.demoExtra == "reset" { confirmReset = true }
-        }
-        .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
-            Button("Clear History", role: .destructive) { state.history = History() }
-            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: {
-            Text("Recent results and the cache are deleted.")
         }
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {

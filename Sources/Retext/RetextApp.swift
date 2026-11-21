@@ -66,7 +66,7 @@ struct RetextApp: App {
                     }
                 }
                 if let problem = state.providerStatus?.problem {
-                    Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
+                    Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.ai) }
                 }
                 if let update = availableUpdate {
                     Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(update.page) }
@@ -134,8 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
-                // The case name (styles, words) or the start of the title (app, protected).
-                SettingsView.initialPane = SettingsView.Pane.allCases.first { "\($0)" == pane || $0.rawValue.lowercased().hasPrefix(pane) } ?? .overview
+                SettingsView.initialPane = SettingsView.Pane(demoName: pane) ?? .about
                 SettingsWindow.shared.show()
                 print("window \(SettingsWindow.shared.window?.windowNumber ?? 0)")  // for screencapture -l
                 fflush(stdout)
