@@ -90,9 +90,15 @@ public struct History: Codable, Equatable, Sendable {
         return copy
     }
 
-    /// Older files decode as they are; their shortened inputs are shown as such.
+    /// Older files decode as they are; their shortened inputs are shown as such. A file that can't be decoded is first
+    /// copied to `history.json.invalid` next to it (an earlier copy is kept, never overwritten), like settings.json.
     public static func load(from url: URL) -> History {
-        (try? Data(contentsOf: url)).flatMap { try? decoder.decode(History.self, from: $0) } ?? History()
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: url.path) else { return History() }
+        if let data = try? Data(contentsOf: url), let history = try? decoder.decode(History.self, from: data) { return history }
+        let invalid = url.appendingPathExtension("invalid")
+        if !fm.fileExists(atPath: invalid.path) { try? fm.copyItem(at: url, to: invalid) }
+        return History()
     }
 
     /// Compact JSON: an unlimited history of long texts is rewritten after every run.

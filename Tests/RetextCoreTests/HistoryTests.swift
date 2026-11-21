@@ -108,6 +108,21 @@ import Testing
         #expect(!full.isShortened)
     }
 
+    @Test func unreadableFileIsKeptAsInvalid() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("retext-history-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("history.json"), invalid = dir.appendingPathComponent("history.json.invalid")
+        #expect(History.load(from: url) == History())
+        #expect(!FileManager.default.fileExists(atPath: invalid.path))
+        try Data("not json".utf8).write(to: url)
+        #expect(History.load(from: url) == History())
+        #expect(try String(contentsOf: invalid, encoding: .utf8) == "not json")
+        // An earlier copy is never overwritten.
+        try Data("{\"entries\": 1}".utf8).write(to: url)
+        #expect(History.load(from: url) == History())
+        #expect(try String(contentsOf: invalid, encoding: .utf8) == "not json")
+    }
+
     @Test func selectionLimit() {
         #expect(Engine.maxSelectionLength == 50_000)
         #expect(!Engine.isTooLong(String(repeating: "a", count: 50_000)))
