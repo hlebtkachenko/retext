@@ -6,6 +6,7 @@ import SwiftUI
 struct WordsPane: View {
     @Binding var settings: RetextSettings
     @State private var newWord = ""
+    @State private var pasting = false
     /// The add field takes the focus, so typing on opening the pane never overwrites a saved word.
     @FocusState private var adding: Bool
 
@@ -26,10 +27,22 @@ struct WordsPane: View {
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
-                Text("Click a word to edit it.").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Click a word to edit it.").foregroundStyle(.secondary)
+                    HStack {
+                        Button("Paste List…", systemImage: "list.bullet.clipboard") { pasting = true }
+                        Spacer()
+                    }
+                }
             }
         }
-        .onAppear { adding = true }
+        .onAppear {
+            adding = true
+            if SettingsView.demoExtra == "paste" { pasting = true }
+        }
+        .sheet(isPresented: $pasting) {
+            PasteListSheet { settings.addProtectedWords($0) }
+        }
     }
 
     private func add() {
@@ -76,5 +89,33 @@ private struct WordRow: View {
         guard draft != word else { return }
         commit(draft)
         draft = word
+    }
+}
+
+/// A long list pasted at once: one word per line or separated by commas; words already in the list are skipped.
+private struct PasteListSheet: View {
+    let add: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+
+    var body: some View {
+        let count = RetextSettings.terms(in: text).count
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Paste a List of Words").font(.headline)
+            Text("One word per line, or separated by commas. Words already in the list are skipped.").foregroundStyle(.secondary)
+            TextEditor(text: $text)
+                .font(.body)
+                .frame(minHeight: 180)
+                .accessibilityLabel("Words")
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(count == 1 ? "Add 1 Word" : "Add \(count) Words") { add(text); dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(count == 0)
+            }
+        }
+        .padding()
+        .frame(width: 440)
     }
 }
