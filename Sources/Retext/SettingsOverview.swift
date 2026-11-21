@@ -42,7 +42,7 @@ struct OverviewPane: View {
             } header: {
                 Text("Updates")
             } footer: {
-                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Check Now asks right away. Nothing is downloaded automatically. Apart from the custom API, when you choose it, this is the only network request Retext makes itself.")
+                Text("Asks GitHub for the latest release at most once a day. Nothing is downloaded.")
                     .foregroundStyle(.secondary)
             }
             Section {
