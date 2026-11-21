@@ -193,7 +193,7 @@ private struct HistoryRow: View {
 }
 
 extension HistoryEntry {
-    /// "Fix grammar · Mail · 5 minutes ago · High · 1.8 s"; older entries have no level or duration and say so.
+    /// "Fix grammar · Mail · 5 minutes ago · High · 1.8 s"; older entries have no level or duration; shortened ones say so.
     var metadata: String {
         var parts = [title, appName, date.formatted(.relative(presentation: .named).locale(Self.english))]
         if let level { parts.append(level.title) }
