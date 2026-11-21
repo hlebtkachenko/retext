@@ -122,7 +122,8 @@ struct ProviderRow: View {
             switch status {
             case nil: ProgressView().controlSize(.small)
             case let status? where status.ready:
-                Label(status.detail, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
+                // The executable's path (or the API host), with ~ for the home folder so a screenshot shows no user name.
+                Label((status.detail as NSString).abbreviatingWithTildeInPath, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
             case .some: Label("Not ready", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
         } label: {
