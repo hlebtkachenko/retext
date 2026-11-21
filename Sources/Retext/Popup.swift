@@ -353,6 +353,8 @@ final class PopupController {
             defer { if runID == id { work = nil } }
             do {
                 let result = try await result(of: job, timeout: timeout, for: selection)
+                // A late ⌘C watch still running could restore the clipboard over a fast copied result.
+                await SelectionIO.settle()
                 // A cache hit returns without a cancellation check; after Esc nothing may show, copy or paste.
                 try Task.checkCancellation()
                 if Engine.isUnchanged(input: selection.text, output: result) {

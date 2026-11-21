@@ -23,6 +23,9 @@ enum SelectionIO {
     /// so it never snapshots or overwrites a clipboard that is about to be put back.
     @MainActor private static var restoring: Task<Void, Never>?
 
+    /// Waits for the pending clipboard restore, so a copy written after it can't be overwritten by it.
+    @MainActor static func settle() async { await restoring?.value }
+
     /// Main actor, like `replace`: AppKit, the pasteboard and the ⌘C event stay on main; the waits are async sleeps.
     @MainActor
     static func read() async -> Selection? {
