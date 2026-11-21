@@ -39,7 +39,7 @@ struct RetextApp: App {
                 Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
             }
             Button("Welcome…") { WelcomeWindow.shared.show() }
-            Button("Check for Updates…") { Self.checkForUpdates() }
+            Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         } label: {
@@ -48,42 +48,7 @@ struct RetextApp: App {
         // The app menu (About Retext, Services, Hide…) shown while Settings or Welcome is open.
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") { Self.checkForUpdates() }
-            }
-        }
-    }
-
-    private static var checking = false
-
-    /// "Check for Updates…": asks GitHub now and answers in an alert; a second click while a check runs is ignored.
-    private static func checkForUpdates() {
-        guard !checking else { return }
-        checking = true
-        Task { @MainActor in
-            let result = await UpdateChecker.checkNow()
-            checking = false
-            let alert = NSAlert()
-            switch result {
-            case .upToDate(let current):
-                alert.messageText = "Retext \(current) is up to date."
-            case .available(let release):
-                alert.messageText = "Retext \(release.version) is available."
-                alert.informativeText = "You have \(UpdateChecker.currentVersion ?? "an older version")."
-                alert.addButton(withTitle: "Open Release Page")
-                alert.addButton(withTitle: "Later")
-            case .failed(let reason):
-                alert.alertStyle = .warning
-                alert.messageText = "Couldn't check for updates."
-                alert.informativeText = reason
-            }
-            // A menu-bar app is not active after a menu click; the alert must come to the front, and stay visible
-            // when another app is clicked (an alert hides on deactivation, and runModal would keep waiting).
-            alert.window.hidesOnDeactivate = false
-            NSApp.activate()
-            let response = alert.runModal()
-            if case .available(let release) = result, response == .alertFirstButtonReturn,
-               release.html_url.hasPrefix("https://github.com/"), let page = URL(string: release.html_url) {
-                NSWorkspace.shared.open(page)
+                Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             }
         }
     }

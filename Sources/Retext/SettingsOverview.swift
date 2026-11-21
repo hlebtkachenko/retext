@@ -5,8 +5,6 @@ import SwiftUI
 /// The first pane: what this build is, whether it can work, updates and links.
 struct OverviewPane: View {
     @ObservedObject private var state = AppState.shared
-    @State private var checking = false
-    @State private var result: UpdateCheckResult?
 
     private static let version: String = {
         let info = Bundle.main.infoDictionary ?? [:]
@@ -37,9 +35,9 @@ struct OverviewPane: View {
             Section {
                 Toggle("Check for updates automatically", isOn: $state.settings.checkForUpdates)
                 HStack {
-                    Button("Check Now", action: checkNow).disabled(checking)
-                    if checking { ProgressView().controlSize(.small) }
-                    if let result { ResultView(result: result) }
+                    Button("Check Now") { state.checkForUpdatesNow() }.disabled(state.checkingForUpdates)
+                    if state.checkingForUpdates { ProgressView().controlSize(.small) }
+                    if let result = state.updateCheckResult { ResultView(result: result) }
                 }
             } header: {
                 Text("Updates")
@@ -59,16 +57,7 @@ struct OverviewPane: View {
         }
         .onAppear {
             // `--demo settings overview update`: shows a found release without asking GitHub.
-            if SettingsView.demoExtra == "update" { result = .available(Release(tag_name: "v9.9.9", html_url: page.appending(path: "releases").absoluteString)) }
-        }
-    }
-
-    private func checkNow() {
-        checking = true
-        result = nil
-        Task {
-            result = await UpdateChecker.checkNow()
-            checking = false
+            if SettingsView.demoExtra == "update" { state.updateCheckResult = .available(Release(tag_name: "v9.9.9", html_url: page.appending(path: "releases").absoluteString)) }
         }
     }
 

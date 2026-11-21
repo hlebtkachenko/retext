@@ -19,6 +19,10 @@ final class AppState: ObservableObject {
     @Published var providerStatus: ProviderStatus?
     /// A newer release found by `UpdateChecker`; the menu offers it.
     @Published var update: Release?
+    /// A manual update check (Check Now, Check for Updates…) is running; a second one is not started.
+    @Published private(set) var checkingForUpdates = false
+    /// The last manual check's answer, shown in Settings → Overview.
+    @Published var updateCheckResult: UpdateCheckResult?
     @Published var history: History { didSet { history.save(to: Store.url("history.json")) } }
     @Published var usage: Usage { didSet { usage.save(to: Store.url("usage.json")) } }
 
@@ -26,6 +30,24 @@ final class AppState: ObservableObject {
         settings = RetextSettings.load(from: Store.url("settings.json"))
         history = History.load(from: Store.url("history.json"))
         usage = Usage.load(from: Store.url("usage.json"))
+    }
+
+    /// "Check for Updates…": opens Settings on Overview, which shows the answer, and checks there.
+    func checkForUpdatesInSettings() {
+        SettingsWindow.shared.show(.overview)
+        checkForUpdatesNow()
+    }
+
+    /// Asks GitHub now, unless a manual check is already running. Kept here, not in the Overview pane, so it
+    /// survives Settings rebuilding its content when it is opened on a pane.
+    func checkForUpdatesNow() {
+        guard !checkingForUpdates else { return }
+        checkingForUpdates = true
+        updateCheckResult = nil
+        Task {
+            updateCheckResult = await UpdateChecker.checkNow()
+            checkingForUpdates = false
+        }
     }
 
     /// Checks the active provider again (after a settings change, a key change or a failed run).

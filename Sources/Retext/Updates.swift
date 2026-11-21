@@ -28,7 +28,7 @@ enum UpdateChecker {
         Task { if case .success(let release) = await fetch(current: current) { remember(release) } }
     }
 
-    /// "Check for Updates…": asks now, whatever the setting and the last check, and remembers the answer like
+    /// Check Now and "Check for Updates…": asks now, whatever the setting and the last check, and remembers the answer like
     /// `checkIfDue`, so the menu's "Update available" item follows it.
     static func checkNow() async -> UpdateCheckResult {
         guard let current = currentVersion else { return .failed("This build has no version number.") }
@@ -73,13 +73,13 @@ enum UpdateChecker {
     }
 }
 
-/// What "Check for Updates…" reports.
+/// What a manual check reports, in Settings → Overview.
 enum UpdateCheckResult: Sendable {
     /// The current version.
     case upToDate(String)
     /// A newer release whose page is on https://github.com/.
     case available(Release)
-    /// Why the check failed, for the alert.
+    /// Why the check failed.
     case failed(String)
 }
 
