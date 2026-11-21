@@ -2,7 +2,41 @@ import Carbon.HIToolbox
 import RetextCore
 import SwiftUI
 
+/// Takes the single-instance lock before the app starts; `--demo` and `--provider-smoke` run alongside the app.
 @main
+@MainActor
+enum RetextMain {
+    static func main() {
+        let args = CommandLine.arguments
+        if !args.contains("--demo"), !args.contains("--provider-smoke") { SingleInstance.claim() }
+        RetextApp.main()
+    }
+}
+
+/// One Retext at a time: an exclusive flock on Application Support/Retext/instance.lock, held until the process exits
+/// (the kernel drops it then, even after a crash). A second launch asks the running one to show Settings and exits.
+enum SingleInstance {
+    /// Posted by a second launch; the running Retext shows Settings, like opening it again from Finder.
+    static let reopen = Notification.Name(Identity.bundleID + ".reopen")
+    /// The lock's descriptor: never closed or unlinked, and close-on-exec so provider subprocesses don't inherit it.
+    nonisolated(unsafe) private static var lock: Int32 = -1
+
+    static func claim() {
+        try? FileManager.default.createDirectory(at: Store.directory, withIntermediateDirectories: true)
+        let fd = open(Store.url("instance.lock").path, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { return }  // no lock file: launch normally rather than not at all
+        // Retries cover a Retext that is still quitting (a relaunch right after Quit, or build.sh replacing it).
+        for attempt in 0...5 {
+            if flock(fd, LOCK_EX | LOCK_NB) == 0 { lock = fd; return }
+            guard errno == EWOULDBLOCK else { close(fd); return }
+            if attempt < 5 { usleep(200_000) }
+        }
+        DistributedNotificationCenter.default().postNotificationName(reopen, object: nil, userInfo: nil, deliverImmediately: true)
+        FileHandle.standardError.write(Data("Retext is already running; showing its Settings.\n".utf8))
+        exit(0)
+    }
+}
+
 struct RetextApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @ObservedObject private var state = AppState.shared
@@ -117,6 +151,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
             controller.demo(state)
             return
+        }
+        DistributedNotificationCenter.default().addObserver(forName: SingleInstance.reopen, object: nil, queue: .main) { _ in
+            // queue: .main delivers on the main thread.
+            MainActor.assumeIsolated { SettingsWindow.shared.show() }
         }
         // The value of kAXTrustedCheckOptionPrompt, a C global var that Swift 6 treats as shared mutable state.
         let prompt = "AXTrustedCheckOptionPrompt"
