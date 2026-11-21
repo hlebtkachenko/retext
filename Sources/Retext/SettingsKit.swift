@@ -196,7 +196,10 @@ struct PullDownButton: NSViewRepresentable {
         let menu = NSMenu()
         menu.autoenablesItems = false
         // A pull-down shows its first item as the button's face; the rest is added when the menu opens.
-        menu.addItem(NSMenuItem(title: "", action: nil, keyEquivalent: ""))
+        let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        face.image = systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        context.coordinator.faceSymbol = systemImage
+        menu.addItem(face)
         menu.delegate = context.coordinator
         button.menu = menu
         return button
