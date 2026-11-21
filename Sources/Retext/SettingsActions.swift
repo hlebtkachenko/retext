@@ -108,9 +108,20 @@ private struct ActionEditor: View {
             .help("Grammar and Translate keep a one-line text on one line unless an app style applies, and a Grammar result much longer than the text is rejected. Other has no such checks.")
             VStack(alignment: .leading, spacing: 8) {
                 Text("Prompt")
-                TextField("Prompt", text: $action.prompt, prompt: Text("What Retext should do with the selected text"), axis: .vertical)
-                    .labelsHidden()
-                    .lineLimit(5...14)
+                // TextEditor, not a vertical TextField: Return starts a new line instead of ending the edit.
+                TextEditor(text: $action.prompt)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 90, maxHeight: 240)
+                    .overlay(alignment: .topLeading) {
+                        if action.prompt.isEmpty {
+                            Text("What Retext should do with the selected text")
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityLabel("Prompt")
                     .padding(6)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
                 // One row when it fits, else one example per line.
