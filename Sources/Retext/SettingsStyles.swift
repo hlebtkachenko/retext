@@ -62,7 +62,6 @@ private struct AppMenu: View {
             Section("Running") { items(running) }
             Section("Installed") { items(installed.filter { app in !running.contains { $0.bundleID == app.bundleID } }) }
         }
-        .fixedSize()
     }
 
     private func items(_ apps: [AppInfo]) -> some View {
@@ -86,41 +85,23 @@ struct StylesPane: View {
     var body: some View {
         Form {
             Section {
-                ForEach($styles) { $style in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            let path = AppIcons.path(style.bundleID)
-                            if let icon = AppIcons.icon(path: path) {
-                                Image(nsImage: icon).resizable().frame(width: 24, height: 24)
-                            } else {
-                                Image(systemName: "app.dashed").font(.title2).frame(width: 24, height: 24).foregroundStyle(.secondary)
-                            }
-                            VStack(alignment: .leading) {
-                                Text(appName(style.bundleID, path: path)).font(.headline)
-                                Text(style.bundleID.isEmpty ? "No app chosen" : style.bundleID)
-                                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                            }
-                            Spacer()
-                            AppMenu(title: "Change App", systemImage: "arrow.left.arrow.right", running: running, installed: installed) {
-                                style.bundleID = $0
-                            }
-                            Button("Remove", systemImage: "minus.circle") { styles.removeAll { $0.id == style.id } }
-                                .labelStyle(.iconOnly).buttonStyle(.borderless)
-                        }
-                        TextField("Style", text: $style.style, prompt: Text("e.g. casual chat"), axis: .vertical)
-                            .lineLimit(1...4)
+                IntroCard(symbol: "app.badge.fill", title: "Per-App Styles",
+                          text: "A style is added to the prompt whenever the selected text is in that app, so every action fits the place you write in: casual in Slack, formal in Mail.")
+            }
+            ForEach($styles) { $style in
+                Section { row($style) }
+            }
+            Section {
+                HStack {
+                    AppMenu(title: "Add App Style", systemImage: "plus", running: running, installed: installed) {
+                        styles.append(AppStyle(bundleID: $0, style: ""))
                     }
-                    .padding(.vertical, 4)
+                    .fixedSize()
+                    Spacer()
                 }
             } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("A style is added to the prompt when the text is selected in that app.").foregroundStyle(.secondary)
-                    HStack {
-                        AppMenu(title: "Add App Style", systemImage: "plus", running: running, installed: installed) {
-                            styles.append(AppStyle(bundleID: $0, style: ""))
-                        }
-                        Spacer()
-                    }
+                if styles.isEmpty {
+                    Text("No app styles yet. Actions then write the same way in every app.").foregroundStyle(.secondary)
                 }
             }
         }
@@ -128,6 +109,54 @@ struct StylesPane: View {
             running = AppInfo.running()
             installed = await Task.detached { AppInfo.installed() }.value
         }
+    }
+
+    private func row(_ style: Binding<AppStyle>) -> some View {
+        let id = style.wrappedValue.id, bundleID = style.wrappedValue.bundleID
+        let path = AppIcons.path(bundleID)
+        let name = appName(bundleID, path: path)
+        let remove = { styles.removeAll { $0.id == id } }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Group {
+                    if let icon = AppIcons.icon(path: path) {
+                        Image(nsImage: icon).resizable()
+                    } else {
+                        Image(systemName: "app.dashed").font(.title).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name).font(.headline)
+                    Text(bundleID.isEmpty ? "No app chosen" : bundleID)
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                Spacer()
+                Menu {
+                    AppMenu(title: "Change App", systemImage: "arrow.left.arrow.right", running: running, installed: installed) {
+                        style.wrappedValue.bundleID = $0
+                    }
+                    Divider()
+                    Button("Remove", systemImage: "trash", role: .destructive, action: remove)
+                } label: {
+                    Image(systemName: "ellipsis.circle").font(.title3)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Change the app or remove this style")
+                .accessibilityLabel("Options for \(name)")
+            }
+            TextField("Style for \(name)", text: style.style,
+                      prompt: Text("How to write in this app, e.g. casual and short, no greetings"), axis: .vertical)
+                .lineLimit(2...5)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+        }
+        .padding(.vertical, 4)
+        .contextMenu { Button("Remove", systemImage: "trash", role: .destructive, action: remove) }
     }
 
     private func appName(_ bundleID: String, path: String?) -> String {
