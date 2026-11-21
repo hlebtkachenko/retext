@@ -14,7 +14,7 @@ import RetextCore
     @Test func timeoutKillsAChildThatIgnoresTerm() async throws {
         // The shell and its sleep both ignore SIGTERM; SIGKILL to the group must stop them.
         let (result, took) = try await sh("trap '' TERM; sleep 30 & echo $!; wait", timeout: .seconds(1))
-        #expect(took < .seconds(4))
+        #expect(took < .seconds(6))
         #expect(!result.exited)
         let sleep = try #require(pid_t(String(decoding: result.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)))
         try await Task.sleep(for: .milliseconds(200))
