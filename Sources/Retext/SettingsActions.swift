@@ -40,7 +40,7 @@ struct ActionsPane: View {
         }
         .sheet(item: $editing) { action in
             ActionSheet(action: action, isNew: !actions.contains { $0.id == action.id },
-                        save: save, delete: { editing = nil; confirmDelete = action })
+                        save: save, delete: { delete(action.id); editing = nil })
         }
         .onAppear {
             switch SettingsView.demoExtra {
@@ -59,7 +59,7 @@ struct ActionsPane: View {
         .dialogSeverity(.critical)
         .confirmationDialog("Delete “\(confirmDelete?.title ?? "")”?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                             presenting: confirmDelete) { action in
-            Button("Delete Action", role: .destructive) { actions.removeAll { $0.id == action.id } }
+            Button("Delete Action", role: .destructive) { delete(action.id) }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: { _ in
             Text("Its prompt is lost, and the actions after it move up one shortcut.")
@@ -74,6 +74,8 @@ struct ActionsPane: View {
         }
         editing = nil
     }
+
+    private func delete(_ id: CustomAction.ID) { actions.removeAll { $0.id == id } }
 
     private func move(_ id: CustomAction.ID, by offset: Int) {
         guard let i = actions.firstIndex(where: { $0.id == id }), actions.indices.contains(i + offset) else { return }
@@ -165,6 +167,7 @@ private struct ActionSheet: View {
     let isNew: Bool
     let save: (CustomAction) -> Void
     let delete: () -> Void
+    @State private var confirmDelete = false
     @Environment(\.dismiss) private var dismiss
 
     init(action: CustomAction, isNew: Bool, save: @escaping (CustomAction) -> Void, delete: @escaping () -> Void) {
@@ -235,7 +238,7 @@ private struct ActionSheet: View {
             }
             HStack {
                 if !isNew {
-                    Button("Delete Action…", role: .destructive, action: delete).foregroundStyle(.red)
+                    Button("Delete Action…", role: .destructive) { confirmDelete = true }.foregroundStyle(.red)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
@@ -244,6 +247,13 @@ private struct ActionSheet: View {
         }
         .padding(20)
         .frame(minWidth: 480, idealWidth: 560, maxWidth: 900, minHeight: 420, idealHeight: 520, maxHeight: 900)
+        // On the sheet, not the pane: an alert presented while the sheet closes may not show at all.
+        .confirmationDialog("Delete “\(action.title)”?", isPresented: $confirmDelete) {
+            Button("Delete Action", role: .destructive, action: delete)
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: {
+            Text("Its prompt is lost, and the actions after it move up one shortcut.")
+        }
     }
 
     private static let examples = ["Make it shorter and keep the meaning.", "Rewrite it more politely.", "Rewrite it in a formal business tone.",
