@@ -104,6 +104,8 @@ struct RetextApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let controller = PopupController()
+    /// SIGTERM (`pkill`, as build.sh sends, or a logout) skips willTerminate, so the pending history save is flushed here.
+    private var terminateSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A `claude` that exits before reading a large selection must not kill Retext.
@@ -143,6 +145,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             controller.demo(state)
             return
         }
+        signal(SIGTERM, SIG_IGN)
+        let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        terminate.setEventHandler {
+            // queue: .main runs the handler on the main thread. Usage is saved on every change; only history waits.
+            MainActor.assumeIsolated { AppState.shared.flushHistory() }
+            exit(0)
+        }
+        terminate.resume()
+        terminateSource = terminate
         DistributedNotificationCenter.default().addObserver(forName: SingleInstance.reopen, object: nil, queue: .main) { _ in
             // queue: .main delivers on the main thread.
             MainActor.assumeIsolated { SettingsWindow.shared.show() }

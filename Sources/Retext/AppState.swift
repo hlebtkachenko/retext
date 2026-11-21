@@ -67,8 +67,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Writes a pending change now and waits for writes already queued, before Retext quits.
-    private func flushHistory() {
+    /// Writes a pending change now and waits for writes already queued, before Retext quits (at quit and on SIGTERM).
+    func flushHistory() {
         if let pending = historySave {
             pending.cancel()
             writeHistory(wait: true)
