@@ -262,6 +262,9 @@ public struct ClaudeOutput: Decodable, Sendable {
     /// The answer stopped at the output limit, so it is incomplete.
     public var isCutOff: Bool { stop_reason == "length" }
 
+    /// Throws `ClaudeFailure.cutOff` for a cut-off answer. Called after usage is recorded, so the call still counts.
+    public func checkComplete() throws { if isCutOff { throw ClaudeFailure.cutOff } }
+
     public var inputTokens: Int { usage?.input_tokens ?? 0 }
     public var outputTokens: Int { usage?.output_tokens ?? 0 }
     public var costUSD: Double { total_cost_usd ?? 0 }

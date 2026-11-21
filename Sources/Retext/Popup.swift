@@ -443,6 +443,8 @@ final class PopupController {
         let output = try await ProviderRunner.run(job, text: selection.text, settings: state.settings, timeout: timeout)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
+        // A truncated answer would replace the selection with part of it.
+        try output.checkComplete()
         guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
         if keep { state.history.add(HistoryEntry(key: key, appName: selection.app.localizedName ?? "", title: job.title,
                                        input: selection.text, output: text, model: job.model,

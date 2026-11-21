@@ -360,6 +360,7 @@ private struct TestButton: View {
                 if let failure = await precheck() { throw failure }
                 let output = try await ProviderRunner.run(job, text: "ok", settings: settings, timeout: Level.medium.timeout)
                 state.usage.recordCall(model: job.model, output: output)
+                try output.checkComplete()
                 result = (true, await success())
             } catch {
                 let failure = error as? ClaudeFailure ?? .other("")
