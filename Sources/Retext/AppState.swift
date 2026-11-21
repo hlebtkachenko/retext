@@ -89,8 +89,8 @@ final class AppState: ObservableObject {
         checkForUpdatesNow()
     }
 
-    /// Asks GitHub now, unless a manual check is already running. Kept here, not in the About pane, so it
-    /// survives Settings rebuilding its content when it is opened on a pane.
+    /// Asks GitHub now, unless a manual check is already running. Kept here, not in the About pane, so the check
+    /// and its answer outlive the pane: "Check for Updates…" starts it as About opens, and switching panes keeps it.
     func checkForUpdatesNow() {
         guard !checkingForUpdates else { return }
         checkingForUpdates = true

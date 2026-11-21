@@ -35,12 +35,6 @@ public struct BarShortcut: Codable, Hashable, Sendable {
     /// No modifier or only ⇧ would take a key from typing everywhere.
     public var isValid: Bool { !modifiers.subtracting(.shift).isEmpty }
 
-    /// "⌃⌥Space": modifiers in the macOS menu order ⌃⌥⇧⌘, then the key.
-    public var label: String {
-        let glyphs: [(Modifiers, String)] = [(.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
-        return glyphs.filter { modifiers.contains($0.0) }.map(\.1).joined() + (keyCode == Self.spaceKey ? "Space" : "Key \(keyCode)")
-    }
-
     /// The 1.x `menuShortcut` value; anything else is nil.
     static func legacy(_ name: String) -> BarShortcut? {
         switch name {
@@ -51,7 +45,7 @@ public struct BarShortcut: Codable, Hashable, Sendable {
     }
 }
 
-/// How many results history.json keeps (Recent and the cache).
+/// How many results history.json keeps, each with the whole selection and answer (the History list and the cache).
 public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
     case off, last20, last60, unlimited
 
@@ -119,7 +113,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var chatGPTModels: [Level: ProviderModel] = [:]
     /// The OpenAI-compatible API (base URL and models; the key is in the Keychain).
     public var custom = CustomProviderSettings()
-    /// Off: no results are written to history.json and the cache isn't used.
+    /// Off: nothing is written to history.json; the last result stays in memory as the cache, until Retext quits.
     public var historyRetention = HistoryRetention.last20
     /// On: AXManualAccessibility is set on every app switch, so ⌥N sees Electron selections before the first bar.
     /// Off: it is set only when Retext reads a selection.

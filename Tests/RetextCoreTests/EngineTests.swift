@@ -145,7 +145,7 @@ import Testing
         // No modifier or only ⇧ would take Space from typing: the old key, then the default, instead.
         #expect(try decode(#"{"menuShortcut": "controlOptionSpace", "barShortcut": {"keyCode": 49, "modifiers": 0}}"#) == .controlOptionSpace)
         #expect(try decode(#"{"barShortcut": {"keyCode": 49, "modifiers": 4}}"#) == .optionSpace)
-        #expect(BarShortcut.presets.map(\.label) == ["⌥Space", "⌃⌥Space", "⌃⇧Space"])
+        #expect(BarShortcut.presets.map(\.displayLabel) == ["⌥Space", "⌃⌥Space", "⌃⇧Space"])
     }
 
     @Test func oldExportImportsAndSavesOnlyNewKeys() throws {

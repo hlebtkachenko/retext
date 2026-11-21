@@ -99,7 +99,7 @@ struct GeneralPane: View {
         .alert(backupError ?? "", isPresented: Binding(get: { backupError != nil }, set: { if !$0 { backupError = nil } })) {}
     }
 
-    /// Keeps `onboarded`, so the welcome window doesn't come back after an import or reset, and `historyRetention`,
+    /// Keeps `onboarded`, so Onboarding doesn't come back after an import or reset, and `historyRetention`,
     /// which goes with the history that is kept too.
     private func replaceSettings(with new: RetextSettings) {
         var new = new

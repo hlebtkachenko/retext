@@ -113,7 +113,7 @@ private struct UpdateCard: View {
                     Button("Open Release Page") { NSWorkspace.shared.open(url) }.buttonStyle(.borderedProminent)
                 }
             }
-            (Text("Built from source? In your Retext folder run ") + Text("git pull && ./build.sh").font(.callout.monospaced()) + Text("."))
+            Text("Built from source? In your Retext folder run \(Text("git pull && ./build.sh").font(.callout.monospaced())).")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)

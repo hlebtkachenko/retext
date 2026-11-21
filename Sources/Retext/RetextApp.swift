@@ -104,15 +104,15 @@ struct RetextApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let controller = PopupController()
-    @Published var hotkeyOK = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A `claude` that exits before reading a large selection must not kill Retext.
         signal(SIGPIPE, SIG_IGN)
         if let i = CommandLine.arguments.firstIndex(of: "--provider-smoke") { return providerSmoke(Array(CommandLine.arguments.dropFirst(i + 1))) }
         if let i = CommandLine.arguments.firstIndex(of: "--demo") {
-            // A demo runs in the background with no Dock icon, so one left open quits itself.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
+            // A demo runs in the background with no Dock icon, so one left open quits itself. exit, not NSApp.terminate:
+            // terminate waits while a sheet or dialog is open. A demo saves nothing, so there is nothing to flush.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 30) { exit(0) }
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             // `--dark` anywhere after `--demo`: dark mode for screenshots, whatever the Mac's appearance.
             if CommandLine.arguments.dropFirst(i + 1).contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
@@ -222,8 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /// The tap needs the Accessibility grant; retry until it is given so no relaunch is needed.
     private func startHotkeys() {
-        hotkeyOK = Hotkeys.start()
-        if !hotkeyOK { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startHotkeys() } }
+        if !Hotkeys.start() { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startHotkeys() } }
     }
 }
 
