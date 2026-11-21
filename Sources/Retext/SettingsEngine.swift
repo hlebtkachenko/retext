@@ -8,67 +8,90 @@ struct EnginePane: View {
     @ObservedObject private var state = AppState.shared
     /// The models `codex debug models` lists, for the ChatGPT model pickers.
     @State private var codexModels: [String] = []
+    /// ChatGPT: nil while checking; then the login state, or nil again when Codex can't be run.
+    @State private var loggedIn: Bool??
+    /// Custom API: the Keychain didn't accept the last key.
+    @State private var keyError = false
 
     var body: some View {
         let provider = state.settings.provider
         Form {
             PageDescription(.ai)
             Section {
+                IconRow(symbol: "cpu", tint: .indigo, title: "Provider", subtitle: Self.about(provider)) {
+                    PopUpPicker("Provider", selection: $state.settings.provider, options: Provider.allCases) { $0.title }
+                        .fixedSize()
+                }
+                switch provider {
+                case .claude: ClaudeSection(claudePath: $state.settings.claudePath)
+                case .chatgpt: ChatGPTSection(settings: $state.settings, loggedIn: loggedIn)
+                case .custom: CustomAPISection(custom: $state.settings.custom, keyError: $keyError)
+                }
+            } header: {
+                SectionTitle("Provider")
+            } footer: {
+                footer(provider)
+            }
+            Section {
                 IconRow(symbol: "star.fill", tint: .yellow, title: "Default Level", subtitle: "The bar and ⌥1…⌥9 use it; ↑ and ↓ in the bar change it for one run.") {
                     Picker("Default Level", selection: $state.settings.defaultLevel) {
                         ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
+                    .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
                 }
-                // The level and its model; the time limit is in the tooltip.
-                ForEach(Level.allCases, id: \.self) { level in
-                    IconRow(symbol: Self.symbol(level).name, tint: Self.symbol(level).tint, title: level.title) {
-                        Text(describe(level)).foregroundStyle(.secondary)
-                    }
-                    .help("Stops after \(Self.seconds(level)) s")
-                    .accessibilityElement(children: .combine)
-                }
             } header: {
-                Text("Levels")
-            }
-            switch provider {
-            case .claude: EmptyView()
-            case .chatgpt: ChatGPTModelsSection(settings: $state.settings, models: codexModels)
-            case .custom: CustomModelsSection(custom: $state.settings.custom)
+                SectionTitle("Default Level")
             }
             Section {
-                IconRow(symbol: "cpu", tint: .indigo, title: "Provider", subtitle: Self.about(provider)) {
-                    Picker("Provider", selection: $state.settings.provider) {
-                        ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
+                switch provider {
+                case .claude:
+                    // The level and its model; the time limit is in the tooltip.
+                    ForEach(Level.allCases, id: \.self) { level in
+                        IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
+                            Text(Model.shortName(state.settings.model(for: level).model)).foregroundStyle(.secondary)
+                        }
+                        .help("Stops after \(Self.seconds(level)) s")
+                        .accessibilityElement(children: .combine)
                     }
-                    .labelsHidden()
-                    .fixedSize()
+                case .chatgpt: ChatGPTModelsSection(settings: $state.settings, models: codexModels)
+                case .custom: CustomModelsSection(custom: $state.settings.custom)
                 }
             } header: {
-                Text("Setup")
-            }
-            switch provider {
-            case .claude: ClaudeSection(claudePath: $state.settings.claudePath)
-            case .chatgpt: ChatGPTSection(settings: $state.settings)
-            case .custom: CustomAPISection(custom: $state.settings.custom)
+                SectionTitle("Models")
             }
         }
         .onAppear {
-            // `--demo settings ai chatgpt|custom` shows another provider's sections; demo settings are never saved.
+            // `--demo settings ai chatgpt|custom` shows another provider's rows; demo settings are never saved.
             if let demo = SettingsView.demoExtra.flatMap(Provider.init(rawValue:)) { state.settings.provider = demo }
         }
         .task(id: provider == .chatgpt ? state.settings.codexPath : nil) {
             guard provider == .chatgpt else { return }
-            codexModels = await CodexRunner.models(codexPath: state.settings.codexPath)
+            let path = state.settings.codexPath
+            loggedIn = nil
+            async let login = CodexRunner.isLoggedInWithChatGPT(codexPath: path)
+            async let models = CodexRunner.models(codexPath: path)
+            loggedIn = .some(await login)
+            codexModels = await models
         }
     }
 
-    private static func symbol(_ level: Level) -> (name: String, tint: Color) {
-        switch level {
-        case .medium: ("gauge.with.dots.needle.33percent", .green)
-        case .high: ("gauge.with.dots.needle.67percent", .blue)
-        case .max: ("gauge.with.dots.needle.100percent", .purple)
+    /// One footer for the Provider section, about the chosen provider's setup.
+    @ViewBuilder private func footer(_ provider: Provider) -> some View {
+        switch provider {
+        case .claude:
+            if state.providerStatus?.ready == false {
+                Text("Claude Code not found: install it, or enter the full path to the claude executable.").foregroundStyle(.orange)
+            }
+        case .chatgpt:
+            if loggedIn != .some(true) {
+                Text("Install with npm install -g @openai/codex, then sign in with codex login.").foregroundStyle(.secondary)
+            }
+        case .custom:
+            Text(keyError ? "The Keychain didn't accept the key. Try again."
+                          : "Any OpenAI-compatible API (http only on your local network). The key stays in the Keychain and is sent only to this server.")
+                .foregroundStyle(keyError ? Color.orange : .secondary)
         }
     }
 
@@ -80,107 +103,70 @@ struct EnginePane: View {
         }
     }
 
-    private func describe(_ level: Level) -> String {
-        let m = state.settings.model(for: level)
-        switch state.settings.provider {
-        case .claude: return Model.shortName(m.model)
-        case .chatgpt, .custom:
-            guard !m.model.isEmpty else { return "No model set" }
-            return "\(m.model)\(m.effort.isEmpty ? "" : " (\(m.effort))")"
-        }
-    }
-
     static func seconds(_ level: Level) -> Int64 { level.timeout.components.seconds }
 }
 
+/// The Claude Code rows of the Provider section.
 private struct ClaudeSection: View {
     @Binding var claudePath: String
-    @ObservedObject private var state = AppState.shared
 
     var body: some View {
-        let found = state.providerStatus?.ready != false
-        Section {
-            TextField("Path", text: $claudePath, prompt: Text("Found automatically"))
-            TestButton(title: "Test Claude Code", success: {
-                await ClaudeRunner.version(claudePath: claudePath).map { "Works (Claude Code \($0))" } ?? "Works"
-            })
-        } header: {
-            Text("Claude Code")
-        } footer: {
-            if !found {
-                Text("Claude Code not found: install it, or enter the full path to the claude executable.").foregroundStyle(.orange)
-            }
-        }
+        TextField("Claude Code Path", text: $claudePath, prompt: Text("Found automatically"))
+        TestButton(title: "Test Claude Code", success: {
+            await ClaudeRunner.version(claudePath: claudePath).map { "Works (Claude Code \($0))" } ?? "Works"
+        })
     }
 }
 
+/// The ChatGPT rows of the Provider section; EnginePane checks the login, so the footer can follow it too.
 private struct ChatGPTSection: View {
     @Binding var settings: RetextSettings
     /// nil while checking; then the login state, or nil again when Codex can't be run.
-    @State private var loggedIn: Bool??
+    let loggedIn: Bool??
 
     var body: some View {
-        Section {
-            TextField("Path", text: $settings.codexPath, prompt: Text("Found automatically"))
-            LabeledContent("Login") {
-                switch loggedIn {
-                case nil: ProgressView().controlSize(.small)
-                case .some(true): Label("Signed in with ChatGPT", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                case .some(false): Label("Not signed in with ChatGPT", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                case .some(nil): Label("Codex not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                }
-            }
-            .help("Retext never reads or stores your OpenAI credentials, and runs Codex with its tools, web search, plugins and your Codex settings turned off.")
-            TestButton(title: "Test ChatGPT", precheck: {
-                switch await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath) {
-                case nil: .notFound
-                case false?: .notLoggedIn
-                case true?: nil
-                }
-            }, success: {
-                await CodexRunner.version(codexPath: settings.codexPath).map { "Works (Codex \($0))" } ?? "Works"
-            })
-        } header: {
-            Text("ChatGPT (Codex)")
-        } footer: {
-            if loggedIn != .some(true) {
-                Text("Install with npm install -g @openai/codex, then sign in with codex login.").foregroundStyle(.secondary)
+        TextField("Codex Path", text: $settings.codexPath, prompt: Text("Found automatically"))
+        LabeledContent("Login") {
+            switch loggedIn {
+            case nil: ProgressView().controlSize(.small)
+            case .some(true): Label("Signed in with ChatGPT", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            case .some(false): Label("Not signed in with ChatGPT", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            case .some(nil): Label("Codex not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
         }
-        .task(id: settings.codexPath) {
-            loggedIn = nil
-            loggedIn = .some(await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath))
-        }
+        .help("Retext never reads or stores your OpenAI credentials, and runs Codex with its tools, web search, plugins and your Codex settings turned off.")
+        TestButton(title: "Test ChatGPT", precheck: {
+            switch await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath) {
+            case nil: .notFound
+            case false?: .notLoggedIn
+            case true?: nil
+            }
+        }, success: {
+            await CodexRunner.version(codexPath: settings.codexPath).map { "Works (Codex \($0))" } ?? "Works"
+        })
     }
 }
 
-/// The per-level ChatGPT models and efforts: a user choice, so above the setup.
+/// The Models rows for ChatGPT: each level's model and effort.
 private struct ChatGPTModelsSection: View {
     static let efforts = ["low", "medium", "high", "xhigh", "max"]
     @Binding var settings: RetextSettings
     let models: [String]
 
     var body: some View {
-        Section {
-            ForEach(Level.allCases, id: \.self) { level in
-                let base = Provider.chatgpt.defaultModel(level)
-                LabeledContent(level.title) {
-                    HStack {
-                        Picker("Model", selection: field(level, \.model)) {
-                            Text("Default (\(base.model))").tag("")
-                            ForEach(options(level), id: \.self) { Text($0).tag($0) }
-                        }
-                        Picker("Effort", selection: field(level, \.effort)) {
-                            Text("Default (\(base.effort))").tag("")
-                            ForEach(Self.efforts, id: \.self) { Text($0).tag($0) }
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
+        ForEach(Level.allCases, id: \.self) { level in
+            let base = Provider.chatgpt.defaultModel(level)
+            IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
+                // "" is the provider's default for the level.
+                PopUpPicker("\(level.title) Model", selection: field(level, \.model), options: [""] + options(level)) {
+                    $0.isEmpty ? "Default (\(base.model))" : $0
                 }
+                .fixedSize()
+                PopUpPicker("\(level.title) Effort", selection: field(level, \.effort), options: [""] + Self.efforts) {
+                    $0.isEmpty ? "Default (\(base.effort))" : $0
+                }
+                .fixedSize()
             }
-        } header: {
-            Text("ChatGPT Models")
         }
     }
 
@@ -196,57 +182,49 @@ private struct ChatGPTModelsSection: View {
     }
 }
 
+/// The custom API rows of the Provider section.
 private struct CustomAPISection: View {
     @Binding var custom: CustomProviderSettings
+    /// Lifted into EnginePane, which shows it in the Provider section's footer.
+    @Binding var keyError: Bool
     @ObservedObject private var state = AppState.shared
     @State private var key = ""
-    @State private var keyError = false
     @State private var confirmRemove = false
     /// Bumped on save and remove, so the view reads the Keychain again.
     @State private var keyVersion = 0
 
     var body: some View {
-        Section {
-            LabeledContent("Base URL") {
-                HStack {
-                    TextField("Base URL", text: $custom.baseURL, prompt: Text("https://openrouter.ai/api/v1")).labelsHidden()
-                    Menu("Presets") {
-                        ForEach(CustomProviderSettings.presets, id: \.url) { preset in
-                            Button("\(preset.name): \(preset.url)") { custom.baseURL = preset.url }
-                        }
-                    }
-                    .fixedSize()
-                }
+        LabeledContent("Base URL") {
+            HStack {
+                TextField("Base URL", text: $custom.baseURL, prompt: Text("https://openrouter.ai/api/v1")).labelsHidden()
+                PullDownButton("Presets", items: CustomProviderSettings.presets.map { preset in
+                    .action("\(preset.name): \(preset.url)") { custom.baseURL = preset.url }
+                })
+                .fixedSize()
             }
-            LabeledContent("API Key") {
-                HStack {
-                    SecureField("API Key", text: $key, prompt: Text(keyPrompt)).labelsHidden()
-                        .onSubmit(saveKey)
-                    Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty || custom.keyAccount == nil)
-                    if keySaved, let account = custom.keyAccount {
-                        Button("Remove…", role: .destructive) { confirmRemove = true }
-                            .foregroundStyle(.red)
-                            .confirmationDialog("Remove the API key?", isPresented: $confirmRemove) {
-                                Button("Remove Key", role: .destructive) {
-                                    Keychain.setAPIKey("", account: account)
-                                    keyVersion += 1
-                                    state.checkProvider()
-                                }
-                                Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-                            } message: {
-                                Text("The key saved for \(custom.endpoint?.host ?? "this server") is deleted from the Keychain.")
-                            }
-                    }
-                }
-            }
-            TestButton(title: "Test API", success: { "Works (\(custom.endpoint?.host ?? "API"))" })
-        } header: {
-            Text("Custom API")
-        } footer: {
-            Text(keyError ? "The Keychain didn't accept the key. Try again."
-                          : "Any OpenAI-compatible API (http only on your local network). The key stays in the Keychain and is sent only to this server.")
-                .foregroundStyle(keyError ? Color.orange : .secondary)
         }
+        LabeledContent("API Key") {
+            HStack {
+                SecureField("API Key", text: $key, prompt: Text(keyPrompt)).labelsHidden()
+                    .onSubmit(saveKey)
+                Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty || custom.keyAccount == nil)
+                if keySaved, let account = custom.keyAccount {
+                    Button("Remove…", role: .destructive) { confirmRemove = true }
+                        .foregroundStyle(.red)
+                        .confirmationDialog("Remove the API key?", isPresented: $confirmRemove) {
+                            Button("Remove Key", role: .destructive) {
+                                Keychain.setAPIKey("", account: account)
+                                keyVersion += 1
+                                state.checkProvider()
+                            }
+                            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+                        } message: {
+                            Text("The key saved for \(custom.endpoint?.host ?? "this server") is deleted from the Keychain.")
+                        }
+                }
+            }
+        }
+        TestButton(title: "Test API", success: { "Works (\(custom.endpoint?.host ?? "API"))" })
     }
 
     /// Read from the Keychain on each render (attributes only), so it follows the base URL's host as it changes.
@@ -266,29 +244,32 @@ private struct CustomAPISection: View {
     }
 }
 
-/// The model id for each level of the custom API: a user choice, so above the setup.
+/// The Models rows for the custom API: each level's model id and optional effort.
 private struct CustomModelsSection: View {
     @Binding var custom: CustomProviderSettings
 
     var body: some View {
-        Section {
-            ForEach(Level.allCases, id: \.self) { level in
-                LabeledContent(level.title) {
-                    HStack {
-                        TextField("Model", text: field(level, \.model), prompt: Text("Model id"))
-                        TextField("Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
-                            .help("Sent as reasoning_effort")
-                    }
-                    .labelsHidden()
-                }
+        ForEach(Level.allCases, id: \.self) { level in
+            IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
+                TextField("\(level.title) Model", text: field(level, \.model), prompt: Text("Model id")).frame(width: 240)
+                TextField("\(level.title) Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
+                    .help("Sent as reasoning_effort")
             }
-        } header: {
-            Text("Custom API Models")
+            .labelsHidden()
         }
     }
 
     private func field(_ level: Level, _ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
         Binding(get: { custom.models[level]?[keyPath: path] ?? "" },
                 set: { custom.models[level, default: ProviderModel()][keyPath: path] = $0 })
+    }
+}
+
+/// The Models rows' symbol and tint for a level.
+private func symbol(_ level: Level) -> (name: String, tint: Color) {
+    switch level {
+    case .medium: ("gauge.with.dots.needle.33percent", .green)
+    case .high: ("gauge.with.dots.needle.67percent", .blue)
+    case .max: ("gauge.with.dots.needle.100percent", .purple)
     }
 }
