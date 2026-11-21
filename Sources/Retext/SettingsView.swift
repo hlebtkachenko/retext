@@ -22,7 +22,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         }
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
-            w.title = "Retext Settings"
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.setContentSize(NSSize(width: 760, height: 620))
             w.center()
@@ -83,6 +82,12 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .navigationTitle((pane ?? .overview).rawValue)
+        }
+        // navigationTitle alone leaves "Untitled" when the window opens on a pane other than Overview. The first call
+        // runs before SettingsWindow has stored the new window, hence the next main-loop turn.
+        .onChange(of: pane, initial: true) {
+            let title = (pane ?? .overview).rawValue
+            DispatchQueue.main.async { SettingsWindow.shared.window?.title = title }
         }
     }
 }
