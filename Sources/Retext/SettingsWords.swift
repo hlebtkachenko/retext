@@ -41,7 +41,7 @@ struct WordsPane: View {
             if SettingsView.demoExtra == "paste" { pasting = true }
         }
         .sheet(isPresented: $pasting) {
-            PasteListSheet { settings.addProtectedWords($0) }
+            PasteListSheet(existing: settings.protectedWords) { settings.addProtectedWords($0) }
         }
     }
 
@@ -94,12 +94,14 @@ private struct WordRow: View {
 
 /// A long list pasted at once: one word per line or separated by commas; words already in the list are skipped.
 private struct PasteListSheet: View {
+    /// The words already protected, so the count covers only the new ones.
+    let existing: [String]
     let add: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
 
     var body: some View {
-        let count = RetextSettings.terms(in: text).count
+        let count = RetextSettings.terms(in: text).filter { !existing.contains($0) }.count
         VStack(alignment: .leading, spacing: 12) {
             Text("Paste a List of Words").font(.headline)
             Text("One word per line, or separated by commas. Words already in the list are skipped.").foregroundStyle(.secondary)
