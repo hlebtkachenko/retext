@@ -6,7 +6,11 @@ import SwiftUI
 /// so the window gets focus and a Dock icon; it goes back to a menu-bar app when the last one closes.
 @MainActor
 enum AppWindows {
+    /// `--demo`: windows open behind the others, with no Dock icon and no focus, so a screenshot run never takes the screen.
+    static let isDemo = CommandLine.arguments.contains("--demo")
+
     static func bringForward(_ window: NSWindow?) {
+        guard !isDemo else { window?.orderBack(nil); return }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)

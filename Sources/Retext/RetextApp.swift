@@ -96,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         signal(SIGPIPE, SIG_IGN)
         if let i = CommandLine.arguments.firstIndex(of: "--provider-smoke") { return providerSmoke(Array(CommandLine.arguments.dropFirst(i + 1))) }
         if let i = CommandLine.arguments.firstIndex(of: "--demo") {
+            // A demo runs in the background with no Dock icon, so one left open quits itself.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
