@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         let action = RetextSettings.defaultActions(languages: ["en"])[0]
         let text = "I has two cat."
-        let job = Engine.job(for: action, level: level, text: text, settings: settings, bundleID: nil)
+        let job = Engine.job(for: action, level: level, settings: settings, bundleID: nil)
         Task {
             let start = Date()
             do {
