@@ -23,7 +23,7 @@
 
 The CLIs keep their own settings, including their own telemetry. Details: [Privacy](#privacy).
 
-Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Edit as" field and your action buttons. Type an instruction or pick an action. Retext sends the text to the provider you chose (your installed Claude Code CLI by default) and pastes the result over the selection. The original font, size and colour are kept.
+Retext is a macOS menu-bar app for rewriting selected text in place. Select text in any app and press ⌥Space. A compact Liquid Glass bar opens under the selection, with an "Instruction" field and your action buttons. Type an instruction or pick an action. Retext sends the text to the provider you chose (your installed Claude Code CLI by default) and pastes the result over the selection. The original font, size and colour are kept.
 
 ![The Retext bar under a selected sentence in a text document](docs/images/bar.png)
 
@@ -33,7 +33,7 @@ Requires macOS 26+, Xcode 26+ to build, the Accessibility permission, and one pr
 
 Install Retext by [building it from source](#build-from-source): `./build.sh` puts it in `~/Applications` and starts it. Releases are tags with release notes on GitHub, without a built app. A signed, notarized DMG and a Homebrew cask are planned for a later release.
 
-On first launch, a welcome window shows whether Retext has the Accessibility permission and whether the active provider is ready, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. The welcome window is in the menu (Welcome…) and in Settings → Overview later.
+On first launch, a welcome window shows whether Retext has the Accessibility permission and whether the active provider is ready, with a sample text to try it on. Allow Retext in System Settings → Privacy & Security → Accessibility (the "Grant Access…" button opens it). The shortcuts start working without a relaunch. Later, open it again from Settings → Overview (Show Welcome…) or, while Settings is open, Help → Welcome to Retext. Only one Retext runs at a time: opening it again while it runs shows its Settings.
 
 Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed release (not used yet).
 
@@ -48,7 +48,8 @@ Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed
 - **Read-only text** (web pages, PDFs, received mail): the result is copied to the clipboard instead of pasted.
 - **Images in the selection** (such as a Mail signature image): the result is copied instead of pasted, so the image isn't replaced by its file name.
 - **Preview (optional):** review changes before they replace your text. With "Preview before replacing" on in Settings → General, the bar shows the result with inserted words highlighted and deleted ones struck through; Return (or Replace) replaces the selection, Esc (or Discard) discards the result, ⌘C (or Copy) copies it. A click elsewhere or a switch to another app discards it; if you switched apps while Retext worked, the result is copied instead.
-- **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu (icon: an "R" with a text cursor) with your actions, Recent results to copy, a daily usage summary and Check for Updates….
+- **Extras:** a "No changes needed" check, a cache of recent results, and a menu-bar menu (icon: an "R" with a text cursor) with your actions, Copy Recent, Check for Updates…, Settings… (⌘,) and Quit; rows for a missing permission, a provider problem or an available update appear only when needed.
+- **Limits:** selections over 50,000 characters are refused ("Selection too long (over 50,000 characters)"). A custom API answer cut off at the model's output limit is never pasted: "The answer was cut off. Your text is unchanged."
 
 ![Retext settings: the Actions pane](docs/images/settings.png)
 
@@ -69,7 +70,7 @@ Maintainers: [docs/RELEASING.md](docs/RELEASING.md) describes the planned signed
 
 - macOS 26 or later.
 - Xcode 26 or later, to build.
-- One provider (see [Providers](#providers)). The default is [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine.
+- One provider (see [Providers](#providers)). The default is [Claude Code](https://code.claude.com/docs/en/overview), installed and logged in. Any recent version works; Retext was tested with 2.1.284. Retext looks for `claude` in your login shell's `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. You can also set the path in Settings → Engine. If it isn't found, Retext looks again on the next run, so you can install it without relaunching Retext.
 - The Accessibility permission (System Settings → Privacy & Security → Accessibility). Retext needs it to read the selection and to see its shortcuts.
 
 Each provider runs under your own login or key and its own billing: with Claude Code or Codex, subscription usage counts against your plan's limits (API-key logins are billed to your account); a custom API bills the account its key belongs to. The Usage pane counts calls and tokens for every provider; the list-price equivalent of a call is shown only for Claude Code, which reports it. ChatGPT and custom API calls count tokens only.
@@ -87,10 +88,10 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 - **Overview:** the first pane, where Settings opens: app version, Accessibility and provider status (Grant Access…), Show Welcome…, the automatic update check toggle with Check Now, and links to the repository, the changelog and the issue tracker.
 - **Actions:** edit, reorder, add or delete actions (⌥N follows the list order). Click an action to expand its editor in place; the icon is picked from 20 symbols. Reset Prompt puts back the built-in prompt of a Grammar or Translate action; Restore Default Actions… brings back the defaults, after a confirmation. The prompt editor has example prompts you can click to start from.
 - **App styles:** pick an app from the running and installed apps and describe the style for it.
-- **Protected words:** add terms one by one, several separated by commas, or with Paste List… (one per line).
-- **Engine:** the provider, the default quality level (each level's description sits under its name) and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
-- **General:** open at login, menu-bar icon, bar shortcut, preview before replacing (off by default), history, Backup (export, import, Reset All Settings to Defaults…, which asks for confirmation and keeps history and usage) and Advanced (Electron app support).
-- **Usage:** calls and tokens per day, plus the API list-price equivalent for Claude Code calls.
+- **Protected words:** add terms one by one, or several at once, one per line or separated by commas.
+- **Engine:** the provider, the default quality level (each level's description sits under its name) and what each level runs, and the provider's own settings: the Claude Code or Codex path, ChatGPT models per level, or the custom API's base URL, key (Remove… asks first) and models. Test sends one tiny request and shows the version or what went wrong. A run stops after 1 minute at Medium and High, 2 minutes at Max.
+- **General:** open at login, menu-bar icon, bar shortcut, preview before replacing (off by default), history (Clear History… asks first), Backup (Export and Import), Advanced (Electron app support), and Reset All Settings to Defaults… at the bottom, which asks first and keeps history and usage.
+- **Usage:** calls, cache hits and tokens per day, and a Price row: the Claude Code list-price equivalent (ChatGPT and custom API calls count tokens only).
 
 ## Shortcuts
 
@@ -103,17 +104,17 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 | ↑ / ↓ | Raise or lower the quality level (Medium, High, Max) for this run. |
 | Esc | Cancels a running request or closes the bar. In a preview, discards the result. |
 | ⌘C | In a preview, copies the result without replacing the selection. |
-| ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back. |
+| ⌘Z | Undoes a paste in the app as usual. After a "Copied" result (read-only text), ⌘Z within 4 seconds puts your previous clipboard back ("Clipboard restored"). |
 
 ## Privacy
 
 - **What's sent:** the selected text, the action's prompt or your typed instruction, your protected words, and the style for the current app. With Claude Code they go to Anthropic under your account; with ChatGPT (Codex) they go to OpenAI under your ChatGPT account; with a custom API they go to the base URL you set, with your API key.
 - **API key:** the custom API's key is kept in the macOS Keychain (service `dev.hapd.retext`; a key saved by 1.4.0 or earlier under `co.hleb.retext` is moved there on first use; the first custom API run after updating may ask for Keychain access to that old item: allow it so Retext can move the key, or enter the key again in Settings → Engine), saved for the base URL's server (scheme, host and port) and sent only to that server; change it and Retext asks for a key again. Plain http works only for servers on this Mac or the local network. Importing settings keeps your current base URL. Retext stores no Claude or OpenAI credentials.
-- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates automatically" in Settings → Overview. "Check for Updates…" in the menu (also in the Retext app menu while Settings or Welcome is open) opens Settings → Overview and checks right away regardless of that limit and setting, like Check Now there; Overview shows whether you are up to date, or a newer version with a button to its release page. The time of the last check and the latest version found are kept in the app's preferences (`dev.hapd.retext`).
-- **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, including the original text. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings; a `settings.json` that can't be read is kept as `settings.json.invalid`. `codex-home/` is the private Codex home described under [Providers](#providers). The custom API key is the only item Retext keeps in the Keychain.
+- **Update check:** apart from the custom API, the only network request Retext makes itself. At most once a day, at launch and when the Mac wakes, it asks `api.github.com` for the latest Retext release, with no account and no identifier other than the `Retext/<version>` user agent. When a newer version exists, the menu shows "Update available"; nothing is downloaded. Turn it off with "Check for updates automatically" in Settings → Overview. "Check for Updates…" in the menu-bar menu (also in the Retext app menu while Settings or Welcome is open) opens Settings → Overview and checks right away regardless of that limit and setting, like Check Now there; Overview shows whether you are up to date, or a newer version with a button to its release page. The time of the last check and the latest version found are kept in the app's preferences (`dev.hapd.retext`).
+- **History:** `~/Library/Application Support/Retext/history.json` keeps the last 20 results in plain text, each with only the first 60 characters of its selection as a label. It powers the Recent menu and the cache. To clear it, use Settings → General → Clear History. To stop saving results, turn off "Keep history"; the cache is then off too. `usage.json` keeps only daily counts of calls, tokens and cost. `settings.json` holds your settings; a `settings.json` that can't be read is kept as `settings.json.invalid`. `codex-home/` is the private Codex home described under [Providers](#providers). `instance.lock` is an empty file that keeps a second Retext from starting. The custom API key is the only item Retext keeps in the Keychain.
 - **Conversations:** neither CLI saves the conversation: `claude` runs with `--no-session-persistence`, `codex` with `--ephemeral`.
 - **CLI settings:** Retext's runs don't load your Claude Code `settings.json` (including its `env` block) or your Codex `config.toml`, so a telemetry opt-out set there may not apply to them; set such an opt-out in the environment Retext is started with. The CLIs get that environment, not your shell profile's.
-- **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard about 0.7 seconds later. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
+- **Clipboard:** to read a selection, Retext sends ⌘C and then restores your clipboard. To paste, it puts the result on the clipboard, sends ⌘V, and restores your previous clipboard 1.5 seconds later, unless you copied something else meanwhile. The pasted result and the restored items are marked `org.nspasteboard.TransientType`, so clipboard managers that follow the [nspasteboard.org](http://nspasteboard.org) markers skip them. Concealed items, such as passwords from a password manager, keep their `org.nspasteboard.ConcealedType` marker. For read-only text, the result stays on the clipboard.
 
 
 ## Known conflicts
@@ -124,7 +125,7 @@ One provider is active at a time; pick it in Settings → Engine. Medium, High a
 
 ## Uninstall
 
-1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu.
+1. If "Open at login" is on, turn it off in Settings → General. Then quit Retext from its menu (Quit Retext).
 2. Delete `Retext.app` from `~/Applications` (where `./build.sh` installs it).
 3. Delete `~/Library/Application Support/Retext` to remove settings, history, usage and the private Codex home, delete the `dev.hapd.retext` item from Keychain Access if you saved a custom API key, and run `defaults delete dev.hapd.retext` to remove the update-check state.
 4. Remove Retext from System Settings → Privacy & Security → Accessibility, or run:
@@ -161,7 +162,7 @@ cd retext
 ./build.sh
 ```
 
-`./build.sh` builds a release binary, signs `build/Retext.app`, copies it to `~/Applications/Retext.app` and starts it. `./build.sh --no-install` only builds.
+`./build.sh` builds a release binary, signs `build.noindex/Retext.app` (the `.noindex` keeps Spotlight from offering the build copy), waits for a running Retext to quit, copies the app to `~/Applications/Retext.app`, verifies its signature and starts it. `./build.sh --no-install` only builds.
 
 Signing uses the first of these that is set:
 
@@ -182,8 +183,8 @@ security find-identity -v -p codesigning
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). For a larger change, open an issue first. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
-- Build with `swift build`, test with `swift test`. Both must pass. `RetextCore` holds the testable logic, with tests in `Tests/RetextCoreTests` (Swift Testing).
-- To check UI changes without a selection, run `build/Retext.app/Contents/MacOS/Retext --demo menu` or `--demo settings general`. See [AGENTS.md](AGENTS.md) for all demo states.
+- Build with `swift build`, test with `swift test`. Both must pass. `RetextCore` holds the testable logic, with tests in `Tests/RetextCoreTests`; the app's subprocess runner is tested in `Tests/RetextTests` (Swift Testing).
+- To check UI changes without a selection, run `build.noindex/Retext.app/Contents/MacOS/Retext --demo menu` or `--demo settings general` (demo windows open in the background and quit after 30 seconds). See [AGENTS.md](AGENTS.md) for all demo states.
 - [ARCHITECTURE.md](ARCHITECTURE.md) describes the flow from shortcut to paste, and the decisions behind it.
 - Keep the app dependency-free. Use [Conventional Commits](https://www.conventionalcommits.org) for commit messages.
 - To report a security issue, see [SECURITY.md](SECURITY.md).
