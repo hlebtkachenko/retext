@@ -51,30 +51,14 @@ private enum AppIcons {
     }
 }
 
-/// A menu of running apps, then the other installed ones, each with its icon.
-private struct AppMenu: View {
-    let title: String, systemImage: String
-    let running: [AppInfo], installed: [AppInfo]
-    let pick: (String) -> Void
-
-    var body: some View {
-        Menu(title, systemImage: systemImage) {
-            Section("Running") { items(running) }
-            Section("Installed") { items(installed.filter { app in !running.contains { $0.bundleID == app.bundleID } }) }
-        }
+/// Menu items for running apps, then the other installed ones, each with its icon.
+@MainActor
+private func appItems(running: [AppInfo], installed: [AppInfo], pick: @escaping @MainActor (String) -> Void) -> [PullDownItem] {
+    func items(_ apps: [AppInfo]) -> [PullDownItem] {
+        apps.map { app in .action(app.name, image: AppIcons.icon(path: app.path)) { pick(app.bundleID) } }
     }
-
-    private func items(_ apps: [AppInfo]) -> some View {
-        ForEach(apps, id: \.bundleID) { app in
-            Button { pick(app.bundleID) } label: {
-                Label {
-                    Text(app.name)
-                } icon: {
-                    if let icon = AppIcons.icon(path: app.path) { Image(nsImage: icon) }
-                }
-            }
-        }
-    }
+    let others = installed.filter { app in !running.contains { $0.bundleID == app.bundleID } }
+    return [.header("Running")] + items(running) + [.separator, .header("Installed")] + items(others)
 }
 
 struct StylesPane: View {
@@ -90,9 +74,9 @@ struct StylesPane: View {
             }
             Section {
                 HStack {
-                    AppMenu(title: "Add App Style", systemImage: "plus", running: running, installed: installed) {
+                    PullDownButton("Add App Style", systemImage: "plus", items: appItems(running: running, installed: installed) {
                         styles.append(AppStyle(bundleID: $0, style: ""))
-                    }
+                    })
                     .fixedSize()
                     Spacer()
                 }
@@ -114,33 +98,28 @@ struct StylesPane: View {
         let name = appName(bundleID, path: path)
         let remove = { styles.removeAll { $0.id == id } }
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Group {
                     if let icon = AppIcons.icon(path: path) {
                         Image(nsImage: icon).resizable()
                     } else {
-                        Image(systemName: "app.dashed").font(.title).foregroundStyle(.secondary)
+                        Image(systemName: "app.dashed").font(.title2).foregroundStyle(.secondary)
                     }
                 }
-                .frame(width: 32, height: 32)
+                .frame(width: 24, height: 24)
                 .accessibilityHidden(true)
-                Text(name).font(.headline).help(bundleID)
-                Spacer()
-                Menu {
-                    AppMenu(title: "Change App", systemImage: "arrow.left.arrow.right", running: running, installed: installed) {
-                        style.wrappedValue.bundleID = $0
-                    }
-                    Divider()
-                    Button("Remove", systemImage: "trash", role: .destructive, action: remove)
-                } label: {
-                    Image(systemName: "ellipsis.circle").font(.title3)
+                VStack(alignment: .leading) {
+                    Text(name).font(.headline)
+                    Text(bundleID.isEmpty ? "No app chosen" : bundleID)
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .menuIndicator(.hidden)
+                Spacer()
+                PullDownButton("Change App", systemImage: "arrow.left.arrow.right",
+                               items: appItems(running: running, installed: installed) { style.wrappedValue.bundleID = $0 })
                 .fixedSize()
-                .help("Change the app or remove this style")
-                .accessibilityLabel("Options for \(name)")
+                Button("Remove \(name)", systemImage: "minus.circle", action: remove)
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    .help("Remove")
             }
             TextField("Style for \(name)", text: style.style,
                       prompt: Text("e.g. casual and short, no greetings"), axis: .vertical)
