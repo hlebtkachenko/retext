@@ -234,9 +234,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /// The tap needs the Accessibility grant; retry until it is given so no relaunch is needed. Creating the tap without
     /// the grant shows the system prompt, so it is tried only once AXIsProcessTrusted() (which never prompts) says yes:
-    /// a new user sees no prompt before Onboarding's Grant Access….
+    /// a new user sees no prompt before Onboarding's Grant Access…. Meanwhile a Carbon hotkey takes the bar shortcut, so it
+    /// doesn't type into the front app (⌥Space a no-break space), and opens Settings → About, whose Accessibility row says
+    /// what to do; `Hotkeys.start()` removes it.
     private func startHotkeys() {
         if !(AXIsProcessTrusted() && Hotkeys.start()) {
+            Hotkeys.startFallback { SettingsWindow.shared.show(.about) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startHotkeys() }
         }
     }
