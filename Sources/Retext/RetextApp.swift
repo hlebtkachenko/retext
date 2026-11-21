@@ -15,7 +15,7 @@ struct RetextApp: App {
                     .keyboardShortcut(index < 9 ? KeyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option) : nil)
             }
             Divider()
-            Menu("Recent (click to copy)") {
+            Menu("Copy Recent") {
                 if state.history.entries.isEmpty { Text("Nothing yet") }
                 ForEach(state.history.entries) { entry in
                     Button(Self.short(entry)) {
@@ -24,33 +24,52 @@ struct RetextApp: App {
                     }
                 }
             }
-            Button(state.usage.today.summary) { SettingsWindow.shared.show(.usage) }
             Divider()
-            // Shown only when something blocks Retext; each opens the place that fixes it.
-            if !delegate.hotkeyOK {
-                Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            // Shown only when something blocks Retext (each opens the place that fixes it) or an update is out.
+            if hasProblemRows {
+                if !delegate.hotkeyOK {
+                    Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
                 }
+                if let problem = state.providerStatus?.problem {
+                    Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
+                }
+                if let update = availableUpdate {
+                    Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(update.page) }
+                }
+                Divider()
             }
-            if let problem = state.providerStatus?.problem {
-                Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
-            }
-            if state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) {
-                Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
-            }
-            Button("Welcome…") { WelcomeWindow.shared.show() }
             Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
+            Divider()
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
-        // The app menu (About Retext, Services, Hide…) shown while Settings or Welcome is open.
+        // The main menu shown while Settings or Welcome is open: About Retext, Check for Updates…, Settings… ⌘, in the
+        // app menu (Settings is Retext's own window, not a SwiftUI Settings scene), Welcome to Retext in Help.
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             }
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
+            }
+            CommandGroup(replacing: .help) {
+                Button("Welcome to Retext") { WelcomeWindow.shared.show() }
+            }
         }
+    }
+
+    private var hasProblemRows: Bool {
+        !delegate.hotkeyOK || state.providerStatus?.problem != nil || availableUpdate != nil
+    }
+
+    /// The newer release the menu offers, when update checks are on.
+    private var availableUpdate: (version: String, page: URL)? {
+        guard state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) else { return nil }
+        return (update.version, page)
     }
 
     /// SwiftUI writes isInserted back on every scene update; writing only real changes keeps that from
