@@ -3,25 +3,28 @@ import RetextCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The action list: drag a row (or use its context menu or VoiceOver actions) to reorder, click it to edit in a sheet.
-/// Dragging moves the row live as it passes over the others; `onMove` does nothing in a grouped Form on macOS.
+/// The action list. Clicking a row opens its editor; dragging it, its context menu or the VoiceOver actions reorder it.
+/// The rows are their own drop targets because a grouped Form on macOS never calls `onMove`; the list rearranges
+/// itself while the pointer passes over it, so the drop only ends the drag.
 struct ActionsPane: View {
     @Binding var actions: [CustomAction]
-    /// The action being dragged; nil when no drag is in progress.
-    @State private var dragging: CustomAction.ID?
+    /// The row a drag picked up; nil when nothing is being dragged.
+    @State private var draggedID: CustomAction.ID?
     /// The action the sheet edits; a new action is only added when its sheet is saved.
     @State private var editing: CustomAction?
     @State private var confirmRestore = false
     @State private var confirmDelete: CustomAction?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
             PageDescription(.actions)
             Section {
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                    ActionRow(action: action, index: index, count: actions.count, dragging: $dragging, open: { editing = action },
-                              move: { move(action.id, by: $0) }, moveOnto: { moveOnto(dragged: $0, target: action.id) },
-                              delete: { confirmDelete = action })
+                    ActionRow(action: action, index: index, count: actions.count, isDragged: draggedID == action.id,
+                              open: { editing = action }, move: { move(action.id, by: $0) }, delete: { confirmDelete = action })
+                        .onDrag { pickUp(action.id) }
+                        .onDrop(of: [.retextActionRow], delegate: reorderDelegate(over: action.id))
                 }
             }
             Section {
@@ -37,8 +40,8 @@ struct ActionsPane: View {
                 }
             }
         }
-        // A drop anywhere else in the pane still ends the drag.
-        .onDrop(of: [.text], delegate: DragCleanupDelegate(dragging: $dragging))
+        .onDrop(of: [.retextActionRow], delegate: reorderDelegate(over: nil))
+        .task(id: draggedID) { await endDragOnMouseUp() }
         .sheet(item: $editing) { action in
             ActionSheet(action: action, isNew: !actions.contains { $0.id == action.id },
                         save: save, delete: { delete(action.id); editing = nil })
@@ -83,71 +86,89 @@ struct ActionsPane: View {
         actions.swapAt(i, i + offset)
     }
 
-    /// Puts the dragged action where the target is, so the rows between them shift by one.
-    private func moveOnto(dragged: CustomAction.ID, target: CustomAction.ID) {
-        guard dragged != target, let from = actions.firstIndex(where: { $0.id == dragged }),
-              let to = actions.firstIndex(where: { $0.id == target }) else { return }
-        actions.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+    private func reorderDelegate(over target: CustomAction.ID?) -> ReorderDropDelegate {
+        ReorderDropDelegate(target: target, actions: $actions, draggedID: $draggedID, reduceMotion: reduceMotion)
+    }
+
+    /// Starts a drag of the row. The id travels in a type only this process can read, so another app offered the drag
+    /// (TextEdit, a browser field) finds nothing it accepts and a text drag from elsewhere never reorders the list.
+    private func pickUp(_ id: CustomAction.ID) -> NSItemProvider {
+        draggedID = id
+        let payload = Data(id.uuidString.utf8)
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.retextActionRow.identifier, visibility: .ownProcess) { deliver in
+            deliver(payload, nil)
+            return nil
+        }
+        return provider
+    }
+
+    /// A drag released outside the window reaches none of the delegates here, so this watches the mouse instead:
+    /// with every button up, the drag is over and the row stops looking picked up.
+    private func endDragOnMouseUp() async {
+        guard draggedID != nil else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(200))
+            if NSEvent.pressedMouseButtons == 0 {
+                draggedID = nil
+                return
+            }
+        }
     }
 }
 
-/// Moves the dragged action onto this row as soon as the drag enters it.
-private struct ActionDropDelegate: DropDelegate {
-    @Binding var dragging: CustomAction.ID?
-    let reduceMotion: Bool
-    let moveOnto: (CustomAction.ID) -> Void
+extension UTType {
+    /// The pasteboard type of a dragged action row, private to Retext.
+    fileprivate static let retextActionRow = UTType(exportedAs: "dev.hapd.retext.action-id")
+}
 
-    func validateDrop(info: DropInfo) -> Bool { dragging != nil }
+/// Takes drops of Retext's own action rows. Over a row (`target`), the dragged action moves to that row's place as
+/// soon as the pointer arrives; over the rest of the pane (`target` nil), it accepts the drop only to end the drag.
+private struct ReorderDropDelegate: DropDelegate {
+    let target: CustomAction.ID?
+    @Binding var actions: [CustomAction]
+    @Binding var draggedID: CustomAction.ID?
+    let reduceMotion: Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggedID != nil && info.hasItemsConforming(to: [.retextActionRow])
+    }
 
     func dropEntered(info: DropInfo) {
-        guard let dragging else { return }
-        if reduceMotion {
-            moveOnto(dragging)
-        } else {
-            withAnimation(.easeInOut(duration: 0.12)) { moveOnto(dragging) }
+        guard let target, let draggedID, target != draggedID,
+              let from = actions.firstIndex(where: { $0.id == draggedID }),
+              let to = actions.firstIndex(where: { $0.id == target }) else { return }
+        // `move(toOffset:)` counts the offset before the moved row is taken out, hence the + 1 when moving down.
+        withAnimation(reduceMotion ? nil : .snappy) {
+            actions.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
 
     func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
+        draggedID = nil
         return true
     }
 }
 
-/// Ends a drag dropped outside the rows.
-private struct DragCleanupDelegate: DropDelegate {
-    @Binding var dragging: CustomAction.ID?
-
-    func validateDrop(info: DropInfo) -> Bool { dragging != nil }
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
-        return true
-    }
-}
-
-/// Drag handle, then icon, title, kind and shortcut as a plain button that opens the editor. The whole row drags;
-/// keyboard and VoiceOver users reorder with the context menu or the named actions.
+/// One action: a drag handle, then the icon, title, kind and ⌥ shortcut as a plain button that opens the editor.
+/// The whole row is the drag source; reordering without a pointer goes through the context menu or VoiceOver.
 private struct ActionRow: View {
     let action: CustomAction
     let index: Int, count: Int
-    @Binding var dragging: CustomAction.ID?
+    /// Dimmed and tinted while it is the row being dragged.
+    let isDragged: Bool
     let open: () -> Void
     let move: (Int) -> Void
-    let moveOnto: (CustomAction.ID) -> Void
     let delete: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let isDragged = dragging == action.id
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(.tertiary)
-                .help("Drag to reorder")
                 .accessibilityHidden(true)
+                .help("Drag to reorder")
             Button(action: open) {
                 IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title) {
                     shortcut
@@ -161,21 +182,14 @@ private struct ActionRow: View {
             .accessibilityAction(named: "Move Up") { move(-1) }
             .accessibilityAction(named: "Move Down") { move(1) }
         }
-        .opacity(isDragged ? 0.5 : 1)
         .padding(.vertical, 2)
+        .opacity(isDragged ? 0.5 : 1)
         .background {
             if isDragged {
                 RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor.opacity(0.12)).padding(-4)
             }
         }
         .contentShape(Rectangle())
-        .onDrag {
-            dragging = action.id
-            return NSItemProvider(object: action.id.uuidString as NSString)
-        }
-        .onDrop(of: [.text], delegate: ActionDropDelegate(dragging: $dragging, reduceMotion: reduceMotion, moveOnto: moveOnto))
-        // With no mouse button down the drag is over, so a drag that ended outside the window stops dimming this row.
-        .onHover { _ in if dragging != nil, NSEvent.pressedMouseButtons == 0 { dragging = nil } }
         .contextMenu {
             Button("Edit…", systemImage: "pencil", action: open)
             Divider()
