@@ -24,7 +24,9 @@ struct ShortcutField: View {
             .accessibilityValue(shortcut.spokenLabel)
             .accessibilityHint(recorder.recording ? "Press the new shortcut, or Escape to cancel." : "Records a new shortcut.")
             .contextMenu {
-                Picker("Presets", selection: $state.settings.barShortcut) {
+                // Picking a preset while recording ends the recording, so the next key isn't taken as a shortcut too.
+                let preset = Binding(get: { state.settings.barShortcut }, set: { recorder.stop(); state.settings.barShortcut = $0 })
+                Picker("Presets", selection: preset) {
                     ForEach(BarShortcut.presets, id: \.self) { Text($0.displayLabel).tag($0) }
                     if !BarShortcut.presets.contains(shortcut) { Text(shortcut.displayLabel).tag(shortcut) }
                 }
@@ -124,7 +126,8 @@ final class ShortcutRecorder: ObservableObject {
         }
     }
 
-    /// Ends recording on every exit (accept, esc, Cancel, leaving the pane or the window), so the tap never stays paused.
+    /// Ends recording on every exit (accept, esc, a second click on the field, a preset, leaving the pane or the window),
+    /// so the tap never stays paused.
     func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
