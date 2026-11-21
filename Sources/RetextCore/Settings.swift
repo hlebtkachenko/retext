@@ -124,7 +124,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var showMenuBarIcon = true
     /// The level every bar opens at and ⌥1…⌥9 run at.
     public var defaultLevel = Level.medium
-    /// The welcome window was shown. False only for a new install: a settings file without the key is an upgrade.
+    /// Onboarding was shown. False only for a new install: a settings file without the key is an upgrade.
     public var onboarded = false
     /// At most once a day, at launch and on wake, ask GitHub for the latest release and offer it in the menu.
     public var checkForUpdates = true
@@ -250,7 +250,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         return settings
     }
 
-    /// Whether to skip the welcome window when settings.json is missing or can't be decoded: only a new install
+    /// Whether to skip Onboarding when settings.json is missing or can't be decoded: only a new install
     /// (no settings file and no history or usage) sees it; an unreadable file or leftover data means an earlier run.
     public static func onboardedWithoutSettings(settingsFileExists: Bool, otherDataExists: Bool) -> Bool {
         settingsFileExists || otherDataExists

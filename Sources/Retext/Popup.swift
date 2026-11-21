@@ -606,7 +606,7 @@ final class PopupController {
     }
 
     /// The field keeps first responder throughout; a highlighted button is model state only, so typing always lands in the field.
-    /// Only the bar's own keys: a local monitor also sees keys meant for Settings or the welcome window.
+    /// Only the bar's own keys: a local monitor also sees keys meant for Settings or Onboarding.
     private func handle(_ event: NSEvent) -> Bool {
         guard event.window === panel else { return false }
         let key = Int(event.keyCode)
