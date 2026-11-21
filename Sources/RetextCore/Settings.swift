@@ -115,7 +115,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var chatGPTModels: [Level: ProviderModel] = [:]
     /// The OpenAI-compatible API (base URL and models; the key is in the Keychain).
     public var custom = CustomProviderSettings()
-    /// Off: nothing is written to history.json; the last result stays in memory as the cache, until Retext quits.
+    /// Off: history.json keeps no results (it is emptied); the last result stays in memory as the cache, until Retext quits.
     public var historyRetention = HistoryRetention.last20
     /// On: AXManualAccessibility is set on every app switch, so ⌥N sees Electron selections before the first bar.
     /// Off: it is set only when Retext reads a selection.
