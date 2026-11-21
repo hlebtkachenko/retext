@@ -10,6 +10,9 @@ struct HistoryPane: View {
     @State private var pendingRetention: HistoryRetention?
     @State private var query = ""
     @State private var detail: HistoryEntry?
+    /// Rows shown: a grouped Form lays out every row, so an unlimited history is shown a page at a time.
+    @State private var shown = HistoryPane.page
+    private static let page = 100
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -50,6 +53,7 @@ struct HistoryPane: View {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                         TextField("Search", text: $query, prompt: Text("Search"))
                             .textFieldStyle(.plain).labelsHidden()
+                            .onChange(of: query) { shown = Self.page }
                         if !query.isEmpty {
                             Button("Clear Search", systemImage: "xmark.circle.fill") { query = "" }
                                 .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary)
@@ -60,8 +64,13 @@ struct HistoryPane: View {
                 if items.isEmpty {
                     emptyState
                 } else {
-                    ForEach(items) { entry in
+                    ForEach(items.prefix(shown)) { entry in
                         HistoryRow(entry: entry, open: { detail = entry }, delete: { state.history.remove(id: entry.id) })
+                    }
+                    if items.count > shown {
+                        Button("Show More (\(items.count - shown) more)") { shown += Self.page }
+                            .buttonStyle(.borderless)
+                            .frame(maxWidth: .infinity)
                     }
                 }
             } header: {
@@ -220,7 +229,7 @@ private struct HistoryDetail: View {
                 Text(entry.title).font(.title3.bold()).lineLimit(1)
                 Spacer()
                 // Older entries kept only the start of the original: a diff against it would mark nearly everything.
-                Toggle("Show Changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
+                Toggle("Show changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)

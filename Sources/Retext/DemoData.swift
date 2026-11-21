@@ -11,6 +11,8 @@ enum DemoData {
             CustomAction(title: "Shorter", symbol: "scissors", prompt: "Make the text shorter. Keep its meaning, language and tone.", kind: .other),
             CustomAction(title: "Friendly", symbol: "face.smiling", prompt: "Rewrite the text in a warm, friendly tone. Keep its meaning and language.", kind: .other),
         ], protectedWords: ["Retext", "SwiftUI"])
+        settings.appStyles = [AppStyle(bundleID: "com.apple.MobileSMS", style: "Casual and short, no greetings."),
+                              AppStyle(bundleID: "com.apple.mail", style: "")]
         settings.onboarded = true
         return settings
     }()

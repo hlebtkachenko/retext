@@ -42,9 +42,12 @@ final class AppState: ObservableObject {
         }
         let settings = RetextSettings.load(from: Store.url("settings.json"))
         self.settings = settings
-        // Off: nothing is read back, the file is empty anyway; a file over the limit (edited by hand) is trimmed.
-        history = History.load(from: Store.url("history.json")).persisted(for: settings.historyRetention)
+        // Off: nothing is read back; a file over the limit (left by an older version with history off, or edited by hand) is
+        // trimmed on disk too, so Off never leaves results there that the History page can't show or clear.
+        let saved = History.load(from: Store.url("history.json"))
+        history = saved.persisted(for: settings.historyRetention)
         usage = Usage.load(from: Store.url("usage.json"))
+        if history != saved { scheduleHistorySave() }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { AppState.shared.flushHistory() }
         }
