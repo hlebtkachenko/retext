@@ -195,13 +195,11 @@ private struct ProviderStep: View {
             }
             Form {
                 Section {
-                    Picker("Provider", selection: $state.settings.provider) {
-                        ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
+                    LabeledContent("Provider") {
+                        PopUpPicker("Provider", selection: $state.settings.provider, options: Provider.allCases) { $0.title }.fixedSize()
                     }
                     ProviderRow()
                     TestButton(title: "Test Provider")
-                } footer: {
-                    Button("Open AI Settings…") { SettingsWindow.shared.show(.ai) }.buttonStyle(.link)
                 }
             }
             .formStyle(.grouped)
@@ -250,7 +248,7 @@ struct AccessibilityRow: View {
 
     var body: some View {
         IconRow(symbol: "accessibility", tint: .blue, title: "Accessibility",
-                subtitle: trusted ? nil : "Turn on Retext in Privacy & Security → Accessibility.") {
+                subtitle: trusted ? nil : "Turn on Retext in Privacy & Security → Accessibility. If Retext is already listed, remove it with − and add it again.") {
             if trusted {
                 Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
