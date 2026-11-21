@@ -38,9 +38,10 @@ public enum TextDiff {
         }
         let xi = x.map(id), yi = y.map(id)
 
-        var out: [Segment] = []
-        func add(_ kind: Kind, _ text: String) {
-            if let last = out.last, last.kind == kind { out[out.count - 1] = Segment(kind, last.text + text) } else { out.append(Segment(kind, text)) }
+        // Each run collects its tokens and is joined once at the end: appending to the run's string would copy it per token.
+        var runs: [(kind: Kind, tokens: [String])] = []
+        func add(_ kind: Kind, _ token: String) {
+            if runs.last?.kind == kind { runs[runs.count - 1].tokens.append(token) } else { runs.append((kind, [token])) }
         }
         a[..<prefix].forEach { add(.equal, $0) }
         if x.count * y.count > maxCells {
@@ -68,7 +69,7 @@ public enum TextDiff {
             }
         }
         a[(a.count - suffix)...].forEach { add(.equal, $0) }
-        return out
+        return runs.map { Segment($0.kind, $0.tokens.joined()) }
     }
 
     /// Runs of letters and digits, runs of whitespace, and single other characters (punctuation, symbols, emoji).

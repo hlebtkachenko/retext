@@ -9,6 +9,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - "Check for Updates…" in the menu-bar menu and in the Retext app menu (while Settings or Welcome is open). It opens Settings → Overview and checks there like Check Now, regardless of the daily limit and the automatic setting: Overview shows whether you are up to date or a newer version exists (with a button to its GitHub release page). A 403 from GitHub reads "GitHub rate limit reached. Try again later."
 - "Preview before replacing" in Settings → General (off by default): the bar shows the result with the changes marked (inserted words highlighted, deleted ones struck through); Return or the Replace button replaces the selection, Esc or Discard discards the result, ⌘C or Copy copies it. A click elsewhere or a switch to another app discards it; if another app came to the front while Retext worked, the result is copied instead.
 - Example prompts in the Actions editor: clicking one fills an empty prompt or is added to the existing one on a new line.
+- One Retext runs at a time: opening it again while it runs shows the running copy's Settings (from Terminal it prints "Retext is already running; showing its Settings.").
+- The bar refuses selections over 50,000 characters ("Selection too long (over 50,000 characters)"), before any provider call.
+- VoiceOver: the bar's selected action is marked, the level chip is adjustable (swipe up or down), the preview buttons read Replace, Discard and Copy, and the outcome and errors are announced.
 
 ### Changed
 - The menu-bar icon is an "R" with a text cursor (was an "A").
@@ -19,8 +22,28 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Settings → Actions: click an action to expand its editor in place (there is no separate edit section). The icon is picked from 20 symbols (an action with another saved symbol keeps it). "Restore Default Actions…" and "Delete Action…" are shown in red, and Cancel is now the default button of their confirmations. The icon picker's symbols have short names for VoiceOver and tooltips.
 - The bundle id is now `dev.hapd.retext` (was `co.hleb.retext`), and the custom API key's Keychain service follows it: a key saved by an earlier version is moved there on first use and the old item deleted. macOS ties the Accessibility permission and the login item to the bundle id, so after updating, allow Retext in Accessibility again and turn "Open at login" on again once if you used it; remove the old Retext entry in System Settings → Privacy & Security → Accessibility (select it and click −). `tccutil reset Accessibility co.hleb.retext` works only before updating, while the old version is still installed. The first custom API run after updating may ask for Keychain access to the old item: allow it so Retext can move the key, or enter the key again in Settings → Engine. The preferences domain changes too, so the update-check state starts fresh (settings, history and usage are in Application Support and stay).
 - The prompt field in the Actions editor is bigger, and its placeholder no longer names one provider.
-- The usage price says it is for Claude Code: "Claude Code list price" in the menu's usage line and "API list price (Claude Code)" in Settings → Usage, whose Claude Code billing note now shows only while Claude Code is the active provider. ChatGPT and custom API calls count tokens only.
+- Settings → Usage: one currency format for every amount, a "Price" row, and one footer that names the Claude Code list price; ChatGPT and custom API calls count tokens only.
+- The menu-bar menu is shorter: your actions, "Copy Recent" (was "Recent (click to copy)"), the Accessibility, provider and update rows only when there is something to show, Check for Updates…, Settings… (⌘,) and Quit. The usage line and Welcome… are gone; usage is in Settings → Usage.
+- While Settings or Welcome is open, the Retext app menu has About, Check for Updates… and Settings… (⌘,), and the Help menu has "Welcome to Retext".
+- The bar's field placeholder reads "Instruction" (was "Edit as"). In a preview, Replace is an accent-coloured button. After a "Copied" result, ⌘Z shows "Clipboard restored".
+- History and Recent keep only the first 60 characters of the selection, enough to recognize it; older entries are shortened and saved when Retext starts. The result is kept whole, and the cache still matches the full text.
+- Settings: footers are one sentence or gone. Protected words: Paste List… is gone; the add field takes several lines (one term per line, or separated by commas). General: the "Open at login" note shows only while macOS waits for approval, Clear History… is red with Cancel as the default, Reset All Settings to Defaults… sits alone at the bottom, and Backup holds Export and Import. Engine: removing the custom API key asks first.
+- The welcome window's intro is shorter, and the Try it note under the sample text is gone.
+- Build: `./build.sh` builds into `build.noindex/Retext.app` (was `build/`), so Spotlight doesn't offer the build copy as a second Retext. It waits for the running Retext to quit, verifies the installed copy's signature and unregisters the build copies from Launch Services.
+- `--demo` windows open behind other windows, with no Dock icon and without taking focus, and the demo quits after 30 seconds.
+- The eval's prompt parity check also covers the High and Max add-ons and stops the run (exit 1) when the prompts drift from the Swift sources.
+- A new `RetextTests` test target covers the app's subprocess runner and command lookup.
 - Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
+
+### Fixed
+- A Claude Code or Codex run that hangs and ignores the stop is killed 2 seconds later (SIGTERM, then SIGKILL to its process group), and a background job it started can't hold the run open. The login-shell lookup is stopped after 3 seconds the same way.
+- A `claude` or `codex` that wasn't found, or whose found path was removed, is looked up again on the next run, so installing or moving it works without relaunching Retext.
+- A Claude Code or custom API answer cut off at the model's output limit fails with "The answer was cut off. Your text is unchanged." and is never pasted or cached; the call still counts in Settings → Usage.
+- After a paste, the previous clipboard comes back 1.5 seconds later (was 0.7), and only if the clipboard still holds Retext's result, so something you copied in between is kept.
+- A ⌘C copy that lands after Retext stopped waiting for it is undone too, so your clipboard isn't left holding the selection.
+- A second ⌥Space while Retext is still reading the selection is ignored instead of starting another read.
+- The preview's diff stays fast on long text.
+- The menu's provider status no longer shows an older check's result after a newer one.
 
 ## [1.4.0] - 2026-11-20
 

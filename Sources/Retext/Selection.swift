@@ -19,6 +19,13 @@ struct Selection {
 
 /// Reads and replaces the selected text in the frontmost app through Accessibility, with a clipboard fallback.
 enum SelectionIO {
+    /// The pending clipboard restore (after a paste, or watching for a late ⌘C copy). The next read or paste waits for it,
+    /// so it never snapshots or overwrites a clipboard that is about to be put back.
+    @MainActor private static var restoring: Task<Void, Never>?
+
+    /// Waits for the pending clipboard restore, so a copy written after it can't be overwritten by it.
+    @MainActor static func settle() async { await restoring?.value }
+
     /// Main actor, like `replace`: AppKit, the pasteboard and the ⌘C event stay on main; the waits are async sleeps.
     @MainActor
     static func read() async -> Selection? {
@@ -26,7 +33,7 @@ enum SelectionIO {
         enableElectronAccessibility(app)
         let element = focusedElement(of: app)
         let axText = element.flatMap(selectedText)
-        let copied = await copyViaClipboard()
+        let copied = await copyViaClipboard(axText: axText)
         var text = copied?.text
         if text?.isEmpty ?? true { text = axText }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
@@ -48,9 +55,11 @@ enum SelectionIO {
 
     /// Pastes `text` over the selection. With `attributes` it goes in as rich text in the original style,
     /// so apps like Mail keep the font instead of falling back to their default.
+    /// Returns after ⌘V; the old clipboard comes back 1.5 s later, unless something else was copied meanwhile.
     /// Main actor: `attributes` is not Sendable, and the caller is on main.
     @MainActor
     static func replace(in app: NSRunningApplication, with text: String, attributes: [NSAttributedString.Key: Any]?) async {
+        await restoring?.value
         let saved = snapshot()
         let pb = NSPasteboard.general
         pb.clearContents()
@@ -62,12 +71,16 @@ enum SelectionIO {
         }
         pb.setString(text, forType: .string)
         pb.setData(Data(), forType: transient)
+        let written = pb.changeCount
         app.activate()
         try? await Task.sleep(for: .milliseconds(150))
         press(kVK_ANSI_V)
-        // Note: fixed wait before restoring the clipboard; raise it if a slow app pastes the old clipboard.
-        try? await Task.sleep(for: .milliseconds(700))
-        restore(saved)
+        // Unstructured, so cancelling the run can't shorten the wait and restore before a slow app has pasted.
+        restoring = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1500))
+            let pb = NSPasteboard.general
+            if pb.changeCount == written || pb.string(forType: .string) == text { restore(saved) }
+        }
     }
 
     /// Copies `text` and returns a closure that puts the previous clipboard back, or nil when it was empty.
@@ -190,15 +203,31 @@ enum SelectionIO {
         })
     }
 
+    /// ⌘C, read, then the old clipboard back. When the copy doesn't land within 400 ms it is watched until 1.5 s: a late
+    /// copy is undone too, unless it differs from `axText` (then the user copied something else).
     @MainActor
-    private static func copyViaClipboard() async -> (text: String?, attributes: [NSAttributedString.Key: Any]?, hasAttachment: Bool)? {
+    private static func copyViaClipboard(axText: String?) async -> (text: String?, attributes: [NSAttributedString.Key: Any]?, hasAttachment: Bool)? {
+        await restoring?.value
         let saved = snapshot()
         let before = NSPasteboard.general.changeCount
+        let pressed = ContinuousClock.now
         press(kVK_ANSI_C)
         for _ in 0..<10 where NSPasteboard.general.changeCount == before {
             try? await Task.sleep(for: .milliseconds(40))
         }
-        guard NSPasteboard.general.changeCount != before else { return nil }
+        guard NSPasteboard.general.changeCount != before else {
+            restoring = Task { @MainActor in
+                while NSPasteboard.general.changeCount == before, ContinuousClock.now < pressed + .milliseconds(1500) {
+                    try? await Task.sleep(for: .milliseconds(40))
+                }
+                let pb = NSPasteboard.general
+                guard pb.changeCount != before else { return }
+                let squash = { (s: String) in s.filter { !$0.isWhitespace && !$0.isNewline } }
+                if let axText, !axText.isEmpty, squash(pb.string(forType: .string) ?? "") != squash(axText) { return }
+                restore(saved)
+            }
+            return nil
+        }
         let pb = NSPasteboard.general
         let rtf = pb.data(forType: .rtf).flatMap { NSAttributedString(rtf: $0, documentAttributes: nil) }
         let rtfd = pb.data(forType: .rtfd).flatMap { NSAttributedString(rtfd: $0, documentAttributes: nil) }

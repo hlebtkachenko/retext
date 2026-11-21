@@ -81,7 +81,7 @@ struct SettingsView: View {
                 case .words: WordsPane(settings: $state.settings)
                 case .engine: EnginePane()
                 case .general: GeneralPane()
-                case .usage: UsagePane(usage: state.usage, history: state.history, provider: state.settings.provider)
+                case .usage: UsagePane(usage: state.usage)
                 }
             }
             .formStyle(.grouped)
@@ -229,7 +229,6 @@ private struct StylesPane: View {
 private struct WordsPane: View {
     @Binding var settings: RetextSettings
     @State private var newWord = ""
-    @State private var pasting = false
 
     var body: some View {
         Form {
@@ -243,21 +242,14 @@ private struct WordsPane: View {
                     }
                 }
                 HStack {
-                    TextField("New term", text: $newWord, prompt: Text("Add a term, or several separated by commas")).labelsHidden().onSubmit(add)
+                    // Multi-line, so a pasted list keeps its lines; Return adds every term.
+                    TextField("New term", text: $newWord, prompt: Text("Add terms, one per line or separated by commas"), axis: .vertical)
+                        .lineLimit(1...6).labelsHidden().onSubmit(add)
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Names and terms that are never changed or translated.").foregroundStyle(.secondary)
-                    HStack {
-                        Button("Paste List…", systemImage: "list.bullet.clipboard") { pasting = true }
-                        Spacer()
-                    }
-                }
+                Text("Names and terms that are never changed or translated.").foregroundStyle(.secondary)
             }
-        }
-        .sheet(isPresented: $pasting) {
-            PasteListSheet { settings.addProtectedWords($0) }
         }
     }
 
@@ -267,37 +259,9 @@ private struct WordsPane: View {
     }
 }
 
-private struct PasteListSheet: View {
-    let add: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
-
-    var body: some View {
-        let count = RetextSettings.terms(in: text).count
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Paste a List of Terms").font(.headline)
-            Text("One term per line, or separated by commas. Terms already in the list are skipped.").foregroundStyle(.secondary)
-            TextEditor(text: $text)
-                .font(.body)
-                .frame(minHeight: 180)
-                .accessibilityLabel("Terms")
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(count == 1 ? "Add 1 Term" : "Add \(count) Terms") { add(text); dismiss() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(count == 0)
-            }
-        }
-        .padding()
-        .frame(width: 440)
-    }
-}
-
 // MARK: Engine
 
 private struct EnginePane: View {
-    static let billing = "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
     @ObservedObject private var state = AppState.shared
 
     var body: some View {
@@ -330,7 +294,7 @@ private struct EnginePane: View {
             } header: {
                 Text("Quality")
             } footer: {
-                Text("⌥1…⌥9 and every bar start at the default level. In the bar, ↑ and ↓ change the level for that run. High and Max add extra instructions for a deeper native rewrite. A run stops after \(Self.seconds(.medium)) seconds at Medium and High, \(Self.seconds(.max)) at Max.")
+                Text("In the bar, ↑ and ↓ change the level for one run; a run stops after \(Self.seconds(.medium)) s, \(Self.seconds(.max)) s at Max.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -338,9 +302,9 @@ private struct EnginePane: View {
 
     static func about(_ provider: Provider) -> String {
         switch provider {
-        case .claude: billing
-        case .chatgpt: "Uses your own ChatGPT login through the Codex CLI: usage counts against your plan's Codex limits. Retext never reads or stores your OpenAI credentials. Your text goes to OpenAI."
-        case .custom: "Sends the selected text to the API at the base URL you set, with your API key (kept in the macOS Keychain, never in settings.json). That API's pricing and privacy terms apply."
+        case .claude: "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
+        case .chatgpt: "Uses your own ChatGPT login through the Codex CLI, without Retext reading or storing your OpenAI credentials: your text goes to OpenAI and usage counts against your plan's Codex limits."
+        case .custom: "Sends the selected text to the API at the base URL you set, whose pricing and privacy terms apply."
         }
     }
 
@@ -396,6 +360,7 @@ private struct TestButton: View {
                 if let failure = await precheck() { throw failure }
                 let output = try await ProviderRunner.run(job, text: "ok", settings: settings, timeout: Level.medium.timeout)
                 state.usage.recordCall(model: job.model, output: output)
+                try output.checkComplete()
                 result = (true, await success())
             } catch {
                 let failure = error as? ClaudeFailure ?? .other("")
@@ -420,8 +385,8 @@ private struct ClaudeSection: View {
         } header: {
             Text("Claude Code")
         } footer: {
-            Text(found ? "Leave empty to use the claude found in your login shell or the usual install paths. The test sends one tiny request at Medium."
-                       : "Claude Code not found. Install it, or enter the full path to the claude executable.")
+            Text(found ? "The test sends one tiny request at Medium."
+                       : "Claude Code not found: install it, or enter the full path to the claude executable.")
                 .foregroundStyle(found ? .secondary : Color.orange)
         }
     }
@@ -457,7 +422,7 @@ private struct ChatGPTSection: View {
         } header: {
             Text("ChatGPT (Codex)")
         } footer: {
-            Text("Needs the Codex CLI (npm install -g @openai/codex), signed in with codex login using your ChatGPT account. Leave the path empty to use the codex found in your login shell or the usual install paths. Retext runs Codex with its tools, web search, plugins and your Codex settings turned off.")
+            Text("Needs the Codex CLI (npm install -g @openai/codex) signed in with codex login using your ChatGPT account; Retext runs it with its tools, web search, plugins and your Codex settings turned off.")
                 .foregroundStyle(.secondary)
         }
         .task(id: settings.codexPath) {
@@ -486,7 +451,7 @@ private struct ChatGPTSection: View {
         } header: {
             Text("ChatGPT models")
         } footer: {
-            Text("Which models a ChatGPT plan offers changes over time. Pick another model or effort for a level if a run says the model isn't available; the list comes from codex debug models.")
+            Text("If a run says the model isn't available, pick another model or effort for that level; the list comes from codex debug models.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -508,6 +473,7 @@ private struct CustomAPISection: View {
     @ObservedObject private var state = AppState.shared
     @State private var key = ""
     @State private var keyError = false
+    @State private var confirmRemove = false
     /// Bumped on save and remove, so the view reads the Keychain again.
     @State private var keyVersion = 0
 
@@ -530,11 +496,18 @@ private struct CustomAPISection: View {
                         .onSubmit(saveKey)
                     Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty || custom.keyAccount == nil)
                     if keySaved, let account = custom.keyAccount {
-                        Button("Remove", role: .destructive) {
-                            Keychain.setAPIKey("", account: account)
-                            keyVersion += 1
-                            state.checkProvider()
-                        }
+                        Button("Remove…", role: .destructive) { confirmRemove = true }
+                            .foregroundStyle(.red)
+                            .confirmationDialog("Remove the API key?", isPresented: $confirmRemove) {
+                                Button("Remove Key", role: .destructive) {
+                                    Keychain.setAPIKey("", account: account)
+                                    keyVersion += 1
+                                    state.checkProvider()
+                                }
+                                Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+                            } message: {
+                                Text("The key saved for \(custom.endpoint?.host ?? "this server") is deleted from the Keychain.")
+                            }
                     }
                 }
             }
@@ -543,7 +516,7 @@ private struct CustomAPISection: View {
             Text("Custom API")
         } footer: {
             Text(keyError ? "The Keychain didn't accept the key. Try again."
-                          : "Any OpenAI-compatible Chat Completions API: Retext posts to the base URL + /chat/completions. The key is kept in the macOS Keychain for this URL's server and never shown again; it is sent only to that server. http works only for local-network servers.")
+                          : "Any OpenAI-compatible Chat Completions API (http only on the local network); the key is kept in the macOS Keychain and sent only to this URL's server.")
                 .foregroundStyle(keyError ? Color.orange : .secondary)
         }
         Section {
@@ -559,7 +532,7 @@ private struct CustomAPISection: View {
         } header: {
             Text("Models")
         } footer: {
-            Text("The model id the API expects for each level, such as anthropic/claude-sonnet-4.5 on OpenRouter or llama3.3 on Ollama. Effort is sent as reasoning_effort (low, medium or high) only when set, for models that support it.")
+            Text("The model id the API expects for each level; effort is sent as reasoning_effort only when set.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -601,12 +574,14 @@ private struct GeneralPane: View {
             Section {
                 Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { setOpenAtLogin($0) }))
             } footer: {
-                Text(loginStatusText).foregroundStyle(.secondary)
+                if loginStatus == .requiresApproval {
+                    Text("Waiting for approval in System Settings → General → Login Items.").foregroundStyle(.secondary)
+                }
             }
             Section {
                 Toggle("Show in menu bar", isOn: $state.settings.showMenuBarIcon)
             } footer: {
-                Text("Off: no icon in the menu bar, so it can't hide behind the notch. Shortcuts keep working; open Retext again from Spotlight or Finder to get back to Settings.")
+                Text("Off: shortcuts keep working; open Retext again from Spotlight or Finder to get back to Settings.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -614,38 +589,36 @@ private struct GeneralPane: View {
                     ForEach(MenuShortcut.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
             } footer: {
-                Text("Choose ⌃⌥Space if another app uses ⌥Space. macOS can also use ⌃⌥Space to switch input sources; turn that off in Keyboard Shortcuts if you pick it. Actions stay on ⌥1…⌥9.").foregroundStyle(.secondary)
+                Text("Choose ⌃⌥Space if another app uses ⌥Space; macOS may use ⌃⌥Space to switch input sources, which you can turn off in Keyboard Shortcuts.").foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Preview before replacing", isOn: $state.settings.previewBeforeReplace)
             } footer: {
-                Text("Shows the result with its changes marked before it replaces your text: added words highlighted, removed words struck through. Return replaces, Esc discards, ⌘C copies the result instead. Off: the result replaces the selection right away. Text that can't be edited is copied either way.")
+                Text("Text that can't be edited is copied either way.")
                     .foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Keep history", isOn: $state.settings.keepHistory)
                 LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
                     Button("Clear History…", role: .destructive) { confirmClear = true }
+                        .foregroundStyle(.red)
                         .disabled(state.history.entries.isEmpty)
                 }
             } header: {
                 Text("History")
             } footer: {
-                Text("The last \(History.limit) results, with their original text, are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache. Off: nothing is written and the cache isn't used.")
+                Text("The last \(History.limit) results and the first \(HistoryEntry.inputLimit) characters of each selection are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
                     .foregroundStyle(.secondary)
             }
             Section {
                 HStack {
                     Button("Export Settings…", action: export)
                     Button("Import Settings…", action: chooseImport)
-                    Spacer()
-                    Button("Reset All Settings to Defaults…", role: .destructive) { confirmReset = true }
-                        .foregroundStyle(.red)
                 }
             } header: {
                 Text("Backup")
             } footer: {
-                Text("Settings are saved as JSON, in the same format as settings.json. History and usage are not included and are kept on import and reset.")
+                Text("History and usage are not included and are kept on import and reset.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -653,8 +626,21 @@ private struct GeneralPane: View {
             } header: {
                 Text("Advanced")
             } footer: {
-                Text("Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away. Off: Retext asks only when you use a shortcut, and the first ⌥N in such an app may pass through.")
+                Text("Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away.")
                     .foregroundStyle(.secondary)
+            }
+            Section {
+                Button("Reset All Settings to Defaults…", role: .destructive) { confirmReset = true }
+                    .foregroundStyle(.red)
+                    // Here, not on the Form, so only this dialog is critical.
+                    .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
+                        Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
+                        // Cancel is the default button, so Return never resets.
+                        Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+                    } message: {
+                        Text("Actions, app styles, protected words, the provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
+                    }
+                    .dialogSeverity(.critical)
             }
         }
         .onAppear {
@@ -663,17 +649,10 @@ private struct GeneralPane: View {
         }
         .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { state.history = History() }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
             Text("Recent results and the cache are deleted.")
         }
-        .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
-            Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
-            // Cancel is the default button, so Return never resets.
-            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: {
-            Text("Actions, app styles, protected words, the provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
-        }
-        .dialogSeverity(.critical)
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {
             Button("Replace Settings", role: .destructive) {
@@ -726,22 +705,12 @@ private struct GeneralPane: View {
         try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
         loginStatus = SMAppService.mainApp.status
     }
-
-    private var loginStatusText: String {
-        switch loginStatus {
-        case .enabled: "Retext opens when you log in."
-        case .requiresApproval: "Waiting for approval in System Settings → General → Login Items."
-        default: "Retext doesn't open at login."
-        }
-    }
 }
 
 // MARK: Usage
 
 private struct UsagePane: View {
     let usage: Usage
-    let history: History
-    let provider: Provider
 
     var body: some View {
         Form {
@@ -754,18 +723,27 @@ private struct UsagePane: View {
                 LabeledContent("Cache hits", value: "\(today.cacheHits)")
                 LabeledContent("Input tokens", value: today.inputTokens.formatted())
                 LabeledContent("Output tokens", value: today.outputTokens.formatted())
-                LabeledContent("≈ API list price (Claude Code)", value: today.costUSD.formatted(.currency(code: "USD")))
+                LabeledContent("Price", value: Self.price(today))
             }
             Section {
                 ForEach(usage.days.keys.sorted(by: >).prefix(14), id: \.self) { day in
-                    LabeledContent(day, value: usage.days[day]!.summary.replacingOccurrences(of: "Today: ", with: ""))
+                    LabeledContent(day, value: Self.summary(usage.days[day]!))
                 }
             } header: {
                 Text("Recent days")
             } footer: {
-                Text("The price is what the same tokens would cost at API list prices, as Claude Code reports it; ChatGPT and custom API calls count tokens only.\(provider == .claude ? " " + EnginePane.billing : "") \(history.entries.count) results are cached.")
+                Text("The price is the Claude Code list price for the same tokens; ChatGPT and custom API calls count tokens only.")
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// One formatter for every amount, so all rows show the Mac's currency format.
+    private static func price(_ day: UsageDay) -> String { day.costUSD.formatted(.currency(code: "USD")) }
+
+    private static func summary(_ day: UsageDay) -> String {
+        let calls = day.callsByModel.map { "\($0.name) \($0.calls)" }.joined(separator: ", ")
+        return [calls.isEmpty ? "0 calls" : calls, "\(day.cacheHits) cached",
+                "\((day.inputTokens + day.outputTokens).formatted()) tokens", price(day)].joined(separator: ", ")
     }
 }

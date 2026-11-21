@@ -126,7 +126,12 @@ public enum Engine {
         "Rewrite the text as the user's instruction below asks. Keep the text's language unless the instruction asks for another. Keep its key information, and add no facts, reasons, numbers or commitments it doesn't contain (expanding on what it already says is fine). The result must read like natural writing by a skilled native speaker.\nInstruction: \(instruction.trimmingCharacters(in: .whitespacesAndNewlines))"
     }
 
-    public static func job(for action: CustomAction, level: Level, text: String, settings: RetextSettings, bundleID: String?) -> Job {
+    /// Longer selections are refused before the bar opens: no provider call.
+    public static let maxSelectionLength = 50_000
+
+    public static func isTooLong(_ text: String) -> Bool { text.count > maxSelectionLength }
+
+    public static func job(for action: CustomAction, level: Level, settings: RetextSettings, bundleID: String?) -> Job {
         let m = settings.model(for: level)
         return Job(title: action.title, provider: settings.provider, model: m.model, effort: m.effort,
             system: systemPrompt(action.prompt, addOn: level.addOn, style: settings.style(for: bundleID), protectedWords: settings.protectedWords),
@@ -186,6 +191,8 @@ public enum ClaudeFailure: Error, Equatable, Sendable {
     case notFound, notLoggedIn, limit, unknownModel
     /// The result failed `Engine.checkLayout`.
     case extraText
+    /// The answer hit the output limit (`stop_reason` "length" or "max_tokens"): never pasted or cached.
+    case cutOff
     /// Anything else, with a short excerpt of the error ("" when there is none, e.g. a timeout).
     case other(String)
 
@@ -221,6 +228,7 @@ public enum ClaudeFailure: Error, Equatable, Sendable {
         case (.unknownModel, .claude): return "Claude Code doesn't know this model. Update Claude Code."
         case (.unknownModel, .chatgpt): return "Your ChatGPT plan doesn't offer this model. Pick another in Settings → Engine."
         case (.unknownModel, .custom): return "The API doesn't know this model. Check the models in Settings → Engine."
+        case (.cutOff, _): return "The answer was cut off. Your text is unchanged."
         case (.extraText, _): return "\(who) added text that isn't a fix. Your text is unchanged."
         case (.other(""), _): return "\(who) didn't answer. Your text is unchanged."
         case (.other(let excerpt), _): return "\(who) failed: \(excerpt)"
@@ -239,14 +247,23 @@ public struct ClaudeOutput: Decodable, Sendable {
     public let total_cost_usd: Double?
     public let usage: Usage?
     public let is_error: Bool?
+    /// `claude -p`'s `stop_reason`, or the custom API's `finish_reason`.
+    public let stop_reason: String?
 
     /// For the other providers' answers, so usage and history record them the same way.
-    public init(result: String, inputTokens: Int, outputTokens: Int, costUSD: Double = 0) {
+    public init(result: String, inputTokens: Int, outputTokens: Int, costUSD: Double = 0, stopReason: String? = nil) {
         self.result = result
         total_cost_usd = costUSD
         usage = Usage(input_tokens: inputTokens, output_tokens: outputTokens)
         is_error = false
+        stop_reason = stopReason
     }
+
+    /// The answer stopped at the output limit, so it is incomplete: "max_tokens" from Claude, "length" from the custom API.
+    public var isCutOff: Bool { stop_reason == "max_tokens" || stop_reason == "length" }
+
+    /// Throws `ClaudeFailure.cutOff` for a cut-off answer. Called after usage is recorded, so the call still counts.
+    public func checkComplete() throws { if isCutOff { throw ClaudeFailure.cutOff } }
 
     public var inputTokens: Int { usage?.input_tokens ?? 0 }
     public var outputTokens: Int { usage?.output_tokens ?? 0 }

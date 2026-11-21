@@ -255,14 +255,16 @@ public enum OpenAICompatible {
         return (try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])) ?? Data()
     }
 
-    /// `choices[0].message.content` and the token counts, or nil when the answer has no text.
+    /// `choices[0].message.content`, the token counts and `finish_reason`, or nil when the answer has no text.
     public static func parse(_ data: Data) -> ClaudeOutput? {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let message = (object["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any],
+              let choice = (object["choices"] as? [[String: Any]])?.first,
+              let message = choice["message"] as? [String: Any],
               let content = message["content"] as? String,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let usage = object["usage"] as? [String: Any] ?? [:]
-        return ClaudeOutput(result: content, inputTokens: usage["prompt_tokens"] as? Int ?? 0, outputTokens: usage["completion_tokens"] as? Int ?? 0)
+        return ClaudeOutput(result: content, inputTokens: usage["prompt_tokens"] as? Int ?? 0, outputTokens: usage["completion_tokens"] as? Int ?? 0,
+                           stopReason: choice["finish_reason"] as? String)
     }
 
     /// `{"error":{"message"}}`, `{"error":"…"}` or `{"message"}` (OpenRouter), else the body as text.

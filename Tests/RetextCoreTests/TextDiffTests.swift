@@ -64,4 +64,13 @@ import Testing
         let segments = diff(old, new)
         #expect(segments.map(\.kind) == [.deleted, .inserted])
     }
+
+    @Test func longMostlyEqualTextIsFast() {
+        // ~100k tokens with one word changed: the equal runs on both sides must not be rebuilt per token.
+        let start = (0..<25_000).map { "w\($0)" }.joined(separator: " "), end = (25_000..<50_000).map { "w\($0)" }.joined(separator: " ")
+        let clock = ContinuousClock(), began = clock.now
+        let segments = diff("\(start) old \(end)", "\(start) new \(end)")
+        #expect(clock.now - began < .seconds(1))
+        #expect(segments.map(\.kind) == [.equal, .deleted, .inserted, .equal])
+    }
 }

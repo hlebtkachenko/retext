@@ -4,12 +4,13 @@ import RetextCore
 /// Sends a job to its provider's runner.
 enum ProviderRunner {
     /// `apiKey` is read only for the custom API, for the endpoint's own host (default: the Keychain).
+    /// A cut-off answer is returned as is: callers record it, then `checkComplete()` rejects it.
     static func run(_ job: Job, text: String, settings: RetextSettings, timeout: Duration,
                     apiKey: @Sendable (String) -> String? = Keychain.apiKey(account:)) async throws -> ClaudeOutput {
         switch job.provider {
-        case .claude: try await ClaudeRunner.run(job, text: text, claudePath: settings.claudePath, timeout: timeout)
-        case .chatgpt: try await CodexRunner.run(job, text: text, codexPath: settings.codexPath, timeout: timeout)
-        case .custom: try await APIRunner.run(job, text: text, custom: settings.custom, key: settings.custom.keyAccount.flatMap(apiKey), timeout: timeout)
+        case .claude: return try await ClaudeRunner.run(job, text: text, claudePath: settings.claudePath, timeout: timeout)
+        case .chatgpt: return try await CodexRunner.run(job, text: text, codexPath: settings.codexPath, timeout: timeout)
+        case .custom: return try await APIRunner.run(job, text: text, custom: settings.custom, key: settings.custom.keyAccount.flatMap(apiKey), timeout: timeout)
         }
     }
 }

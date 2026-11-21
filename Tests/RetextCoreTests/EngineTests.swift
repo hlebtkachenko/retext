@@ -19,7 +19,7 @@ import Testing
     }
 
     @Test func mediumKeepsTodaysPrompt() {
-        let job = Engine.job(for: grammar, level: .medium, text: "x", settings: RetextSettings(), bundleID: nil)
+        let job = Engine.job(for: grammar, level: .medium, settings: RetextSettings(), bundleID: nil)
         #expect(job.model == Model.haiku && job.effort == "low")
         #expect(job.system == Engine.systemPrompt("Fix it.", style: nil, protectedWords: []))
         #expect(!job.system.contains(Engine.highAddOn) && !job.system.contains(Engine.maxAddOn))
@@ -27,13 +27,13 @@ import Testing
 
     @Test func highAndMaxAddTheirBlockAfterTheTask() {
         for level in [Level.high, .max] {
-            let job = Engine.job(for: grammar, level: level, text: "x", settings: RetextSettings(), bundleID: nil)
+            let job = Engine.job(for: grammar, level: level, settings: RetextSettings(), bundleID: nil)
             #expect(job.model == level.model && job.effort == level.effort)
             #expect(job.system.hasPrefix("Fix it.\n\n\(level.addOn!)\n\n"))
             let typed = Engine.job(instruction: "shorter", level: level, settings: RetextSettings(), bundleID: nil)
             #expect(typed.model == level.model && typed.system.contains(level.addOn!))
         }
-        #expect(!Engine.job(for: grammar, level: .high, text: "x", settings: RetextSettings(), bundleID: nil).system.contains(Engine.maxAddOn))
+        #expect(!Engine.job(for: grammar, level: .high, settings: RetextSettings(), bundleID: nil).system.contains(Engine.maxAddOn))
     }
 }
 
@@ -42,7 +42,7 @@ import Testing
         var settings = RetextSettings(appStyles: [], protectedWords: ["Acme"])
         let action = settings.actions[0]
         func key() -> String {
-            let job = Engine.job(for: action, level: .medium, text: "helo", settings: settings, bundleID: "com.apple.mail")
+            let job = Engine.job(for: action, level: .medium, settings: settings, bundleID: "com.apple.mail")
             return Engine.cacheKey(provider: "claude", model: job.model, effort: job.effort, system: job.system, text: "helo")
         }
         let base = key()
@@ -76,8 +76,8 @@ import Testing
         #expect(Engine.checkLayout(input: "a, b, c", output: "- a\n- b\n- c", kind: nil) == "- a\n- b\n- c")
         #expect(Engine.checkLayout(input: "Hi, sending it.", output: "Ahoj,\n\nposílám to.", kind: .translate, styled: true) == "Ahoj,\n\nposílám to.")
         let mail = RetextSettings(appStyles: [AppStyle(bundleID: "com.apple.mail", style: "formal")])
-        #expect(Engine.job(for: mail.actions[0], level: .medium, text: "x", settings: mail, bundleID: "com.apple.mail").styled)
-        #expect(!Engine.job(for: mail.actions[0], level: .medium, text: "x", settings: mail, bundleID: nil).styled)
+        #expect(Engine.job(for: mail.actions[0], level: .medium, settings: mail, bundleID: "com.apple.mail").styled)
+        #expect(!Engine.job(for: mail.actions[0], level: .medium, settings: mail, bundleID: nil).styled)
     }
 
     @Test func grammarWithExtraTextIsRejected() {
@@ -215,6 +215,22 @@ import Testing
         #expect(output.costUSD == 0.0123)
         #expect(ClaudeOutput.parse(Data("not json".utf8)) == nil)
     }
+
+    @Test func maxTokensIsCutOff() throws {
+        let json = #"""
+        {"type":"result","subtype":"success","is_error":false,"result":"Hello, wor","stop_reason":"max_tokens",
+         "total_cost_usd":0.01,"usage":{"input_tokens":120,"output_tokens":4096}}
+        """#
+        let output = try #require(ClaudeOutput.parse(Data(json.utf8)))
+        #expect(output.isCutOff)
+        #expect(throws: ClaudeFailure.cutOff) { try output.checkComplete() }
+        #expect(ClaudeFailure.cutOff.message(for: .claude) == "The answer was cut off. Your text is unchanged.")
+        for reason in ["end_turn", "refusal"] {
+            let other = try #require(ClaudeOutput.parse(Data(#"{"result":"x","stop_reason":"\#(reason)"}"#.utf8)))
+            #expect(!other.isCutOff)
+            #expect(throws: Never.self) { try other.checkComplete() }
+        }
+    }
 }
 
 @Suite struct HistoryUsageTests {
@@ -230,6 +246,36 @@ import Testing
         #expect(history.entries.first?.key == "k24")
         #expect(history.lookup("k3") == nil)
         #expect(history.lookup("k10")?.output == "b")
+    }
+
+    @Test func historyKeepsOnlyTheStartOfTheInput() throws {
+        let long = "  Teh   quick\nbrown fox " + String(repeating: "jumps over the lazy dog ", count: 3000)
+        var history = History()
+        history.add(HistoryEntry(key: "k", appName: "Mail", title: "Fix", input: long, output: long, model: Model.haiku,
+                                 inputTokens: 1, outputTokens: 1, costUSD: 0))
+        let saved = try #require(history.lookup("k"))  // the cache key, not the input, finds the entry
+        #expect(saved.input.count <= HistoryEntry.inputLimit && saved.input.hasPrefix("Teh quick brown fox jumps"))
+        #expect(saved.output == long)
+    }
+
+    @Test func loadShortensOlderEntries() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-history-\(UUID()).json")
+        let long = String(repeating: "word ", count: 100)
+        // An older history.json: the whole selection as input.
+        let json = #"{"entries":[{"key":"k","date":"2026-01-01T00:00:00Z","appName":"Mail","title":"Fix","input":"\#(long)","output":"out","model":"haiku","inputTokens":1,"outputTokens":1,"costUSD":0}]}"#
+        try Data(json.utf8).write(to: url)
+        let entry = try #require(History.load(from: url).lookup("k"))
+        #expect(entry.input.count <= HistoryEntry.inputLimit && entry.output == "out")
+        // Saved back shortened: the file itself, read without `History.load`.
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let inputs = try #require((object["entries"] as? [[String: Any]])?.map { $0["input"] as? String })
+        #expect(!inputs.isEmpty && inputs.allSatisfy { ($0?.count ?? .max) <= HistoryEntry.inputLimit })
+    }
+
+    @Test func selectionLimit() {
+        #expect(Engine.maxSelectionLength == 50_000)
+        #expect(!Engine.isTooLong(String(repeating: "a", count: 50_000)))
+        #expect(Engine.isTooLong(String(repeating: "a", count: 50_001)))
     }
 
     @Test func usageCountsCallsAndHits() throws {
@@ -250,6 +296,11 @@ import Testing
         #expect(usage.today.callsByModel.map(\.name) == ["Haiku", "Sonnet"])
         #expect(usage.today.callsByModel.map(\.calls) == [2, 2])
         #expect(usage.today.summary.hasPrefix("Today: Haiku 2, Sonnet 2,"))
+        #expect(usage.today.summary.hasSuffix("Claude Code list price"))
+        var free = UsageDay()
+        free.calls["gpt-6-luna"] = 1
+        free.outputTokens = 5
+        #expect(free.summary == "Today: gpt-6-luna 1, 0 cached, 5 tokens")
         let decoded = try JSONDecoder().decode(Usage.self, from: JSONEncoder().encode(usage))
         #expect(decoded == usage)
     }

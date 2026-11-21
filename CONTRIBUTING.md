@@ -14,14 +14,14 @@ Requirements: macOS 26+, Xcode 26+, and one provider set up (for end-to-end chec
 
 ```sh
 swift build          # debug build
-swift test           # RetextCore tests (Swift Testing)
-./build.sh           # release build, sign, install to ~/Applications, launch
+swift test           # RetextCore and RetextTests (Swift Testing)
+./build.sh           # release build into build.noindex/, sign, install to ~/Applications, launch
 ./build.sh --no-install
 ```
 
 - `Sources/RetextCore`: pure logic (settings, routing, prompts, cache key, history, usage). New logic goes here, with tests in `Tests/RetextCoreTests`.
 - `Sources/Retext`: the app (event tap, Accessibility, popup, settings window).
-- UI changes: check them with `build/Retext.app/Contents/MacOS/Retext --demo menu` (or `working`, `done`, `error`, `nochange`, `settings <pane>`) and include a screenshot in the pull request.
+- UI changes: check them with `build.noindex/Retext.app/Contents/MacOS/Retext --demo menu` (or `working`, `done`, `error`, `nochange`, `settings <pane>`) and include a screenshot in the pull request.
 - [ARCHITECTURE.md](ARCHITECTURE.md) explains the flow from shortcut to paste; [AGENTS.md](AGENTS.md) holds the conventions for AI coding agents and humans alike.
 
 ## Pull requests

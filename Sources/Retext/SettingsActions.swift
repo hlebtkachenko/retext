@@ -40,7 +40,7 @@ struct ActionsPane: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Click an action to edit it. While text is selected, ⌥1 runs the first action, ⌥2 the second, and so on, in list order: move an action up or down to change its shortcut. Up to \(RetextSettings.maxActions) actions.")
+                    Text("⌥1 to ⌥9 run the actions in list order.")
                         .foregroundStyle(.secondary)
                     HStack {
                         Button("Add Action", systemImage: "plus") {
@@ -105,6 +105,7 @@ private struct ActionEditor: View {
                 Text("Translate").tag(ActionKind.translate)
                 Text("Other").tag(ActionKind.other)
             }
+            .help("Grammar and Translate keep a one-line text on one line unless an app style applies, and a Grammar result much longer than the text is rejected. Other has no such checks.")
             VStack(alignment: .leading, spacing: 8) {
                 Text("Prompt")
                 TextField("Prompt", text: $action.prompt, prompt: Text("What Retext should do with the selected text"), axis: .vertical)
@@ -112,26 +113,21 @@ private struct ActionEditor: View {
                     .lineLimit(5...14)
                     .padding(6)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                Text("Describe the change in plain words. Click an example to use it:")
-                    .font(.callout).foregroundStyle(.secondary)
                 // One row when it fits, else one example per line.
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 6) { exampleButtons }
                     VStack(alignment: .leading, spacing: 6) { exampleButtons }
                 }
             }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(position == 0)
-                    Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(position == count - 1)
-                    Spacer()
-                    Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
-                        .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
-                    Button("Delete Action…", role: .destructive) { confirmDelete = true }
-                        .foregroundStyle(.red)
-                }
-                Text("Kind: Grammar and Translate keep a one-line text on one line (unless an app style applies), and a Grammar result much longer than the text is rejected as an added note. Other has no such checks. Reset Prompt puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
-                    .font(.callout).foregroundStyle(.secondary)
+            HStack {
+                Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(position == 0)
+                Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(position == count - 1)
+                Spacer()
+                Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
+                    .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
+                    .help("Puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
+                Button("Delete Action…", role: .destructive) { confirmDelete = true }
+                    .foregroundStyle(.red)
             }
             // On this row, not the Group: a modifier on a Group applies to each of its rows.
             .confirmationDialog("Delete “\(action.title)”?", isPresented: $confirmDelete) {

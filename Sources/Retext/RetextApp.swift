@@ -2,7 +2,41 @@ import Carbon.HIToolbox
 import RetextCore
 import SwiftUI
 
+/// Takes the single-instance lock before the app starts; `--demo` and `--provider-smoke` run alongside the app.
 @main
+@MainActor
+enum RetextMain {
+    static func main() {
+        let args = CommandLine.arguments
+        if !args.contains("--demo"), !args.contains("--provider-smoke") { SingleInstance.claim() }
+        RetextApp.main()
+    }
+}
+
+/// One Retext at a time: an exclusive flock on Application Support/Retext/instance.lock, held until the process exits
+/// (the kernel drops it then, even after a crash). A second launch asks the running one to show Settings and exits.
+enum SingleInstance {
+    /// Posted by a second launch; the running Retext shows Settings, like opening it again from Finder.
+    static let reopen = Notification.Name(Identity.bundleID + ".reopen")
+    /// The lock's descriptor: never closed or unlinked, and close-on-exec so provider subprocesses don't inherit it.
+    nonisolated(unsafe) private static var lock: Int32 = -1
+
+    static func claim() {
+        try? FileManager.default.createDirectory(at: Store.directory, withIntermediateDirectories: true)
+        let fd = open(Store.url("instance.lock").path, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { return }  // no lock file: launch normally rather than not at all
+        // Retries cover a Retext that is still quitting (a relaunch right after Quit, or build.sh replacing it).
+        for attempt in 0...5 {
+            if flock(fd, LOCK_EX | LOCK_NB) == 0 { lock = fd; return }
+            guard errno == EWOULDBLOCK else { close(fd); return }
+            if attempt < 5 { usleep(200_000) }
+        }
+        DistributedNotificationCenter.default().postNotificationName(reopen, object: nil, userInfo: nil, deliverImmediately: true)
+        FileHandle.standardError.write(Data("Retext is already running; showing its Settings.\n".utf8))
+        exit(0)
+    }
+}
+
 struct RetextApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @ObservedObject private var state = AppState.shared
@@ -15,7 +49,7 @@ struct RetextApp: App {
                     .keyboardShortcut(index < 9 ? KeyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option) : nil)
             }
             Divider()
-            Menu("Recent (click to copy)") {
+            Menu("Copy Recent") {
                 if state.history.entries.isEmpty { Text("Nothing yet") }
                 ForEach(state.history.entries) { entry in
                     Button(Self.short(entry)) {
@@ -24,33 +58,52 @@ struct RetextApp: App {
                     }
                 }
             }
-            Button(state.usage.today.summary) { SettingsWindow.shared.show(.usage) }
             Divider()
-            // Shown only when something blocks Retext; each opens the place that fixes it.
-            if !delegate.hotkeyOK {
-                Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            // Shown only when something blocks Retext (each opens the place that fixes it) or an update is out.
+            if hasProblemRows {
+                if !delegate.hotkeyOK {
+                    Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
                 }
+                if let problem = state.providerStatus?.problem {
+                    Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
+                }
+                if let update = availableUpdate {
+                    Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(update.page) }
+                }
+                Divider()
             }
-            if let problem = state.providerStatus?.problem {
-                Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.engine) }
-            }
-            if state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) {
-                Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(page) }
-            }
-            Button("Welcome…") { WelcomeWindow.shared.show() }
             Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
+            Divider()
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
-        // The app menu (About Retext, Services, Hide…) shown while Settings or Welcome is open.
+        // The main menu shown while Settings or Welcome is open: About Retext, Check for Updates…, Settings… ⌘, in the
+        // app menu (Settings is Retext's own window, not a SwiftUI Settings scene), Welcome to Retext in Help.
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
             }
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
+            }
+            CommandGroup(replacing: .help) {
+                Button("Welcome to Retext") { WelcomeWindow.shared.show() }
+            }
         }
+    }
+
+    private var hasProblemRows: Bool {
+        !delegate.hotkeyOK || state.providerStatus?.problem != nil || availableUpdate != nil
+    }
+
+    /// The newer release the menu offers, when update checks are on.
+    private var availableUpdate: (version: String, page: URL)? {
+        guard state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) else { return nil }
+        return (update.version, page)
     }
 
     /// SwiftUI writes isInserted back on every scene update; writing only real changes keeps that from
@@ -77,6 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         signal(SIGPIPE, SIG_IGN)
         if let i = CommandLine.arguments.firstIndex(of: "--provider-smoke") { return providerSmoke(Array(CommandLine.arguments.dropFirst(i + 1))) }
         if let i = CommandLine.arguments.firstIndex(of: "--demo") {
+            // A demo runs in the background with no Dock icon, so one left open quits itself.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
@@ -96,6 +151,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
             controller.demo(state)
             return
+        }
+        DistributedNotificationCenter.default().addObserver(forName: SingleInstance.reopen, object: nil, queue: .main) { _ in
+            // queue: .main delivers on the main thread.
+            MainActor.assumeIsolated { SettingsWindow.shared.show() }
         }
         // The value of kAXTrustedCheckOptionPrompt, a C global var that Swift 6 treats as shared mutable state.
         let prompt = "AXTrustedCheckOptionPrompt"
@@ -146,12 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         let action = RetextSettings.defaultActions(languages: ["en"])[0]
         let text = "I has two cat."
-        let job = Engine.job(for: action, level: level, text: text, settings: settings, bundleID: nil)
+        let job = Engine.job(for: action, level: level, settings: settings, bundleID: nil)
         Task {
             let start = Date()
             do {
                 let output = try await ProviderRunner.run(job, text: text, settings: settings, timeout: level.timeout,
                                                           apiKey: { _ in provider == .custom ? env["RETEXT_SMOKE_KEY"] : nil })
+                try output.checkComplete()
                 print("OK \(provider.rawValue) \(level.rawValue) \(job.model)/\(job.effort) \(String(format: "%.1f", Date().timeIntervalSince(start))) s, "
                       + "\(output.inputTokens) in, \(output.outputTokens) out: \(output.text)")
                 exit(0)
