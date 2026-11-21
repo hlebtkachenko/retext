@@ -6,6 +6,18 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 identity="${RETEXT_SIGN_IDENTITY:-$(cat .sign-identity 2>/dev/null || echo -)}"
+aside="build.noindex/replaced/$(date +%Y%m%d-%H%M%S)"
+files() { (cd "$1" && find . \( -type f -o -type l \) | sort); }
+# Moves files in bundle $1 that are not listed in $2 to $aside/$3 (never deleted): a build or install replaces
+# the app's contents instead of merging into them, so a file a newer version dropped can't linger and get sealed.
+# User data (Application Support, preferences, Keychain, Accessibility grant) lives outside the bundle and is kept.
+prune() {
+    comm -23 <(files "$1") "$2" | while IFS= read -r f; do
+        mkdir -p "$aside/$3/$(dirname "$f")"
+        mv "$1/$f" "$aside/$3/$f"
+        echo "Moved stale $1/${f#./} to $aside/$3" >&2
+    done
+}
 swift build -c release
 # .noindex keeps Spotlight from indexing the build copy and offering it as a second Retext.
 app=build.noindex/Retext.app
@@ -19,6 +31,9 @@ xcrun actool Resources/AppIcon.icon --compile "$icon" --platform macosx --minimu
     --app-icon AppIcon --output-partial-info-plist "$icon/partial.plist" >/dev/null
 [[ -s "$icon/Assets.car" ]] || { echo "actool did not compile Resources/AppIcon.icon (needs Xcode 26 or later)." >&2; exit 1; }
 cp "$icon/Assets.car" "$app/Contents/Resources/Assets.car"
+printf '%s\n' ./Contents/Info.plist ./Contents/MacOS/Retext ./Contents/Resources/AppIcon.icns \
+    ./Contents/Resources/Assets.car ./Contents/_CodeSignature/CodeResources | sort > "$icon/expected"
+prune "$app" "$icon/expected" build
 codesign --force --options runtime --sign "$identity" "$app"
 
 [[ "${1:-}" == "--no-install" ]] && exit 0
@@ -27,6 +42,8 @@ pkill -x Retext || true
 for _ in {1..50}; do pgrep -x Retext >/dev/null || break; sleep 0.1; done
 pgrep -x Retext >/dev/null && { echo "Retext is still running; quit it and run ./build.sh again." >&2; exit 1; }
 ditto "$app" ~/Applications/Retext.app
+files "$app" > "$icon/built"
+prune ~/Applications/Retext.app "$icon/built" installed
 codesign --verify --strict ~/Applications/Retext.app
 # Forget the build copies (and the old build/ one) so "Open at login" (SMAppService) resolves to the installed app.
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister

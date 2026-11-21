@@ -13,5 +13,6 @@
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
     <key>RetextRepository</key><string>hlebtkachenko/retext</string>
+    <key>RetextWebsite</key><string>https://retext.hapd.dev</string>
 </dict>
 </plist>

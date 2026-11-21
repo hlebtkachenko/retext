@@ -217,17 +217,17 @@ public enum ClaudeFailure: Error, Equatable, Sendable {
     public func message(for provider: Provider) -> String {
         let who = provider.shortTitle
         switch (self, provider) {
-        case (.notFound, .claude): return "Claude Code not found. Install it or set its path in Settings → Engine."
-        case (.notFound, .chatgpt): return "Codex not found. Install the Codex CLI or set its path in Settings → Engine."
-        case (.notFound, .custom): return "Custom API isn't set up. Enter its base URL and models in Settings → Engine."
+        case (.notFound, .claude): return "Claude Code not found. Install it or set its path in Settings → AI."
+        case (.notFound, .chatgpt): return "Codex not found. Install the Codex CLI or set its path in Settings → AI."
+        case (.notFound, .custom): return "Custom API isn't set up. Enter its base URL and models in Settings → AI."
         case (.notLoggedIn, .claude): return "Claude Code isn't logged in. Run claude in Terminal and log in."
         case (.notLoggedIn, .chatgpt): return "Codex isn't logged in. Run codex login in Terminal and sign in with ChatGPT."
-        case (.notLoggedIn, .custom): return "API key rejected. Check it in Settings → Engine."
+        case (.notLoggedIn, .custom): return "API key rejected. Check it in Settings → AI."
         case (.limit, .custom): return "The API's rate limit was reached. Try again later."
         case (.limit, _): return "\(who) usage limit reached. Try again later."
         case (.unknownModel, .claude): return "Claude Code doesn't know this model. Update Claude Code."
-        case (.unknownModel, .chatgpt): return "Your ChatGPT plan doesn't offer this model. Pick another in Settings → Engine."
-        case (.unknownModel, .custom): return "The API doesn't know this model. Check the models in Settings → Engine."
+        case (.unknownModel, .chatgpt): return "Your ChatGPT plan doesn't offer this model. Pick another in Settings → AI."
+        case (.unknownModel, .custom): return "The API doesn't know this model. Check the models in Settings → AI."
         case (.cutOff, _): return "The answer was cut off. Your text is unchanged."
         case (.extraText, _): return "\(who) added text that isn't a fix. Your text is unchanged."
         case (.other(""), _): return "\(who) didn't answer. Your text is unchanged."

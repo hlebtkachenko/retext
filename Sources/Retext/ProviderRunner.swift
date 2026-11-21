@@ -28,19 +28,19 @@ struct ProviderStatus: Equatable, Sendable {
         switch settings.provider {
         case .claude:
             if let path = ClaudeRunner.executable(override: settings.claudePath) { return .ok(path) }
-            return ProviderStatus(ready: false, detail: "Install Claude Code and log in, or set its path in Settings → Engine.",
+            return ProviderStatus(ready: false, detail: "Install Claude Code and log in, or set its path in Settings → AI.",
                                   problem: "Claude Code not found…")
         case .chatgpt:
             guard let path = CodexRunner.executable(override: settings.codexPath) else {
-                return ProviderStatus(ready: false, detail: "Install the Codex CLI and sign in with ChatGPT, or set its path in Settings → Engine.",
+                return ProviderStatus(ready: false, detail: "Install the Codex CLI and sign in with ChatGPT, or set its path in Settings → AI.",
                                       problem: "Codex not found…")
             }
             guard CodexRunner.hasLogin else {
-                return ProviderStatus(ready: false, detail: "Run codex login in Terminal and sign in with ChatGPT. Retext needs Codex's file credential store (the default).", problem: "Codex isn't logged in…")
+                return ProviderStatus(ready: false, detail: "Run codex login in Terminal and sign in with ChatGPT.", problem: "Codex isn't logged in…")
             }
             return .ok(path)
         case .custom:
-            let notSetUp = ProviderStatus(ready: false, detail: "Enter the API's base URL and a model for each level in Settings → Engine.",
+            let notSetUp = ProviderStatus(ready: false, detail: "Enter the API's base URL and a model for each level in Settings → AI.",
                                           problem: "Custom API not set up…")
             guard let url = settings.custom.endpoint, let host = url.host else { return notSetUp }
             guard Level.allCases.allSatisfy({ !settings.model(for: $0).model.isEmpty }) else { return notSetUp }
@@ -49,7 +49,7 @@ struct ProviderStatus: Equatable, Sendable {
             }
             // Local servers (Ollama, LM Studio) take no key; remote APIs need one.
             if !CustomProviderSettings.isLocal(host), !Keychain.hasAPIKey(account: settings.custom.keyAccount) {
-                return ProviderStatus(ready: false, detail: "Save the API key for \(host) in Settings → Engine.", problem: "API key missing…")
+                return ProviderStatus(ready: false, detail: "Save the API key for \(host) in Settings → AI.", problem: "API key missing…")
             }
             return .ok(host)
         }

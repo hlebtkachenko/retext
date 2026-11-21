@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the requests go. One is active at a time (Settings → Engine).
+/// Where the requests go. One is active at a time (Settings → AI).
 public enum Provider: String, Codable, CaseIterable, Sendable {
     /// `claude -p` with the user's Claude Code login.
     case claude

@@ -60,7 +60,7 @@ import Testing
         #expect(try JSONDecoder().decode(RetextSettings.self, from: Data("{}".utf8)).previewBeforeReplace == false)
     }
 
-    @Test func upgradersSkipTheWelcomeWindow() {
+    @Test func upgradersSkipOnboarding() {
         #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: false, otherDataExists: false) == false)
         #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: false, otherDataExists: true) == true)
         #expect(RetextSettings.onboardedWithoutSettings(settingsFileExists: true, otherDataExists: false) == true)

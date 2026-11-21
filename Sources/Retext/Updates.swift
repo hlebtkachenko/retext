@@ -2,7 +2,7 @@ import Foundation
 import RetextCore
 
 /// Asks GitHub for the latest release at most once a day, at launch and on wake, and remembers it so a later launch
-/// the same day still shows "Update available". Nothing is downloaded: the menu item opens the release page.
+/// the same day still shows "Update Available". Nothing is downloaded: the menu item opens Settings → About, which links the release page.
 @MainActor
 enum UpdateChecker {
     static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -18,6 +18,11 @@ enum UpdateChecker {
               let page = defaults.string(forKey: pageKey), page.hasPrefix("https://github.com/"),
               Version.isNewer(version, than: current) else { return nil }
         return Release(tag_name: version, html_url: page)
+    }
+
+    /// When GitHub last answered a check; a fixed sample date in `--demo`, so screenshots show no real state.
+    static var lastChecked: Date? {
+        AppWindows.isDemo ? Date(timeIntervalSince1970: 1_795_000_000) : UserDefaults.standard.object(forKey: checkedKey) as? Date
     }
 
     /// Skipped when turned off, in a `swift build` binary (no version) and within a day of the last check.
@@ -81,7 +86,7 @@ enum UpdateChecker {
     }
 }
 
-/// What a manual check reports, in Settings → Overview.
+/// What a manual check reports, in Settings → About.
 enum UpdateCheckResult: Sendable {
     /// The current version.
     case upToDate(String)

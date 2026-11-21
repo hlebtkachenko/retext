@@ -20,8 +20,8 @@ swift test           # RetextCore and RetextTests (Swift Testing)
 ```
 
 - `Sources/RetextCore`: pure logic (settings, routing, prompts, cache key, history, usage). New logic goes here, with tests in `Tests/RetextCoreTests`.
-- `Sources/Retext`: the app (event tap, Accessibility, popup, settings window).
-- UI changes: check them with `build.noindex/Retext.app/Contents/MacOS/Retext --demo menu` (or `working`, `done`, `error`, `nochange`, `settings <pane>`) and include a screenshot in the pull request.
+- `Sources/Retext`: the app (event tap, Accessibility, popup, Onboarding, and the Settings window with one `Settings*.swift` file per pane). Tests of the app target go in `Tests/RetextTests`.
+- UI changes: check them with `build.noindex/Retext.app/Contents/MacOS/Retext --demo menu` (or `working`, `done`, `error`, `nochange`, `preview`, `onboarding`, `settings <pane>` with `about`, `general`, `actions`, `styles`, `words`, `ai` or `history`; add `--dark` for dark mode; AGENTS.md lists every state) and include a screenshot in the pull request.
 - [ARCHITECTURE.md](ARCHITECTURE.md) explains the flow from shortcut to paste; [AGENTS.md](AGENTS.md) holds the conventions for AI coding agents and humans alike.
 
 ## Pull requests
