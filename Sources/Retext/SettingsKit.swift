@@ -3,7 +3,7 @@ import SwiftUI
 
 // Shared building blocks of the Settings panes.
 
-/// A row with a tinted rounded-square symbol, a title, an optional secondary subtitle and trailing content
+/// A row with a symbol in its tint on a neutral rounded square, a title, an optional secondary subtitle and trailing content
 /// (a toggle, a picker, a button).
 struct IconRow<Trailing: View>: View {
     let symbol: String
@@ -41,35 +41,69 @@ extension IconRow where Trailing == EmptyView {
     }
 }
 
-/// The white symbol on a tinted rounded square that `IconRow` and `IntroCard` lead with; decorative for VoiceOver.
+/// The row's symbol in its tint on a neutral rounded square with a hairline border; decorative for VoiceOver.
 private struct IconTile: View {
     let symbol: String
     let tint: Color
-    var size: CGFloat = 24
+    private let size: CGFloat = 24
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
         Image(systemName: symbol)
             .font(.system(size: size * 0.55, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(tint)
             .frame(width: size, height: size)
-            .background(tint.gradient, in: RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
+            .background(.quaternary, in: shape)
+            .overlay(shape.strokeBorder(.separator, lineWidth: 0.5))
             .accessibilityHidden(true)
     }
 }
 
-/// An explanatory card at the top of a pane: what the page is for, in a sentence or two.
-struct IntroCard: View {
-    let symbol: String
+/// The first section of a pane: what the page is for, in plain secondary text on the window background.
+/// Put it first in the pane's `Form`: `PageDescription(.actions)`, or `PageDescription("Any text.")`.
+struct PageDescription: View {
     let text: String
 
+    init(_ pane: SettingsView.Pane) { text = pane.summary }
+    init(_ text: String) { self.text = text }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            IconTile(symbol: symbol, tint: .accentColor, size: 34)
-            Text(text).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+        Section {
+            Text(text)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
+        .listRowBackground(Color.clear)
+    }
+}
+
+extension SettingsView.Pane {
+    /// The sentence `PageDescription` shows at the top of the pane.
+    var summary: String {
+        switch self {
+        case .about: "Fixes, rewrites or translates the text you select in any app, in place."
+        case .general: "How Retext starts, opens and shows its results."
+        case .actions: "Saved instructions you run from the bar or with ⌥1…⌥9."
+        case .styles: "A style tells every action how to write in that app."
+        case .words: "Names and terms Retext keeps as written, even in translations."
+        case .ai: "The AI that rewrites your text. Higher levels give better results and take longer."
+        case .history: "Your past results and how much Retext has used."
+        }
+    }
+}
+
+extension View {
+    /// A pop-up button with a border, the chosen value and up-down chevrons, like a pop-up in System Settings.
+    /// Put it on a `Picker` in a grouped Form, usually with `.labelsHidden()` when the row shows the title:
+    /// `Picker("Provider", selection: $provider) { ... }.labelsHidden().borderedPopUp()`.
+    func borderedPopUp() -> some View {
+        pickerStyle(.menu).buttonStyle(.bordered).fixedSize()
+    }
+
+    /// A pull-down button with a border, the label and one down chevron, for a `Menu` of commands
+    /// (Add App Style, Presets): `Menu("Presets") { ... }.borderedPullDown()`.
+    func borderedPullDown() -> some View {
+        menuStyle(.button).buttonStyle(.bordered).menuIndicator(.visible).fixedSize()
     }
 }
 

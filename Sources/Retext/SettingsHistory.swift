@@ -27,6 +27,7 @@ struct HistoryPane: View {
 
     private var form: some View {
         Form {
+            PageDescription(.history)
             Section {
                 Picker("Keep", selection: retention) {
                     ForEach(HistoryRetention.allCases, id: \.self) { Text($0.title).tag($0) }

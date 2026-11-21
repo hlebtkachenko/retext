@@ -20,6 +20,7 @@ struct AboutPane: View {
     var body: some View {
         let page = Identity.pageURL(repository: UpdateChecker.repository)
         Form {
+            PageDescription(.about)
             Section {
                 hero
             }

@@ -84,9 +84,7 @@ struct StylesPane: View {
 
     var body: some View {
         Form {
-            Section {
-                IntroCard(symbol: "app.badge.fill", text: "A style tells every action how to write in that app.")
-            }
+            PageDescription(.styles)
             ForEach($styles) { $style in
                 Section { row($style) }
             }

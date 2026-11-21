@@ -11,9 +11,7 @@ struct WordsPane: View {
 
     var body: some View {
         Form {
-            Section {
-                IntroCard(symbol: "lock.fill", text: "Names and terms Retext keeps as written, even in translations.")
-            }
+            PageDescription(.words)
             Section {
                 ForEach(settings.protectedWords, id: \.self) { word in
                     WordRow(word: word,

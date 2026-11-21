@@ -15,6 +15,7 @@ struct GeneralPane: View {
 
     var body: some View {
         Form {
+            PageDescription(.general)
             Section("Startup") {
                 IconRow(symbol: "power", tint: .green, title: "Open at Login",
                         subtitle: loginStatus == .requiresApproval ? "Waiting for approval in System Settings → General → Login Items." : nil) {

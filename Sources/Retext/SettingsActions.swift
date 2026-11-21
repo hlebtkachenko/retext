@@ -12,9 +12,7 @@ struct ActionsPane: View {
 
     var body: some View {
         Form {
-            Section {
-                IntroCard(symbol: "bolt.fill", text: "Saved instructions you run from the bar or with ⌥1…⌥9.")
-            }
+            PageDescription(.actions)
             Section {
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
                     ActionRow(action: action, index: index, count: actions.count, open: { editing = action },
