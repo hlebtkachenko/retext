@@ -2,50 +2,44 @@ import AppKit
 import RetextCore
 import SwiftUI
 
-/// The bar shortcut row in General: a pop-up of presets plus "Record Custom…", and a reset to ⌥Space.
+/// The bar shortcut row in General: a field of keycaps that records a new shortcut on click, the presets in its
+/// context menu, and a reset to ⌥Space.
 struct ShortcutField: View {
-    /// A preset or the custom shortcut, or "Record Custom…", which starts the recorder instead of being selected.
-    private enum Choice: Hashable { case shortcut(BarShortcut), record }
-
     @ObservedObject private var state = AppState.shared
     @StateObject private var recorder = ShortcutRecorder()
 
-    private var choice: Binding<Choice> {
-        Binding(get: { .shortcut(state.settings.barShortcut) }, set: { picked in
-            switch picked {
-            case .shortcut(let shortcut): state.settings.barShortcut = shortcut
-            case .record: recorder.start { state.settings.barShortcut = $0 }
-            }
-        })
-    }
-
     var body: some View {
         let shortcut = state.settings.barShortcut
+        let standard = RetextSettings().barShortcut
         IconRow(symbol: "command", tint: .indigo, title: "Shortcut",
                 subtitle: recorder.recording ? "Press the new shortcut, or esc to cancel." : nil) {
-            if recorder.recording {
-                KeyCaps(text: recorder.live.isEmpty ? "Type Shortcut" : recorder.live, active: true)
-                    .accessibilityLabel("Recording shortcut")
-                Button("Cancel") { recorder.stop() }
-            } else {
-                Picker("Shortcut", selection: choice) {
-                    ForEach(BarShortcut.presets, id: \.self) { Text($0.displayLabel).tag(Choice.shortcut($0)) }
-                    if !BarShortcut.presets.contains(shortcut) { Text(shortcut.displayLabel).tag(Choice.shortcut(shortcut)) }
-                    Divider()
-                    Text("Record Custom…").tag(Choice.record)
-                }
-                .labelsHidden()
-                .fixedSize()
-                .accessibilityValue(shortcut.spokenLabel)
-                Button {
-                    state.settings.barShortcut = RetextSettings().barShortcut
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                }
-                .help("Reset to \(RetextSettings().barShortcut.displayLabel)")
-                .accessibilityLabel("Reset to \(RetextSettings().barShortcut.spokenLabel)")
-                .disabled(shortcut == RetextSettings().barShortcut)
+            Button {
+                if recorder.recording { recorder.stop() } else { recorder.start { state.settings.barShortcut = $0 } }
+            } label: {
+                KeyCaps(caps: recorder.recording ? recorder.live.map(String.init) : Self.caps(shortcut), recording: recorder.recording)
             }
+            .buttonStyle(.plain)
+            .help(recorder.recording ? "Press the new shortcut, or esc to cancel." : "Click to record a new shortcut. Presets are in the context menu.")
+            .accessibilityLabel(recorder.recording ? "Recording shortcut" : "Shortcut")
+            .accessibilityValue(shortcut.spokenLabel)
+            .accessibilityHint(recorder.recording ? "Press the new shortcut, or Escape to cancel." : "Records a new shortcut.")
+            .contextMenu {
+                Picker("Presets", selection: $state.settings.barShortcut) {
+                    ForEach(BarShortcut.presets, id: \.self) { Text($0.displayLabel).tag($0) }
+                    if !BarShortcut.presets.contains(shortcut) { Text(shortcut.displayLabel).tag(shortcut) }
+                }
+                .pickerStyle(.inline)
+                Divider()
+                Button("Record Custom…") { recorder.start { state.settings.barShortcut = $0 } }
+            }
+            Button {
+                state.settings.barShortcut = standard
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+            }
+            .help("Reset to \(standard.displayLabel)")
+            .accessibilityLabel("Reset to \(standard.spokenLabel)")
+            .disabled(shortcut == standard || recorder.recording)
         }
         .onAppear {
             switch SettingsView.demoExtra {
@@ -66,24 +60,40 @@ struct ShortcutField: View {
                 .padding(.leading, 34)
         }
     }
+
+    /// One keycap per modifier, in the menu order ⌃⌥⇧⌘, then the key: ⌥Space is ["⌥", "Space"].
+    nonisolated static func caps(_ shortcut: BarShortcut) -> [String] {
+        shortcut.modifiers.glyphs.map(String.init) + [BarShortcut.keyLabel(shortcut.keyCode)]
+    }
 }
 
-/// A shortcut drawn as keycaps on a rounded background, like System Settings' shortcut fields.
+/// A shortcut as keycaps in a bordered rounded field, like System Settings' shortcut fields; while recording,
+/// the modifiers held so far or "Press keys…", with an accent border.
 private struct KeyCaps: View {
-    let text: String
-    var active = false
+    let caps: [String]
+    let recording: Bool
 
     var body: some View {
-        Text(text)
-            .monospacedDigit()
-            .padding(.horizontal, 10)
-            .frame(minWidth: 110, minHeight: 24)
-            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(active ? Color.accentColor : .clear, lineWidth: 1.5)
+        let field = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        HStack(spacing: 4) {
+            if caps.isEmpty {
+                Text("Press keys…").foregroundStyle(.secondary).padding(.horizontal, 6)
+            } else {
+                ForEach(caps.indices, id: \.self) { index in
+                    Text(caps[index])
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 6)
+                        .frame(minWidth: 24, minHeight: 22)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
             }
-            .foregroundStyle(active ? .secondary : .primary)
+        }
+        .padding(3)
+        .frame(minWidth: 110, minHeight: 28)
+        .background(.quaternary.opacity(0.4), in: field)
+        .overlay { field.strokeBorder(recording ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.separator), lineWidth: recording ? 1.5 : 0.5) }
+        .contentShape(field)
+        .accessibilityElement(children: .ignore)
     }
 }
 
