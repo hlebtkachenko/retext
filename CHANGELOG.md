@@ -44,6 +44,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - A second ⌥Space while Retext is still reading the selection is ignored instead of starting another read.
 - The preview's diff stays fast on long text.
 - The menu's provider status no longer shows an older check's result after a newer one.
+- Return starts a new line in an action's prompt editor instead of ending the edit.
+- `./build.sh` replaces the app's contents instead of merging into them: a file a newer build no longer has is moved to `build.noindex/replaced/`, never left in the app. Settings, history, preferences and the Keychain key live outside the app and are kept.
 
 ## [1.4.0] - 2026-11-20
 
