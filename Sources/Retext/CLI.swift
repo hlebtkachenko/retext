@@ -7,12 +7,16 @@ enum CommandLocator {
     /// Paths found by the login shell. A miss is not kept, so a tool installed later is found without a relaunch.
     static let found = OSAllocatedUnfairLock(initialState: [String: String]())
 
-    /// The override when set (nil if it isn't executable), else `command -v name` in a login shell (cached once found),
-    /// else the first executable candidate.
+    /// The override when set (nil if it isn't executable), else `command -v name` in a login shell (cached once found;
+    /// a cached path that is no longer executable is dropped and looked up again), else the first executable candidate.
     static func find(_ name: String, override: String, candidates: [String]) -> String? {
         let custom = NSString(string: override.trimmingCharacters(in: .whitespaces)).expandingTildeInPath
         if !custom.isEmpty { return FileManager.default.isExecutableFile(atPath: custom) ? custom : nil }
-        if let cached = found.withLock({ $0[name] }) { return cached }
+        if let cached = found.withLock({ $0[name] }) {
+            if FileManager.default.isExecutableFile(atPath: cached) { return cached }
+            // Uninstalled or moved: forget it, unless another lookup already stored a newer path.
+            found.withLock { if $0[name] == cached { $0[name] = nil } }
+        }
         // Profiles can print noise: take the last line that is an executable path.
         if let path = loginShell("command -v \(name)").last(where: { $0.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: $0) }) {
             found.withLock { $0[name] = path }

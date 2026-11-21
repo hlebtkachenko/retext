@@ -66,6 +66,13 @@ import RetextCore
         #expect(CommandLocator.find("ls", override: "", candidates: []) == first)
     }
 
+    @Test func staleCachedPathIsLookedUpAgain() {
+        let name = "retext-missing-tool-\(UInt32.random(in: 0...UInt32.max))"
+        CommandLocator.found.withLock { $0[name] = "/nonexistent/\(name)" }
+        #expect(CommandLocator.find(name, override: "", candidates: []) == nil)
+        #expect(CommandLocator.found.withLock { $0[name] } == nil)
+    }
+
     @Test func loginShellReturnsOutputLines() {
         #expect(CommandLocator.loginShell("echo one; echo two").suffix(2) == ["one", "two"])
     }
