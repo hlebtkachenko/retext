@@ -6,40 +6,65 @@ import SwiftUI
 
 struct EnginePane: View {
     @ObservedObject private var state = AppState.shared
+    /// The models `codex debug models` lists, for the ChatGPT model pickers.
+    @State private var codexModels: [String] = []
 
     var body: some View {
         let provider = state.settings.provider
         Form {
             Section {
-                Picker("Provider", selection: $state.settings.provider) {
-                    ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
+                IntroCard(symbol: "sparkles", title: "How Retext uses AI",
+                          text: "The provider is the AI service that edits your text: Claude Code, ChatGPT or an API of your choice, set up once below. Each run uses a quality level: Medium is fast, High rewrites more naturally, Max gives the best result. In the bar, ↑ and ↓ change the level for one run; a run stops after \(Self.seconds(.medium)) s, \(Self.seconds(.max)) s at Max.")
+            }
+            Section {
+                IconRow(symbol: "star.fill", tint: .yellow, title: "Default Level", subtitle: "Every bar opens at it, and ⌥1…⌥9 run at it.") {
+                    Picker("Default Level", selection: $state.settings.defaultLevel) {
+                        ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
                 }
-            } footer: {
-                Text(Self.about(provider)).foregroundStyle(.secondary)
+                // Name with its model and role below, the same layout for every level whatever the description's length.
+                ForEach(Level.allCases, id: \.self) { level in
+                    IconRow(symbol: Self.symbol(level).name, tint: Self.symbol(level).tint, title: level.title, subtitle: describe(level))
+                        .accessibilityElement(children: .combine)
+                }
+            } header: {
+                Text("Quality")
+            }
+            switch provider {
+            case .claude: EmptyView()
+            case .chatgpt: ChatGPTModelsSection(settings: $state.settings, models: codexModels)
+            case .custom: CustomModelsSection(custom: $state.settings.custom)
+            }
+            Section {
+                IconRow(symbol: "cpu", tint: .indigo, title: "Provider", subtitle: Self.about(provider)) {
+                    Picker("Provider", selection: $state.settings.provider) {
+                        ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            } header: {
+                Text("Setup")
             }
             switch provider {
             case .claude: ClaudeSection(claudePath: $state.settings.claudePath)
             case .chatgpt: ChatGPTSection(settings: $state.settings)
             case .custom: CustomAPISection(custom: $state.settings.custom)
             }
-            Section {
-                Picker("Default level", selection: $state.settings.defaultLevel) {
-                    ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                // Name with its description below, the same layout for every level whatever the description's length.
-                ForEach(Level.allCases, id: \.self) { level in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(level.title)
-                        Text(describe(level)).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-            } header: {
-                Text("Quality")
-            } footer: {
-                Text("In the bar, ↑ and ↓ change the level for one run; a run stops after \(Self.seconds(.medium)) s, \(Self.seconds(.max)) s at Max.")
-                    .foregroundStyle(.secondary)
-            }
+        }
+        .task(id: provider == .chatgpt ? state.settings.codexPath : nil) {
+            guard provider == .chatgpt else { return }
+            codexModels = await CodexRunner.models(codexPath: state.settings.codexPath)
+        }
+    }
+
+    private static func symbol(_ level: Level) -> (name: String, tint: Color) {
+        switch level {
+        case .medium: ("gauge.with.dots.needle.33percent", .green)
+        case .high: ("gauge.with.dots.needle.67percent", .blue)
+        case .max: ("gauge.with.dots.needle.100percent", .purple)
         }
     }
 
@@ -91,11 +116,9 @@ private struct ClaudeSection: View {
 }
 
 private struct ChatGPTSection: View {
-    static let efforts = ["low", "medium", "high", "xhigh", "max"]
     @Binding var settings: RetextSettings
     /// nil while checking; then the login state, or nil again when Codex can't be run.
     @State private var loggedIn: Bool??
-    @State private var models: [String] = []
 
     var body: some View {
         Section {
@@ -126,8 +149,17 @@ private struct ChatGPTSection: View {
         .task(id: settings.codexPath) {
             loggedIn = nil
             loggedIn = .some(await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath))
-            models = await CodexRunner.models(codexPath: settings.codexPath)
         }
+    }
+}
+
+/// The per-level ChatGPT models and efforts: a user choice, so above the setup.
+private struct ChatGPTModelsSection: View {
+    static let efforts = ["low", "medium", "high", "xhigh", "max"]
+    @Binding var settings: RetextSettings
+    let models: [String]
+
+    var body: some View {
         Section {
             ForEach(Level.allCases, id: \.self) { level in
                 let base = Provider.chatgpt.defaultModel(level)
@@ -147,7 +179,7 @@ private struct ChatGPTSection: View {
                 }
             }
         } header: {
-            Text("ChatGPT models")
+            Text("ChatGPT Models")
         } footer: {
             Text("If a run says the model isn't available, pick another model or effort for that level; the list comes from codex debug models.")
                 .foregroundStyle(.secondary)
@@ -217,22 +249,6 @@ private struct CustomAPISection: View {
                           : "Any OpenAI-compatible Chat Completions API (http only on the local network); the key is kept in the macOS Keychain and sent only to this URL's server.")
                 .foregroundStyle(keyError ? Color.orange : .secondary)
         }
-        Section {
-            ForEach(Level.allCases, id: \.self) { level in
-                LabeledContent(level.title) {
-                    HStack {
-                        TextField("Model", text: field(level, \.model), prompt: Text("Model id"))
-                        TextField("Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
-                    }
-                    .labelsHidden()
-                }
-            }
-        } header: {
-            Text("Models")
-        } footer: {
-            Text("The model id the API expects for each level; effort is sent as reasoning_effort only when set.")
-                .foregroundStyle(.secondary)
-        }
     }
 
     /// Read from the Keychain on each render (attributes only), so it follows the base URL's host as it changes.
@@ -249,6 +265,30 @@ private struct CustomAPISection: View {
         key = ""
         keyVersion += 1
         state.checkProvider()
+    }
+}
+
+/// The model id for each level of the custom API: a user choice, so above the setup.
+private struct CustomModelsSection: View {
+    @Binding var custom: CustomProviderSettings
+
+    var body: some View {
+        Section {
+            ForEach(Level.allCases, id: \.self) { level in
+                LabeledContent(level.title) {
+                    HStack {
+                        TextField("Model", text: field(level, \.model), prompt: Text("Model id"))
+                        TextField("Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
+                    }
+                    .labelsHidden()
+                }
+            }
+        } header: {
+            Text("Custom API Models")
+        } footer: {
+            Text("The model id the API expects for each level; effort is sent as reasoning_effort only when set.")
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func field(_ level: Level, _ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
