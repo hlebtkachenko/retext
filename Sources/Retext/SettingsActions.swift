@@ -1,26 +1,31 @@
 import AppKit
 import RetextCore
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// The action list: drag a row (or use its context menu or VoiceOver actions) to reorder, click it to edit in a sheet.
+/// The action list. Clicking a row opens its editor; dragging it, its context menu or the VoiceOver actions reorder it.
+/// The rows are their own drop targets because a grouped Form on macOS never calls `onMove`; the list rearranges
+/// itself while the pointer passes over it, so the drop only ends the drag.
 struct ActionsPane: View {
     @Binding var actions: [CustomAction]
+    /// The row a drag picked up; nil when nothing is being dragged.
+    @State private var draggedID: CustomAction.ID?
     /// The action the sheet edits; a new action is only added when its sheet is saved.
     @State private var editing: CustomAction?
     @State private var confirmRestore = false
     @State private var confirmDelete: CustomAction?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
-            Section {
-                IntroCard(symbol: "bolt.fill", text: "Saved instructions you run from the bar or with ⌥1…⌥9.")
-            }
+            PageDescription(.actions)
             Section {
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                    ActionRow(action: action, index: index, count: actions.count, open: { editing = action },
-                              move: { move(action.id, by: $0) }, delete: { confirmDelete = action })
+                    ActionRow(action: action, index: index, count: actions.count, isDragged: draggedID == action.id,
+                              open: { editing = action }, move: { move(action.id, by: $0) }, delete: { confirmDelete = action })
+                        .onDrag { pickUp(action.id) }
+                        .onDrop(of: [.retextActionRow], delegate: reorderDelegate(over: action.id))
                 }
-                .onMove { actions.move(fromOffsets: $0, toOffset: $1) }
             }
             Section {
                 HStack {
@@ -35,6 +40,8 @@ struct ActionsPane: View {
                 }
             }
         }
+        .onDrop(of: [.retextActionRow], delegate: reorderDelegate(over: nil))
+        .task(id: draggedID) { await endDragOnMouseUp() }
         .sheet(item: $editing) { action in
             ActionSheet(action: action, isNew: !actions.contains { $0.id == action.id },
                         save: save, delete: { delete(action.id); editing = nil })
@@ -78,51 +85,118 @@ struct ActionsPane: View {
         guard let i = actions.firstIndex(where: { $0.id == id }), actions.indices.contains(i + offset) else { return }
         actions.swapAt(i, i + offset)
     }
+
+    private func reorderDelegate(over target: CustomAction.ID?) -> ReorderDropDelegate {
+        ReorderDropDelegate(target: target, actions: $actions, draggedID: $draggedID, reduceMotion: reduceMotion)
+    }
+
+    /// Starts a drag of the row. The id travels in a type only this process can read, so another app offered the drag
+    /// (TextEdit, a browser field) finds nothing it accepts and a text drag from elsewhere never reorders the list.
+    private func pickUp(_ id: CustomAction.ID) -> NSItemProvider {
+        draggedID = id
+        let payload = Data(id.uuidString.utf8)
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.retextActionRow.identifier, visibility: .ownProcess) { deliver in
+            deliver(payload, nil)
+            return nil
+        }
+        return provider
+    }
+
+    /// A drag released outside the window reaches none of the delegates here, so this watches the mouse instead:
+    /// with every button up, the drag is over and the row stops looking picked up.
+    private func endDragOnMouseUp() async {
+        guard draggedID != nil else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(200))
+            if NSEvent.pressedMouseButtons == 0 {
+                draggedID = nil
+                return
+            }
+        }
+    }
 }
 
-/// Icon, title, kind and shortcut. A tap gesture, not a Button, so the row can still be dragged; keyboard and
-/// VoiceOver users open it with Return or the default action and reorder with the named actions.
+extension UTType {
+    /// The pasteboard type of a dragged action row, private to Retext.
+    fileprivate static let retextActionRow = UTType(exportedAs: "dev.hapd.retext.action-id")
+}
+
+/// Takes drops of Retext's own action rows. Over a row (`target`), the dragged action moves to that row's place as
+/// soon as the pointer arrives; over the rest of the pane (`target` nil), it accepts the drop only to end the drag.
+private struct ReorderDropDelegate: DropDelegate {
+    let target: CustomAction.ID?
+    @Binding var actions: [CustomAction]
+    @Binding var draggedID: CustomAction.ID?
+    let reduceMotion: Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggedID != nil && info.hasItemsConforming(to: [.retextActionRow])
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let target, let draggedID, target != draggedID,
+              let from = actions.firstIndex(where: { $0.id == draggedID }),
+              let to = actions.firstIndex(where: { $0.id == target }) else { return }
+        // `move(toOffset:)` counts the offset before the moved row is taken out, hence the + 1 when moving down.
+        withAnimation(reduceMotion ? nil : .snappy) {
+            actions.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedID = nil
+        return true
+    }
+}
+
+/// One action: a drag handle, then the icon, title, kind and ⌥ shortcut as a plain button that opens the editor.
+/// The whole row is the drag source; reordering without a pointer goes through the context menu or VoiceOver.
 private struct ActionRow: View {
     let action: CustomAction
     let index: Int, count: Int
+    /// Dimmed and tinted while it is the row being dragged.
+    let isDragged: Bool
     let open: () -> Void
     let move: (Int) -> Void
     let delete: () -> Void
 
     var body: some View {
-        content
-            .padding(.vertical, 2)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: open)
-            .focusable(interactions: .activate)
-            .onKeyPress(.return) { open(); return .handled }
-            .contextMenu {
-                Button("Edit…", systemImage: "pencil", action: open)
-                Divider()
-                Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(index == 0)
-                Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(index == count - 1)
-                Divider()
-                Button("Delete…", systemImage: "trash", role: .destructive, action: delete)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(action.title), \(kindName(action.kind)), Option \(index + 1)")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Opens the editor")
-            .accessibilityAction(.default, open)
-            .accessibilityAction(named: "Move Up") { move(-1) }
-            .accessibilityAction(named: "Move Down") { move(1) }
-    }
-
-    private var content: some View {
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(.tertiary)
-                .help("Drag to reorder")
                 .accessibilityHidden(true)
-            IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title) {
-                shortcut
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                .help("Drag to reorder")
+            Button(action: open) {
+                IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title) {
+                    shortcut
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(action.title), \(kindName(action.kind)), Option \(index + 1)")
+            .accessibilityHint("Opens the editor")
+            .accessibilityAction(named: "Move Up") { move(-1) }
+            .accessibilityAction(named: "Move Down") { move(1) }
+        }
+        .padding(.vertical, 2)
+        .opacity(isDragged ? 0.5 : 1)
+        .background {
+            if isDragged {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor.opacity(0.12)).padding(-4)
+            }
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Edit…", systemImage: "pencil", action: open)
+            Divider()
+            Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(index == 0)
+            Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(index == count - 1)
+            Divider()
+            Button("Delete…", systemImage: "trash", role: .destructive, action: delete)
         }
     }
 
@@ -201,10 +275,8 @@ private struct ActionSheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Prompt").font(.headline)
                     Spacer()
-                    Menu("Insert Example", systemImage: "plus") {
-                        ForEach(Self.examples, id: \.self) { example in
-                            Button(example) { insert(example) }
-                        }
+                    PullDownButton("Insert Example", systemImage: "plus") {
+                        Self.examples.map { example in .action(example) { insert(example) } }
                     }
                     .fixedSize()
                     .help("Adds an example instruction to the end of the prompt")

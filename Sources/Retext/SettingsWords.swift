@@ -6,14 +6,13 @@ import SwiftUI
 struct WordsPane: View {
     @Binding var settings: RetextSettings
     @State private var newWord = ""
+    @State private var pasting = false
     /// The add field takes the focus, so typing on opening the pane never overwrites a saved word.
     @FocusState private var adding: Bool
 
     var body: some View {
         Form {
-            Section {
-                IntroCard(symbol: "lock.fill", text: "Names and terms Retext keeps as written, even in translations.")
-            }
+            PageDescription(.words)
             Section {
                 ForEach(settings.protectedWords, id: \.self) { word in
                     WordRow(word: word,
@@ -28,10 +27,22 @@ struct WordsPane: View {
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
-                Text("Click a word to edit it.").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Click a word to edit it.").foregroundStyle(.secondary)
+                    HStack {
+                        Button("Paste List…", systemImage: "list.bullet.clipboard") { pasting = true }
+                        Spacer()
+                    }
+                }
             }
         }
-        .onAppear { adding = true }
+        .onAppear {
+            adding = true
+            if SettingsView.demoExtra == "paste" { pasting = true }
+        }
+        .sheet(isPresented: $pasting) {
+            PasteListSheet(existing: settings.protectedWords) { settings.addProtectedWords($0) }
+        }
     }
 
     private func add() {
@@ -78,5 +89,41 @@ private struct WordRow: View {
         guard draft != word else { return }
         commit(draft)
         draft = word
+    }
+}
+
+/// A long list pasted at once: one word per line or separated by commas; words already in the list are skipped.
+private struct PasteListSheet: View {
+    /// The words already protected, so the count covers only the new ones.
+    let existing: [String]
+    let add: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+
+    var body: some View {
+        let count = RetextSettings.terms(in: text).filter { !existing.contains($0) }.count
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Paste a List of Words").font(.headline)
+            Text("One word per line, or separated by commas. Words already in the list are skipped.").foregroundStyle(.secondary)
+            TextEditor(text: $text)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color(nsColor: .separatorColor))
+                }
+                .frame(minHeight: 180)
+                .accessibilityLabel("Words")
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(count == 1 ? "Add 1 Word" : "Add \(count) Words") { add(text); dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(count == 0)
+            }
+        }
+        .padding()
+        .frame(width: 440)
     }
 }

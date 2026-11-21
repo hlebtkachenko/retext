@@ -14,5 +14,13 @@
     <key>LSUIElement</key><true/>
     <key>RetextRepository</key><string>hlebtkachenko/retext</string>
     <key>RetextWebsite</key><string>https://retext.hapd.dev</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>dev.hapd.retext.action-id</string>
+            <key>UTTypeDescription</key><string>Retext action row</string>
+            <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+        </dict>
+    </array>
 </dict>
 </plist>

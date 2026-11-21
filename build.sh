@@ -35,6 +35,9 @@ printf '%s\n' ./Contents/Info.plist ./Contents/MacOS/Retext ./Contents/Resources
     ./Contents/Resources/Assets.car ./Contents/_CodeSignature/CodeResources | sort > "$icon/expected"
 prune "$app" "$icon/expected" build
 codesign --force --options runtime --sign "$identity" "$app"
+if [[ "$identity" == "-" ]]; then
+    echo "Signed ad-hoc: grant Accessibility to Retext again after installing (see .sign-identity in AGENTS.md)." >&2
+fi
 
 [[ "${1:-}" == "--no-install" ]] && exit 0
 pkill -x Retext || true

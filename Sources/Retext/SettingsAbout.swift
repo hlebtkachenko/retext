@@ -20,18 +20,24 @@ struct AboutPane: View {
     var body: some View {
         let page = Identity.pageURL(repository: UpdateChecker.repository)
         Form {
+            PageDescription(.about)
             Section {
                 hero
             }
             .listRowBackground(Color.clear)
             Section {
-                GetStartedCard()
+                IconRow(symbol: "hand.wave.fill", tint: .blue, title: "Onboarding",
+                        subtitle: "Grant access, pick your AI and try the shortcut.") {
+                    Button("Start") { OnboardingWindow.shared.show() }
+                }
             }
-            Section("Status") {
+            Section {
                 AccessibilityRow()
                 ProviderRow()
+            } header: {
+                SectionTitle("Status")
             }
-            Section("Updates") {
+            Section {
                 if let update = state.update { UpdateCard(release: update) }
                 IconRow(symbol: "arrow.triangle.2.circlepath", tint: .blue, title: "Check for Updates Automatically") {
                     Toggle("Check for Updates Automatically", isOn: $state.settings.checkForUpdates).labelsHidden().toggleStyle(.switch)
@@ -42,6 +48,8 @@ struct AboutPane: View {
                     Button("Check Now") { state.checkForUpdatesNow() }.disabled(state.checkingForUpdates)
                 }
                 if let result = state.updateCheckResult { ResultLine(result: result) }
+            } header: {
+                SectionTitle("Updates")
             }
             Section {
                 if let website = Self.website {
@@ -53,7 +61,7 @@ struct AboutPane: View {
                 LinkRow(title: "Changelog", destination: page.appending(path: "blob/HEAD/CHANGELOG.md")) { Image(systemName: "doc.text") }
                 LinkRow(title: "Report an Issue", destination: page.appending(path: "issues/new")) { Image(systemName: "exclamationmark.bubble") }
             } header: {
-                Text("Links")
+                SectionTitle("Links")
             } footer: {
                 Text("Not affiliated with Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.")
                     .font(.footnote).foregroundStyle(.tertiary)
@@ -69,10 +77,6 @@ struct AboutPane: View {
                 .accessibilityHidden(true)
             Text("Retext").font(.largeTitle.bold())
             Text(AppVersion.full).foregroundStyle(.secondary).textSelection(.enabled)
-            Text("Fixes, rewrites or translates the text you select in any app, in place.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -121,22 +125,6 @@ private struct UpdateCard: View {
                 .padding(.leading, 34)
         }
         .padding(.vertical, 4)
-    }
-}
-
-/// The Raycast "Watch Video" card, without a video: opens Onboarding.
-private struct GetStartedCard: View {
-    var body: some View {
-        HStack(spacing: 14) {
-            SidebarTile(symbol: "hand.wave.fill", tint: .accentColor, size: 48)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Onboarding").font(.headline)
-                Text("Grant access, pick your AI and try the shortcut.").foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            Button("Start") { OnboardingWindow.shared.show() }.controlSize(.large)
-        }
-        .padding(.vertical, 6)
     }
 }
 
