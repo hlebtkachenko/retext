@@ -606,7 +606,7 @@ private struct GeneralPane: View {
             } header: {
                 Text("History")
             } footer: {
-                Text("The last \(History.limit) results, with their original text, are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
+                Text("The last \(History.limit) results and the first \(HistoryEntry.inputLimit) characters of each selection are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
                     .foregroundStyle(.secondary)
             }
             Section {
