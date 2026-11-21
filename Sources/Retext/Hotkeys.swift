@@ -24,7 +24,8 @@ enum Hotkeys {
     /// Run by the Carbon fallback hotkey (set by `startFallback`); nil until then, so tests and demos never register it.
     private static var fallback: (@MainActor () -> Void)?
     private static var fallbackRef: EventHotKeyRef?
-    /// The key and Carbon modifiers `fallbackRef` holds, so a settings change re-registers only when the shortcut changed.
+    /// The key and Carbon modifiers last tried (registered or refused), so a settings change or the launch retry tries
+    /// again, and logs, only when the shortcut changed.
     private static var fallbackShortcut: (key: UInt32, modifiers: UInt32)?
     private static var fallbackHandlerInstalled = false
     /// The bar shortcut's modifiers as Carbon bits (⌥ by default).
@@ -108,13 +109,13 @@ enum Hotkeys {
         if let current = fallbackShortcut, current == shortcut { return }
         unregisterFallback()
         installFallbackHandler()
+        fallbackShortcut = shortcut
         var ref: EventHotKeyRef?
         // "RTXT": Retext's signature for its one hotkey.
         let status = RegisterEventHotKey(shortcut.key, shortcut.modifiers, EventHotKeyID(signature: 0x5254_5854, id: 1),
                                          GetApplicationEventTarget(), 0, &ref)
         if status == noErr, let ref {
             fallbackRef = ref
-            fallbackShortcut = shortcut
         } else {
             // Another app owns the combo: carry on without the fallback.
             log.error("RegisterEventHotKey failed for the bar shortcut: OSStatus \(status, privacy: .public)")
