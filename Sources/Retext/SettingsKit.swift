@@ -11,26 +11,35 @@ struct IconRow<Trailing: View>: View {
     let tint: Color
     let title: String
     var subtitle: String?
+    /// A fixed title column (one line): the trailing controls then start right after it and may fill the rest,
+    /// so rows with the same width line up. Without it, the controls sit at the trailing edge.
+    var titleWidth: CGFloat?
     let trailing: Trailing
 
-    init(symbol: String, tint: Color, title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+    init(symbol: String, tint: Color, title: String, subtitle: String? = nil, titleWidth: CGFloat? = nil,
+         @ViewBuilder trailing: () -> Trailing) {
         self.symbol = symbol
         self.tint = tint
         self.title = title
         self.subtitle = subtitle
+        self.titleWidth = titleWidth
         self.trailing = trailing()
     }
 
     var body: some View {
         HStack(spacing: 10) {
             IconTile(symbol: symbol, tint: tint)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                if let subtitle {
-                    Text(subtitle).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let titleWidth {
+                Text(title).lineLimit(1).frame(width: titleWidth, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                    if let subtitle {
+                        Text(subtitle).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                Spacer(minLength: 8)
             }
-            Spacer(minLength: 8)
             trailing
         }
     }
@@ -62,6 +71,7 @@ private struct IconTile: View {
 
 /// The first section of a pane: what the page is for, in plain secondary text on the window background.
 /// Put it first in the pane's `Form`: `PageDescription(.actions)`, or `PageDescription("Any text.")`.
+/// The one exception is About, which shows `Pane.about.summary` in its hero, under the app's name.
 struct PageDescription: View {
     let text: String
 
@@ -94,7 +104,7 @@ struct SectionTitle: View {
 }
 
 extension SettingsView.Pane {
-    /// The sentence `PageDescription` shows at the top of the pane.
+    /// The sentence `PageDescription` shows at the top of the pane (About shows it in its hero instead).
     var summary: String {
         switch self {
         case .about: "Fixes, rewrites or translates the text you select in any app, in place."
@@ -111,17 +121,23 @@ extension SettingsView.Pane {
 /// A bordered pop-up button showing the chosen value and up-down chevrons, as in System Settings.
 /// A SwiftUI `Picker` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
 /// Use it as a row's trailing control: `PopUpPicker("Provider", selection: $provider, options: Provider.allCases) { $0.title }.fixedSize()`.
-/// `title` is the VoiceOver label; the row shows the visible title.
+/// `title` is the VoiceOver label; the row shows the visible title. With `width`, the bordered button is exactly that wide
+/// (`.fixed`) or as wide as offered (`.fill`), and a long title truncates, so pop-ups in a column line up; without it,
+/// it takes its title's width.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
+    enum Width { case fixed(CGFloat), fill }
+
     let title: String
     @Binding var selection: Value
     let options: [Value]
+    var width: Width?
     let label: (Value) -> String
 
-    init(_ title: String, selection: Binding<Value>, options: [Value], label: @escaping (Value) -> String) {
+    init(_ title: String, selection: Binding<Value>, options: [Value], width: Width? = nil, label: @escaping (Value) -> String) {
         self.title = title
         _selection = selection
         self.options = options
+        self.width = width
         self.label = label
     }
 
@@ -133,9 +149,24 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
         button.bezelStyle = .flexiblePush
         button.target = context.coordinator
         button.action = #selector(Coordinator.choose(_:))
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        // A fixed width must win over the title's width, or SwiftUI centers the button at its intrinsic size.
+        let priority: NSLayoutConstraint.Priority = width == nil ? .required : .defaultLow
+        button.setContentHuggingPriority(priority, for: .horizontal)
+        button.setContentCompressionResistancePriority(priority, for: .horizontal)
+        if width != nil { button.cell?.lineBreakMode = .byTruncatingTail }
         return button
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
+        let intrinsic = nsView.intrinsicContentSize
+        switch width {
+        case nil: return nil
+        case .fixed(let fixed): return CGSize(width: fixed, height: intrinsic.height)
+        case .fill:
+            // An unspecified or infinite proposal (an ideal-size query) gets the title's width.
+            let offered = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? intrinsic.width
+            return CGSize(width: offered, height: intrinsic.height)
+        }
     }
 
     func updateNSView(_ button: NSPopUpButton, context: Context) {

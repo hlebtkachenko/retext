@@ -14,6 +14,9 @@ enum DemoData {
         settings.appStyles = [AppStyle(bundleID: "com.apple.MobileSMS", style: "Casual and short, no greetings."),
                               AppStyle(bundleID: "com.apple.mail", style: "")]
         settings.onboarded = true
+        // One effort-only and one model-only override, so the AI pane shows both kinds next to the defaults.
+        settings.claudeModels = [.high: ProviderModel(effort: "high"), .max: ProviderModel(model: "fable")]
+        settings.chatGPTModels = [.high: ProviderModel(effort: "medium")]
         return settings
     }()
 

@@ -5,7 +5,8 @@ import Testing
 @Suite struct ProviderSettingsTests {
     @Test func oldSettingsLoadAsClaude() throws {
         let settings = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"actions":[],"claudePath":"/x/claude"}"#.utf8))
-        #expect(settings.provider == .claude && settings.codexPath.isEmpty && settings.chatGPTModels.isEmpty)
+        #expect(settings.provider == .claude && settings.codexPath.isEmpty && settings.chatGPTModels.isEmpty
+                && settings.claudeModels.isEmpty)
         #expect(settings.custom == CustomProviderSettings())
         #expect(settings.model(for: .high) == ProviderModel(model: Model.sonnet, effort: "medium"))
     }
@@ -14,9 +15,10 @@ import Testing
         var settings = RetextSettings()
         settings.provider = .custom
         settings.chatGPTModels[.high] = ProviderModel(model: "gpt-x", effort: "")
+        settings.claudeModels[.max] = ProviderModel(model: "", effort: "high")
         settings.custom = CustomProviderSettings(baseURL: "http://localhost:11434/v1", models: [.medium: ProviderModel(model: "llama", effort: "low")])
         let json = String(decoding: try settings.encoded(), as: UTF8.self)
-        #expect(json.contains(#""chatGPTModels" : {"#) && json.contains(#""high" : {"#))
+        #expect(json.contains(#""chatGPTModels" : {"#) && json.contains(#""claudeModels" : {"#) && json.contains(#""high" : {"#))
         #expect(!json.lowercased().contains("key\""))  // no API key field
         let back = try JSONDecoder().decode(RetextSettings.self, from: Data(json.utf8))
         #expect(back == settings)
@@ -34,7 +36,26 @@ import Testing
         settings.chatGPTModels[.max] = ProviderModel(model: " gpt-5.6-luna ", effort: "")
         settings.chatGPTModels[.high] = ProviderModel(model: "", effort: "low")
         #expect(settings.model(for: .max) == ProviderModel(model: "gpt-5.6-luna", effort: "max"))
-        #expect(settings.model(for: .high) == ProviderModel(model: "gpt-5.6-terra", effort: "high"))
+        #expect(settings.model(for: .high) == ProviderModel(model: "gpt-5.6-terra", effort: "low"))
+    }
+
+    /// Model only, effort only, both and none, for both providers with built-in models.
+    @Test(arguments: [Provider.claude, .chatgpt])
+    func overridesApplyPerField(provider: Provider) {
+        var settings = RetextSettings()
+        settings.provider = provider
+        let base = provider.defaultModel(.high)
+        #expect(settings.model(for: .high) == base)
+        let overrides: [(ProviderModel, ProviderModel)] = [
+            (ProviderModel(model: "m-own", effort: ""), ProviderModel(model: "m-own", effort: base.effort)),
+            (ProviderModel(model: "", effort: "xhigh"), ProviderModel(model: base.model, effort: "xhigh")),
+            (ProviderModel(model: "m-own", effort: "xhigh"), ProviderModel(model: "m-own", effort: "xhigh")),
+            (ProviderModel(model: " ", effort: ""), base),
+        ]
+        for (own, expected) in overrides {
+            if provider == .claude { settings.claudeModels[.high] = own } else { settings.chatGPTModels[.high] = own }
+            #expect(settings.model(for: .high) == expected)
+        }
     }
 
     @Test func jobsUseTheActiveProvider() {

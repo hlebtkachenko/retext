@@ -142,6 +142,7 @@ import Testing
         #expect(today.costUSD == 1.0)
         #expect(Model.shortName("claude-sonnet-5-5") == "Sonnet" && Model.shortName("opus") == "Opus")
         #expect(Model.shortName("claude-opus-5-5") == "Opus" && Model.shortName("other-model") == "other-model")
+        #expect(Model.shortName("fable") == "Fable" && Model.shortName("claude-fable-5") == "Fable")
         usage.recordCall(model: "claude-haiku-4-5-20251001", output: output)
         usage.recordCall(model: Model.haiku, output: output)
         #expect(usage.today.callsByModel.map(\.name) == ["Haiku", "Sonnet"])

@@ -19,8 +19,8 @@ struct AboutPane: View {
 
     var body: some View {
         let page = Identity.pageURL(repository: UpdateChecker.repository)
+        // The one pane without `PageDescription`: its summary sits in the hero, under the name.
         Form {
-            PageDescription(.about)
             Section {
                 hero
             }
@@ -76,6 +76,10 @@ struct AboutPane: View {
                 .frame(width: 96, height: 96)
                 .accessibilityHidden(true)
             Text("Retext").font(.largeTitle.bold())
+            Text(SettingsView.Pane.about.summary)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Text(AppVersion.full).foregroundStyle(.secondary).textSelection(.enabled)
         }
         .frame(maxWidth: .infinity)

@@ -18,7 +18,8 @@ final class AppState: ObservableObject {
             }
             if settings.provider != oldValue.provider || settings.claudePath != oldValue.claudePath
                 || settings.codexPath != oldValue.codexPath || settings.custom != oldValue.custom
-                || settings.chatGPTModels != oldValue.chatGPTModels { checkProvider() }
+                || settings.chatGPTModels != oldValue.chatGPTModels
+                || settings.claudeModels != oldValue.claudeModels { checkProvider() }
         }
     }
     /// The active provider's local check; nil until the first check. The menu shows its problem.
