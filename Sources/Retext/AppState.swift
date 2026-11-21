@@ -50,12 +50,16 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Counts provider checks, so a slow older check never overwrites a newer one's answer.
+    private var providerCheck = 0
+
     /// Checks the active provider again (after a settings change, a key change or a failed run).
     func checkProvider() {
-        let settings = settings
+        providerCheck += 1
+        let generation = providerCheck, settings = settings
         Task.detached {
             let status = ProviderStatus.check(settings)
-            await MainActor.run { if AppState.shared.settings.provider == settings.provider { AppState.shared.providerStatus = status } }
+            await MainActor.run { if AppState.shared.providerCheck == generation { AppState.shared.providerStatus = status } }
         }
     }
 }
