@@ -68,7 +68,7 @@ import Testing
 
     @Test func loadKeepsOlderEntriesAsTheyAre() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("retext-history-\(UUID()).json")
-        // history.json as 1.4 writes it: pretty-printed, the start of the selection only, no level.
+        // history.json as 1.4.0 writes it: pretty-printed, the whole selection, no level.
         let json = #"""
         {
           "entries" : [
@@ -76,7 +76,7 @@ import Testing
               "appName" : "Mail",
               "costUSD" : 0.001,
               "date" : "2026-01-01T00:00:00Z",
-              "input" : "Thanks for the quick reply, I has",
+              "input" : "Thanks for the quick reply,\nI has attached the file.",
               "inputTokens" : 1,
               "key" : "k",
               "model" : "haiku",
@@ -89,10 +89,23 @@ import Testing
         """#
         try Data(json.utf8).write(to: url)
         let entry = try #require(History.load(from: url).lookup("k"))
-        #expect(entry.input == "Thanks for the quick reply, I has" && entry.output == "out" && entry.outputTokens == 2)
-        #expect(entry.isShortened && entry.provider == nil && entry.durationSeconds == nil && entry.kind == nil)
+        #expect(entry.input == "Thanks for the quick reply,\nI has attached the file." && entry.output == "out" && entry.outputTokens == 2)
+        #expect(!entry.isShortened && entry.level == nil && entry.provider == nil && entry.durationSeconds == nil && entry.kind == nil)
         // Not saved back on load.
         #expect(try String(contentsOf: url, encoding: .utf8) == json)
+    }
+
+    @Test func entriesFromBuildsBeforeFullHistoryAreShortened() throws {
+        // A build from main between 1.4.0 and full history saved `Engine.normalize(input).prefix(60)` and no level.
+        let start = "Thanks for the quick reply, I has attached the file you aske"
+        #expect(start.count == HistoryEntry.legacyInputLimit)
+        let old = HistoryEntry(key: "k", appName: "Mail", title: "Fix", input: start, output: "out", model: "haiku",
+                               inputTokens: 1, outputTokens: 2, costUSD: 0)
+        #expect(old.isShortened)
+        // The same text with a level is a full-history entry.
+        let full = HistoryEntry(key: "k", appName: "Mail", title: "Fix", input: start, output: "out", level: .medium, model: "haiku",
+                                inputTokens: 1, outputTokens: 2, costUSD: 0)
+        #expect(!full.isShortened)
     }
 
     @Test func selectionLimit() {

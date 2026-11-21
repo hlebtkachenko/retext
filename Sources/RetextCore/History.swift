@@ -1,7 +1,8 @@
 import Foundation
 
-/// One result: the whole selection, the whole answer and how it was made. Entries saved before full history have no
-/// `level` and only the start of the selection as `input`; the newer fields are optional so those files still decode.
+/// One result: the whole selection, the whole answer and how it was made. The fields added after 1.4.0 are optional, so
+/// older files decode: 1.4.0 and earlier saved the whole selection without a `level`; builds from main between 1.4.0 and
+/// full history saved only its first `legacyInputLimit` characters (normalized), also without a `level`.
 public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public var id: String { key + date.description }
     /// The cache key (`Engine.cacheKey`): provider, model, effort, prompt and the whole selection.
@@ -19,7 +20,7 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public let bundleID: String?
     /// nil for a typed instruction (and older entries).
     public let kind: ActionKind?
-    /// nil only for older entries, which kept just the start of the selection.
+    /// nil only for entries saved before full history.
     public let level: Level?
     public let provider: Provider?
     public let effort: String?
@@ -47,8 +48,12 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
         self.durationSeconds = durationSeconds
     }
 
-    /// Saved before full history: `input` is only the start of the selection.
-    public var isShortened: Bool { level == nil }
+    /// How many characters of the selection the builds between 1.4.0 and full history kept.
+    public static let legacyInputLimit = 60
+
+    /// Saved by a build between 1.4.0 and full history: `input` is only the start of the selection. A 1.4.0 entry has no
+    /// level either, but its whole selection; one that was exactly 60 characters long is marked too, which is harmless.
+    public var isShortened: Bool { level == nil && input.count == Self.legacyInputLimit }
 }
 
 extension HistoryRetention {

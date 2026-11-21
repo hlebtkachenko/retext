@@ -36,9 +36,9 @@ enum DemoData {
                                 effort: model.effort, inputTokens: 180 + 40 * i, outputTokens: 24 + 6 * i,
                                 costUSD: 0.0012 * Double(i + 1), durationSeconds: 1.4 + 0.7 * Double(i))
         }
-        // Saved before full history: no level, only the start of the selection.
+        // Saved by a build between 1.4.0 and full history: no level, only the first 60 characters of the selection.
         entries.append(HistoryEntry(key: "demo-old", date: Date().addingTimeInterval(-86_400 * 3), appName: "Mail", title: "Fix grammar",
-                                    input: "Thanks for the quick reply, I has", output: "Thanks for the quick reply, I have attached the file.",
+                                    input: "Thanks for the quick reply, I has attached the file you aske", output: "Thanks for the quick reply, I have attached the file.",
                                     model: Model.haiku, inputTokens: 160, outputTokens: 18, costUSD: 0.001))
         return History(entries: entries)
     }()
