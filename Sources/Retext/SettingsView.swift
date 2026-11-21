@@ -10,7 +10,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     static let shared = SettingsWindow()
     private(set) var window: NSWindow?
 
-    /// With a pane, opens on it (rebuilding the content, since the sidebar selection is view state).
+    /// With a pane, opens on it (rebuilding the content, since the sidebar selection is view state). The title is set
+    /// here, before SwiftUI's first update: navigationTitle renames the window when another pane is picked, but leaves
+    /// "Untitled" when it opens on a pane other than Overview, and a title set from the view resets the pane's state.
     func show(_ pane: SettingsView.Pane? = nil) {
         if let pane {
             SettingsView.initialPane = pane
@@ -18,10 +20,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                 let frame = window.frame
                 window.contentViewController = NSHostingController(rootView: SettingsView())
                 window.setFrame(frame, display: false)
+                window.title = pane.rawValue
             }
         }
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
+            w.title = SettingsView.initialPane.rawValue
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.setContentSize(NSSize(width: 760, height: 620))
             w.center()
@@ -82,12 +86,6 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .navigationTitle((pane ?? .overview).rawValue)
-        }
-        // navigationTitle alone leaves "Untitled" when the window opens on a pane other than Overview. The first call
-        // runs before SettingsWindow has stored the new window, hence the next main-loop turn.
-        .onChange(of: pane, initial: true) {
-            let title = (pane ?? .overview).rawValue
-            DispatchQueue.main.async { SettingsWindow.shared.window?.title = title }
         }
     }
 }
