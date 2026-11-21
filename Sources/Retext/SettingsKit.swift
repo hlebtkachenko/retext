@@ -1,3 +1,4 @@
+import AppKit
 import RetextCore
 import SwiftUI
 
@@ -68,12 +69,16 @@ struct PageDescription: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
+        // A header with no rows: a row, even with a clear background, sits on the section's tile.
         Section {
+        } header: {
             Text(text)
+                .font(.body)
+                .fontWeight(.regular)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 12)
         }
-        .listRowBackground(Color.clear)
     }
 }
 
@@ -92,18 +97,136 @@ extension SettingsView.Pane {
     }
 }
 
-extension View {
-    /// A pop-up button with a border, the chosen value and up-down chevrons, like a pop-up in System Settings.
-    /// Put it on a `Picker` in a grouped Form, usually with `.labelsHidden()` when the row shows the title:
-    /// `Picker("Provider", selection: $provider) { ... }.labelsHidden().borderedPopUp()`.
-    func borderedPopUp() -> some View {
-        pickerStyle(.menu).buttonStyle(.bordered).fixedSize()
+/// A bordered pop-up button showing the chosen value and up-down chevrons, as in System Settings.
+/// A SwiftUI `Picker` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
+/// Use it as a row's trailing control: `PopUpPicker("Provider", selection: $provider, options: Provider.allCases) { $0.title }`.
+/// `title` is the VoiceOver label; the row shows the visible title.
+struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
+    let title: String
+    @Binding var selection: Value
+    let options: [Value]
+    let label: (Value) -> String
+
+    init(_ title: String, selection: Binding<Value>, options: [Value], label: @escaping (Value) -> String) {
+        self.title = title
+        _selection = selection
+        self.options = options
+        self.label = label
     }
 
-    /// A pull-down button with a border, the label and one down chevron, for a `Menu` of commands
-    /// (Add App Style, Presets): `Menu("Presets") { ... }.borderedPullDown()`.
-    func borderedPullDown() -> some View {
-        menuStyle(.button).buttonStyle(.bordered).menuIndicator(.visible).fixedSize()
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        // The default push style draws no border on macOS 26; this one keeps the bordered rounded rectangle.
+        button.bezelStyle = .flexiblePush
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.choose(_:))
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.onChoose = { index in
+            if options.indices.contains(index) { selection = options[index] }
+        }
+        let titles = options.map(label)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            // Titles that repeat would collapse into one item with `addItems(withTitles:)`.
+            for title in titles { button.menu?.addItem(withTitle: title, action: nil, keyEquivalent: "") }
+        }
+        button.selectItem(at: options.firstIndex(of: selection) ?? -1)
+        button.setAccessibilityLabel(title)
+        button.isEnabled = context.environment.isEnabled
+    }
+
+    @MainActor final class Coordinator: NSObject {
+        var onChoose: (Int) -> Void = { _ in }
+        @objc func choose(_ sender: NSPopUpButton) { onChoose(sender.indexOfSelectedItem) }
+    }
+}
+
+/// One entry of a `PullDownButton` menu.
+enum PullDownItem {
+    case action(String, image: NSImage? = nil, enabled: Bool = true, perform: @MainActor () -> Void)
+    case submenu(String, image: NSImage? = nil, [PullDownItem])
+    /// A section title (not clickable).
+    case header(String)
+    case separator
+}
+
+/// A bordered pull-down button: the title, an optional symbol and one down chevron, opening a menu of commands.
+/// A SwiftUI `Menu` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
+/// `PullDownButton("Presets", items: [.action("OpenAI") { ... }, .separator, .header("Local"), ...])`;
+/// rebuilt from `items` on every SwiftUI update, so pass the current state.
+struct PullDownButton: NSViewRepresentable {
+    let title: String
+    var systemImage: String?
+    let items: [PullDownItem]
+
+    init(_ title: String, systemImage: String? = nil, items: [PullDownItem]) {
+        self.title = title
+        self.systemImage = systemImage
+        self.items = items
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: true)
+        button.bezelStyle = .flexiblePush
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        let menu = NSMenu()
+        // A pull-down shows its first item as the button's face.
+        let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        face.image = systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        menu.addItem(face)
+        context.coordinator.reset()
+        context.coordinator.add(items, to: menu)
+        button.menu = menu
+        button.isEnabled = context.environment.isEnabled
+    }
+
+    @MainActor final class Coordinator: NSObject {
+        private var actions: [@MainActor () -> Void] = []
+
+        func reset() { actions = [] }
+
+        func add(_ items: [PullDownItem], to menu: NSMenu) {
+            for item in items {
+                switch item {
+                case let .action(title, image, enabled, perform):
+                    let entry = NSMenuItem(title: title, action: enabled ? #selector(run(_:)) : nil, keyEquivalent: "")
+                    entry.target = self
+                    entry.image = image
+                    entry.tag = actions.count
+                    actions.append(perform)
+                    menu.addItem(entry)
+                case let .submenu(title, image, children):
+                    let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                    entry.image = image
+                    let sub = NSMenu(title: title)
+                    add(children, to: sub)
+                    entry.submenu = sub
+                    menu.addItem(entry)
+                case let .header(title):
+                    menu.addItem(.sectionHeader(title: title))
+                case .separator:
+                    menu.addItem(.separator())
+                }
+            }
+        }
+
+        @objc private func run(_ sender: NSMenuItem) {
+            if actions.indices.contains(sender.tag) { actions[sender.tag]() }
+        }
     }
 }
 
