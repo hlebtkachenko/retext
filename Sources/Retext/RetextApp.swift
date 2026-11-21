@@ -220,9 +220,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         return false
     }
 
-    /// The tap needs the Accessibility grant; retry until it is given so no relaunch is needed.
+    /// The tap needs the Accessibility grant; retry until it is given so no relaunch is needed. Creating the tap without
+    /// the grant shows the system prompt, so it is tried only once AXIsProcessTrusted() (which never prompts) says yes:
+    /// a new user sees no prompt before Onboarding's Grant Access….
     private func startHotkeys() {
-        if !Hotkeys.start() { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startHotkeys() } }
+        if !(AXIsProcessTrusted() && Hotkeys.start()) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startHotkeys() }
+        }
     }
 }
 
