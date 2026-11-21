@@ -174,8 +174,8 @@ private struct ActionRow: View {
             return NSItemProvider(object: action.id.uuidString as NSString)
         }
         .onDrop(of: [.text], delegate: ActionDropDelegate(dragging: $dragging, reduceMotion: reduceMotion, moveOnto: moveOnto))
-        // Hover events stop during a drag, so one here means a drag ended where no delegate saw the drop.
-        .onHover { if $0, dragging != nil { dragging = nil } }
+        // With no mouse button down the drag is over, so a drag that ended outside the window stops dimming this row.
+        .onHover { _ in if dragging != nil, NSEvent.pressedMouseButtons == 0 { dragging = nil } }
         .contextMenu {
             Button("Edit…", systemImage: "pencil", action: open)
             Divider()
