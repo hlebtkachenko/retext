@@ -86,7 +86,7 @@ One provider is active at a time; pick it in Settings → AI. Medium, High and M
 
 ## Settings
 
-The sidebar starts with a Retext row (the app icon, its name and the version, or "Update available"); it opens About, the page Settings opens on. Below it are the panes, in this order:
+The sidebar starts with a Retext row (the app icon, its name and the version, or "Update available"); it opens About. Settings opens on About at launch, then on the last pane you used. Below it are the panes, in this order:
 
 - **About:** the version, an Onboarding card (Start opens Onboarding again), Accessibility and provider status (Grant Access…), Updates ("Check for Updates Automatically", the time of the last check with Check Now, and a card when a newer release exists, with Open Release Page and the `git pull && ./build.sh` command for a build from source), and links: Website ([retext.hapd.dev](https://retext.hapd.dev)), GitHub Repository, Changelog and Report an Issue.
 - **General:** Open at Login, Show in Menu Bar, the bar shortcut (see [Shortcuts](#shortcuts)), Preview Before Replacing with a live sample of the preview, Back Up Settings (Export… and Import…; your API key and history aren't included, and an import keeps history, usage and this Mac's Claude Code path, Codex path and API server), Advanced (Improve Electron App Support), and Reset All Settings (Reset… asks first and keeps history and usage).
