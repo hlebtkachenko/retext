@@ -33,7 +33,7 @@ struct EnginePane: View {
                 footer(provider)
             }
             Section {
-                IconRow(symbol: "star.fill", tint: .yellow, title: "Default Level", subtitle: "The bar and ⌥1…⌥9 use it; ↑ and ↓ in the bar change it for one run.") {
+                IconRow(symbol: "star.fill", tint: .yellow, title: "Level", subtitle: "The bar and ⌥1…⌥9 use it; ↑ and ↓ in the bar change it for one run.") {
                     Picker("Default Level", selection: $state.settings.defaultLevel) {
                         ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
