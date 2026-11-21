@@ -261,9 +261,9 @@ private struct ActionSheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Prompt").font(.headline)
                     Spacer()
-                    PullDownButton("Insert Example", systemImage: "plus", items: Self.examples.map { example in
-                        .action(example) { insert(example) }
-                    })
+                    PullDownButton("Insert Example", systemImage: "plus") {
+                        Self.examples.map { example in .action(example) { insert(example) } }
+                    }
                     .fixedSize()
                     .help("Adds an example instruction to the end of the prompt")
                     Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }

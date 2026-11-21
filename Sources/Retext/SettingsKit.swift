@@ -170,16 +170,19 @@ enum PullDownItem {
 
 /// A bordered pull-down button: the title, an optional symbol and one down chevron, opening a menu of commands.
 /// A SwiftUI `Menu` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
-/// `PullDownButton("Presets", items: [.action("OpenAI") { ... }, .separator, .header("Local"), ...]).fixedSize()`;
-/// rebuilt from `items` on every SwiftUI update, so pass the current state.
+/// `PullDownButton("Presets", items: { [.action("OpenAI") { ... }, .separator, .header("Local"), ...] }).fixedSize()`;
+/// `items` runs each time the menu opens, so it reads the state of that moment and a long list costs nothing until then.
+/// `accessibilityLabel` replaces the title for VoiceOver, where one title repeats on several rows.
 struct PullDownButton: NSViewRepresentable {
     let title: String
     var systemImage: String?
-    let items: [PullDownItem]
+    var accessibilityLabel: String?
+    let items: () -> [PullDownItem]
 
-    init(_ title: String, systemImage: String? = nil, items: [PullDownItem]) {
+    init(_ title: String, systemImage: String? = nil, accessibilityLabel: String? = nil, items: @escaping () -> [PullDownItem]) {
         self.title = title
         self.systemImage = systemImage
+        self.accessibilityLabel = accessibilityLabel
         self.items = items
     }
 
@@ -190,28 +193,42 @@ struct PullDownButton: NSViewRepresentable {
         button.bezelStyle = .flexiblePush
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        // A pull-down shows its first item as the button's face; the rest is added when the menu opens.
+        menu.addItem(NSMenuItem(title: "", action: nil, keyEquivalent: ""))
+        menu.delegate = context.coordinator
+        button.menu = menu
         return button
     }
 
     func updateNSView(_ button: NSPopUpButton, context: Context) {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        // A pull-down shows its first item as the button's face.
-        let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        face.image = systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-        menu.addItem(face)
-        context.coordinator.reset()
-        context.coordinator.add(items, to: menu)
-        button.menu = menu
+        context.coordinator.items = items
+        if let face = button.menu?.items.first {
+            if face.title != title { face.title = title }
+            if context.coordinator.faceSymbol != systemImage {
+                context.coordinator.faceSymbol = systemImage
+                face.image = systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+            }
+        }
+        if button.accessibilityLabel() != (accessibilityLabel ?? title) { button.setAccessibilityLabel(accessibilityLabel ?? title) }
         button.isEnabled = context.environment.isEnabled
     }
 
-    @MainActor final class Coordinator: NSObject {
+    @MainActor final class Coordinator: NSObject, NSMenuDelegate {
+        var items: () -> [PullDownItem] = { [] }
+        /// The symbol on the face now, so an update sets the image only when it changes.
+        var faceSymbol: String?
         private var actions: [@MainActor () -> Void] = []
 
-        func reset() { actions = [] }
+        /// Rebuilds everything after the face item from the current `items`.
+        func menuNeedsUpdate(_ menu: NSMenu) {
+            while menu.items.count > 1 { menu.removeItem(at: 1) }
+            actions = []
+            add(items(), to: menu)
+        }
 
-        func add(_ items: [PullDownItem], to menu: NSMenu) {
+        private func add(_ items: [PullDownItem], to menu: NSMenu) {
             for item in items {
                 switch item {
                 case let .action(title, image, enabled, perform):

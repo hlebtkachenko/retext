@@ -74,9 +74,9 @@ struct StylesPane: View {
             }
             Section {
                 HStack {
-                    PullDownButton("Add App Style", systemImage: "plus", items: appItems(running: running, installed: installed) {
-                        styles.append(AppStyle(bundleID: $0, style: ""))
-                    })
+                    PullDownButton("Add App Style", systemImage: "plus") {
+                        appItems(running: running, installed: installed) { styles.append(AppStyle(bundleID: $0, style: "")) }
+                    }
                     .fixedSize()
                     Spacer()
                 }
@@ -114,8 +114,9 @@ struct StylesPane: View {
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
                 Spacer()
-                PullDownButton("Change App", systemImage: "arrow.left.arrow.right",
-                               items: appItems(running: running, installed: installed) { style.wrappedValue.bundleID = $0 })
+                PullDownButton("Change App", systemImage: "arrow.left.arrow.right", accessibilityLabel: "Change App for \(name)") {
+                    appItems(running: running, installed: installed) { style.wrappedValue.bundleID = $0 }
+                }
                 .fixedSize()
                 Button("Remove \(name)", systemImage: "minus.circle", action: remove)
                     .labelStyle(.iconOnly).buttonStyle(.borderless)

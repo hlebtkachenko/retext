@@ -197,9 +197,9 @@ private struct CustomAPISection: View {
         LabeledContent("Base URL") {
             HStack {
                 TextField("Base URL", text: $custom.baseURL, prompt: Text("https://openrouter.ai/api/v1")).labelsHidden()
-                PullDownButton("Presets", items: CustomProviderSettings.presets.map { preset in
-                    .action("\(preset.name): \(preset.url)") { custom.baseURL = preset.url }
-                })
+                PullDownButton("Presets") {
+                    CustomProviderSettings.presets.map { preset in .action("\(preset.name): \(preset.url)") { custom.baseURL = preset.url } }
+                }
                 .fixedSize()
             }
         }
