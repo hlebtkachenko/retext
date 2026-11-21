@@ -56,8 +56,16 @@ enum UpdateChecker {
             return .failure(UpdateCheckFailure(reason: error.localizedDescription))
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        // 404: the repository has no release yet.
-        guard status == 200 else { return .failure(UpdateCheckFailure(reason: status == 404 ? "No release found on GitHub." : "GitHub answered \(status).")) }
+        guard status == 200 else {
+            let reason = switch status {
+            // The repository has no release yet.
+            case 404: "No release found on GitHub."
+            // GitHub answers 403 (or 429) when the unauthenticated hourly limit is used up.
+            case 403, 429: "GitHub rate limit reached. Try again later."
+            default: "GitHub answered \(status)."
+            }
+            return .failure(UpdateCheckFailure(reason: reason))
+        }
         guard let release = try? JSONDecoder().decode(Release.self, from: data) else {
             return .failure(UpdateCheckFailure(reason: "GitHub's answer could not be read."))
         }
