@@ -7,10 +7,11 @@ public enum Model {
     public static let sonnet = "sonnet"
     public static let opus = "opus"
 
-    /// "Haiku", "Sonnet" or "Opus" for an alias or a full id such as claude-haiku-4-5-20251001; other ids unchanged.
+    /// "Haiku", "Sonnet", "Opus" or "Fable" for an alias or a full id such as claude-haiku-4-5-20251001; other ids unchanged.
     public static func shortName(_ id: String) -> String {
         let lower = id.lowercased()
-        return lower.contains("haiku") ? "Haiku" : lower.contains("sonnet") ? "Sonnet" : lower.contains("opus") ? "Opus" : id
+        return lower.contains("haiku") ? "Haiku" : lower.contains("sonnet") ? "Sonnet" : lower.contains("opus") ? "Opus"
+            : lower.contains("fable") ? "Fable" : id
     }
 }
 

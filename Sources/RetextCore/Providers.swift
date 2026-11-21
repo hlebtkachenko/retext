@@ -133,13 +133,14 @@ public struct CustomProviderSettings: Codable, Equatable, Sendable {
 }
 
 extension RetextSettings {
-    /// The active provider's model and effort for a level: ChatGPT overrides fall back to the built-in ones per field.
+    /// The active provider's model and effort for a level: Claude Code and ChatGPT overrides fall back to the built-in
+    /// ones per field, so an effort alone or a model alone can be overridden.
     public func model(for level: Level) -> ProviderModel {
         switch provider {
-        case .claude: return provider.defaultModel(level)
-        case .chatgpt:
-            let base = provider.defaultModel(level), own = chatGPTModels[level]?.trimmed ?? ProviderModel()
-            return own.model.isEmpty ? base : ProviderModel(model: own.model, effort: own.effort.isEmpty ? base.effort : own.effort)
+        case .claude, .chatgpt:
+            let base = provider.defaultModel(level)
+            let own = (provider == .claude ? claudeModels : chatGPTModels)[level]?.trimmed ?? ProviderModel()
+            return ProviderModel(model: own.model.isEmpty ? base.model : own.model, effort: own.effort.isEmpty ? base.effort : own.effort)
         case .custom: return custom.models[level]?.trimmed ?? ProviderModel()
         }
     }
