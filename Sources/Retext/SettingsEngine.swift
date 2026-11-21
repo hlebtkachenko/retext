@@ -54,6 +54,10 @@ struct EnginePane: View {
             case .custom: CustomAPISection(custom: $state.settings.custom)
             }
         }
+        .onAppear {
+            // `--demo settings ai chatgpt|custom` shows another provider's sections; demo settings are never saved.
+            if let demo = SettingsView.demoExtra.flatMap(Provider.init(rawValue:)) { state.settings.provider = demo }
+        }
         .task(id: provider == .chatgpt ? state.settings.codexPath : nil) {
             guard provider == .chatgpt else { return }
             codexModels = await CodexRunner.models(codexPath: state.settings.codexPath)

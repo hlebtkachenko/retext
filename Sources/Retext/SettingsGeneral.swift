@@ -41,7 +41,7 @@ struct GeneralPane: View {
             }
             Section("Backup") {
                 IconRow(symbol: "externaldrive.fill", tint: .teal, title: "Back up your actions, styles and protected words",
-                        subtitle: "Saves every setting except the API key to one file. History and usage stay on this Mac; an import keeps this Mac's Claude Code and Codex paths and API server.")
+                        subtitle: "Saves every setting except the API key to one file. History, usage and how much history is kept stay as they are on import and reset; an import also keeps this Mac's Claude Code and Codex paths and API server.")
                 HStack {
                     Spacer()
                     Button("Export…", action: export)
@@ -72,6 +72,8 @@ struct GeneralPane: View {
                 }
             }
         }
+        // `general reset` shows the Reset row behind its dialog.
+        .defaultScrollAnchor(SettingsView.demoExtra == "reset" ? .bottom : nil)
         // Every toggle sits in an IconRow, which shows its title.
         .toggleStyle(.switch)
         .labelsHidden()
