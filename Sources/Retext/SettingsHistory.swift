@@ -1,77 +1,323 @@
+import AppKit
 import RetextCore
 import SwiftUI
 
-/// Recent results kept for the menu and the cache, with the usage counters below.
+/// Retention, the usage totals and the results themselves, newest first; a click opens a result's details.
 struct HistoryPane: View {
     @ObservedObject private var state = AppState.shared
     @State private var confirmClear = false
+    /// A lower retention that would discard results, waiting for the user's answer.
+    @State private var pendingRetention: HistoryRetention?
+    @State private var query = ""
+    @State private var detail: HistoryEntry?
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form.task {
+                // Screenshots of the list: after the first layout, so the form knows where the rows are.
+                guard SettingsView.demoExtra == "results" else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                proxy.scrollTo("results", anchor: .top)
+            }
+        }
+    }
+
+    private var form: some View {
         Form {
             Section {
-                // Off or Last 20 for now: History keeps 20 entries whatever the setting.
-                Toggle("Keep history", isOn: Binding(get: { state.settings.historyRetention != .off },
-                                                     set: { state.settings.historyRetention = $0 ? .last20 : .off }))
-                LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
+                Picker("Keep", selection: retention) {
+                    ForEach(HistoryRetention.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                LabeledContent {
                     Button("Clear History…", role: .destructive) { confirmClear = true }
                         .foregroundStyle(.red)
                         .disabled(state.history.entries.isEmpty)
+                } label: {
+                    Text(countText)
                 }
             } header: {
                 Text("History")
             } footer: {
-                Text("The last \(History.limit) results and the first \(HistoryEntry.inputLimit) characters of each selection are kept in plain text in ~/Library/Application Support/Retext/history.json for Recent and the cache.")
+                Text(state.settings.historyRetention == .off
+                     ? "Not saved; the last result is kept until Retext quits."
+                     : "Saved in plain text in ~/Library/Application Support/Retext/history.json, also used to reuse results for the same text.")
                     .foregroundStyle(.secondary)
             }
-            UsageSections(usage: state.usage)
+            UsageSection(usage: state.usage)
+            Section {
+                if !state.history.entries.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                        TextField("Search", text: $query, prompt: Text("Search"))
+                            .textFieldStyle(.plain).labelsHidden()
+                        if !query.isEmpty {
+                            Button("Clear Search", systemImage: "xmark.circle.fill") { query = "" }
+                                .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                let items = filtered
+                if items.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(items) { entry in
+                        HistoryRow(entry: entry, open: { detail = entry }, delete: { state.history.remove(id: entry.id) })
+                    }
+                }
+            } header: {
+                Text("Results")
+            }
+            .id("results")
         }
+        .sheet(item: $detail) { HistoryDetail(entry: $0, showChanges: SettingsView.demoExtra == "changes") }
         .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { state.history = History() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
-            Text("Recent results and the cache are deleted.")
+            Text("All saved results are deleted. Retext no longer reuses them for the same text.")
         }
+        .confirmationDialog(confirmTitle, isPresented: Binding(get: { pendingRetention != nil }, set: { if !$0 { pendingRetention = nil } })) {
+            Button(pendingRetention == .off ? "Turn Off History" : "Delete Older Results", role: .destructive) {
+                if let pendingRetention { state.settings.historyRetention = pendingRetention }
+                pendingRetention = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRetention = nil }.keyboardShortcut(.defaultAction)
+        } message: {
+            Text(confirmMessage)
+        }
+        .onAppear {
+            switch SettingsView.demoExtra {
+            case "detail", "changes": detail = state.history.entries.first
+            case "old": detail = state.history.entries.last
+            case "clear": confirmClear = true
+            case "off": pendingRetention = .off
+            default: break
+            }
+        }
+    }
+
+    /// Lowering retention below the number of saved results, or turning it off, asks first.
+    private var retention: Binding<HistoryRetention> {
+        Binding(get: { state.settings.historyRetention }, set: { new in
+            let count = state.history.entries.count
+            let discards = new == .off ? count > 0 : new.limit.map { count > $0 } ?? false
+            if discards { pendingRetention = new } else { state.settings.historyRetention = new }
+        })
+    }
+
+    private var countText: String {
+        let count = state.history.entries.count
+        return count == 1 ? "1 result" : "\(count) results"
+    }
+
+    private var confirmTitle: String {
+        pendingRetention == .off ? "Turn off history?" : "Keep only the \(pendingRetention?.title.lowercased() ?? "")?"
+    }
+
+    private var confirmMessage: String {
+        guard let pendingRetention else { return "" }
+        if pendingRetention == .off { return "Saved results are deleted from history.json. The last result is kept until Retext quits." }
+        let extra = state.history.entries.count - (pendingRetention.limit ?? 0)
+        return "The \(extra) older \(extra == 1 ? "result is" : "results are") deleted."
+    }
+
+    private var filtered: [HistoryEntry] {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return state.history.entries }
+        return state.history.entries.filter { entry in
+            [entry.output, entry.input, entry.title, entry.appName].contains { $0.localizedStandardContains(query) }
+        }
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        if state.history.entries.isEmpty {
+            ContentUnavailableView("No Results Yet", systemImage: "clock.arrow.circlepath",
+                                   description: Text("Results appear here after you run an action or an instruction."))
+        } else {
+            ContentUnavailableView.search(text: query)
+        }
+    }
+}
+
+// MARK: Row
+
+/// One result: its start, the original's start and what made it. Copy and Delete on the row and in its context menu.
+private struct HistoryRow: View {
+    let entry: HistoryEntry
+    let open: () -> Void
+    let delete: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: open) {
+                VStack(alignment: .leading, spacing: 4) {
+                    // A prefix, so a 50,000-character result never lays out in full for three lines.
+                    Text(entry.output.prefix(400)).lineLimit(3)
+                    Text(entry.input.prefix(300)).lineLimit(2).foregroundStyle(.secondary)
+                    Text(entry.metadata).font(.callout).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(entry.title), \(entry.appName)")
+            .accessibilityValue(String(entry.output.prefix(400)))
+            .accessibilityHint("Shows the details")
+            HStack(spacing: 2) {
+                Button("Copy Result", systemImage: "doc.on.doc") { HistoryEntry.copy(entry.output) }.help("Copy Result")
+                Button("Copy Original", systemImage: "text.quote") { HistoryEntry.copy(entry.input) }.help("Copy Original")
+                Button("Delete", systemImage: "trash", action: delete).help("Delete")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .controlSize(.large)
+        }
+        .padding(.vertical, 4)
+        .contextMenu {
+            Button("Show Details", action: open)
+            Divider()
+            Button("Copy Result") { HistoryEntry.copy(entry.output) }
+            Button("Copy Original") { HistoryEntry.copy(entry.input) }
+            Divider()
+            Button("Delete", role: .destructive, action: delete)
+        }
+    }
+}
+
+extension HistoryEntry {
+    /// "Fix grammar · Mail · 5 minutes ago · High · 1.8 s"; older entries have no level or duration and say so.
+    var metadata: String {
+        var parts = [title, appName, date.formatted(.relative(presentation: .named).locale(Self.english))]
+        if let level { parts.append(level.title) }
+        if let durationSeconds { parts.append(Self.seconds(durationSeconds)) }
+        if isShortened { parts.append("Only the start was saved") }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// Dates in words in English, like the rest of the UI, with the Mac's region for the order and clock.
+    static let english = Locale(languageCode: .english, languageRegion: Locale.current.region)
+
+    static func seconds(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(1))) + " s" }
+
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+// MARK: Detail
+
+/// A result in full: the original, the result (optionally with its changes marked) and how it was made.
+private struct HistoryDetail: View {
+    let entry: HistoryEntry
+    @State var showChanges = false
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(entry.title).font(.title3.bold()).lineLimit(1)
+                Spacer()
+                // Older entries kept only the start of the original: a diff against it would mark nearly everything.
+                Toggle("Show Changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 4)
+            Form {
+                Section {
+                    Text(entry.input)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if entry.isShortened {
+                        Label("Only the start was saved.", systemImage: "info.circle").foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Original")
+                }
+                Section {
+                    // The diff is worked out only when asked for: a long text takes a moment.
+                    let segments = showChanges ? TextDiff.words(old: entry.input, new: entry.output) : nil
+                    Group {
+                        if let segments {
+                            Text(PopupView.marked(segments)).accessibilityLabel(PopupView.spoken(segments))
+                        } else {
+                            Text(entry.output)
+                        }
+                    }
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                } header: {
+                    Text("Result")
+                }
+                Section("General") {
+                    LabeledContent("Date", value: entry.date.formatted(Date.FormatStyle(date: .complete, time: .standard).locale(HistoryEntry.english)))
+                    LabeledContent("Action", value: entry.kind == nil && entry.level != nil ? "Instruction: \(entry.title)" : entry.title)
+                    if !entry.appName.isEmpty { LabeledContent("App", value: entry.appName) }
+                    if let provider = entry.provider { LabeledContent("Provider", value: provider.title) }
+                    LabeledContent("Model", value: entry.model)
+                    if let level = entry.level {
+                        let effort = entry.effort.flatMap { $0.isEmpty ? nil : $0 }
+                        LabeledContent("Level", value: effort.map { "\(level.title), \($0) effort" } ?? level.title)
+                    }
+                    LabeledContent("Tokens", value: "\(entry.inputTokens.formatted()) in, \(entry.outputTokens.formatted()) out")
+                    if entry.costUSD > 0 {
+                        LabeledContent("Price", value: entry.costUSD.formatted(.currency(code: "USD").precision(.fractionLength(4))))
+                    }
+                    if let duration = entry.durationSeconds { LabeledContent("Duration", value: HistoryEntry.seconds(duration)) }
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Button("Copy Original") { HistoryEntry.copy(entry.input) }
+                Button("Copy Result") { HistoryEntry.copy(entry.output) }
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            .padding(16)
+        }
+        .frame(width: 560, height: 600)
     }
 }
 
 // MARK: Usage
 
-/// Today's counters and the recent days, as sections of the History pane's form.
-struct UsageSections: View {
+/// Totals from usage.json: today and the last 7, 30 and 90 days.
+private struct UsageSection: View {
     let usage: Usage
 
     var body: some View {
-        Group {
-            Section("Today") {
-                let today = usage.today
-                ForEach(today.callsByModel, id: \.name) { model in
-                    LabeledContent("\(model.name) calls", value: "\(model.calls)")
+        Section {
+            Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 8) {
+                GridRow {
+                    Text("Period").gridColumnAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Runs")
+                    Text("Tokens")
+                    Text("Price")
                 }
-                if today.calls.isEmpty { LabeledContent("Calls", value: "0") }
-                LabeledContent("Cache hits", value: "\(today.cacheHits)")
-                LabeledContent("Input tokens", value: today.inputTokens.formatted())
-                LabeledContent("Output tokens", value: today.outputTokens.formatted())
-                LabeledContent("Price", value: Self.price(today))
-            }
-            Section {
-                ForEach(usage.days.keys.sorted(by: >).prefix(14), id: \.self) { day in
-                    LabeledContent(day, value: Self.summary(usage.days[day]!))
+                .font(.callout).foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+                ForEach([(1, "Today"), (7, "Last 7 days"), (30, "Last 30 days"), (90, "Last 90 days")], id: \.0) { days, title in
+                    let total = usage.total(days: days)
+                    GridRow {
+                        Text(title)
+                        Text(total.runs.formatted())
+                        Text((total.inputTokens + total.outputTokens).formatted())
+                        Text(total.costUSD.formatted(.currency(code: "USD")))
+                    }
+                    .monospacedDigit()
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(title): \(total.runs) runs, \(total.inputTokens + total.outputTokens) tokens, "
+                                        + total.costUSD.formatted(.currency(code: "USD")))
                 }
-            } header: {
-                Text("Recent days")
-            } footer: {
-                Text("The price is the Claude Code list price for the same tokens; ChatGPT and custom API calls count tokens only.")
-                    .foregroundStyle(.secondary)
             }
+        } header: {
+            Text("Usage")
+        } footer: {
+            Text("Runs include results reused from history. The price is the Claude Code list price for the same tokens; ChatGPT and custom API runs count tokens only.")
+                .foregroundStyle(.secondary)
         }
-    }
-
-    /// One formatter for every amount, so all rows show the Mac's currency format.
-    private static func price(_ day: UsageDay) -> String { day.costUSD.formatted(.currency(code: "USD")) }
-
-    private static func summary(_ day: UsageDay) -> String {
-        let calls = day.callsByModel.map { "\($0.name) \($0.calls)" }.joined(separator: ", ")
-        return [calls.isEmpty ? "0 calls" : calls, "\(day.cacheHits) cached",
-                "\((day.inputTokens + day.outputTokens).formatted()) tokens", price(day)].joined(separator: ", ")
     }
 }

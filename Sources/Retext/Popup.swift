@@ -349,12 +349,12 @@ final class PopupController {
         fit()
         runID &+= 1
         let id = runID
-        let timeout = model.level.timeout
+        let level = model.level, timeout = level.timeout
         work = Task {
             // After Esc and a fast re-trigger, `work` already belongs to the next run.
             defer { if runID == id { work = nil } }
             do {
-                let result = try await result(of: job, timeout: timeout, for: selection)
+                let result = try await result(of: job, level: level, timeout: timeout, for: selection)
                 // A late ⌘C watch still running could restore the clipboard over a fast copied result.
                 await SelectionIO.settle()
                 // A cache hit returns without a cancellation check; after Esc nothing may show, copy or paste.
@@ -433,24 +433,28 @@ final class PopupController {
 
     /// The cached result when provider, model, effort, prompt and text match an entry in the history; otherwise the answer after
     /// `Engine.checkLayout`, recorded. A rejected answer is never recorded, so it can't come back as a cache hit.
-    /// With "Keep history" off, neither the cache nor the history is touched.
-    private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
+    /// With History off, the last result is still kept in memory (`HistoryRetention.memoryLimit`), never on disk.
+    private func result(of job: Job, level: Level, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
         let key = Engine.cacheKey(job, baseURL: state.settings.custom.baseURL, text: selection.text)
-        let keep = state.settings.historyRetention != .off
-        if keep, let hit = state.history.lookup(key) {
+        if let hit = state.history.lookup(key) {
             state.usage.recordHit()
             return hit.output
         }
+        let clock = ContinuousClock(), start = clock.now
         let output = try await ProviderRunner.run(job, text: selection.text, settings: state.settings, timeout: timeout)
+        let duration = start.duration(to: clock.now)
         try Task.checkCancellation()
         state.usage.recordCall(model: job.model, output: output)
         // A truncated answer would replace the selection with part of it.
         try output.checkComplete()
         guard let text = Engine.checkLayout(input: selection.text, output: output.text, kind: job.kind, styled: job.styled) else { throw ClaudeFailure.extraText }
-        if keep { state.history.add(HistoryEntry(key: key, appName: selection.app.localizedName ?? "", title: job.title,
-                                       input: selection.text, output: text, model: job.model,
-                                       inputTokens: output.inputTokens, outputTokens: output.outputTokens, costUSD: output.costUSD)) }
+        state.history.add(HistoryEntry(key: key, appName: selection.app.localizedName ?? "", bundleID: selection.app.bundleIdentifier,
+                                       title: job.title, kind: job.kind, input: selection.text, output: text, level: level,
+                                       provider: job.provider, model: job.model, effort: job.effort,
+                                       inputTokens: output.inputTokens, outputTokens: output.outputTokens, costUSD: output.costUSD,
+                                       durationSeconds: Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18),
+                          retention: state.settings.historyRetention)
         return text
     }
 
