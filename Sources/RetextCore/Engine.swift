@@ -191,7 +191,7 @@ public enum ClaudeFailure: Error, Equatable, Sendable {
     case notFound, notLoggedIn, limit, unknownModel
     /// The result failed `Engine.checkLayout`.
     case extraText
-    /// The answer hit the output limit (custom API `finish_reason` "length"): never pasted or cached.
+    /// The answer hit the output limit (`stop_reason` "length" or "max_tokens"): never pasted or cached.
     case cutOff
     /// Anything else, with a short excerpt of the error ("" when there is none, e.g. a timeout).
     case other(String)
@@ -247,7 +247,7 @@ public struct ClaudeOutput: Decodable, Sendable {
     public let total_cost_usd: Double?
     public let usage: Usage?
     public let is_error: Bool?
-    /// The custom API's `finish_reason`. `claude -p` JSON may carry its own `stop_reason`; only "length" counts as cut off.
+    /// `claude -p`'s `stop_reason`, or the custom API's `finish_reason`.
     public let stop_reason: String?
 
     /// For the other providers' answers, so usage and history record them the same way.
@@ -259,8 +259,8 @@ public struct ClaudeOutput: Decodable, Sendable {
         stop_reason = stopReason
     }
 
-    /// The answer stopped at the output limit, so it is incomplete.
-    public var isCutOff: Bool { stop_reason == "length" }
+    /// The answer stopped at the output limit, so it is incomplete: "max_tokens" from Claude, "length" from the custom API.
+    public var isCutOff: Bool { stop_reason == "max_tokens" || stop_reason == "length" }
 
     /// Throws `ClaudeFailure.cutOff` for a cut-off answer. Called after usage is recorded, so the call still counts.
     public func checkComplete() throws { if isCutOff { throw ClaudeFailure.cutOff } }

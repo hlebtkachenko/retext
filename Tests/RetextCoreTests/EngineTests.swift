@@ -215,6 +215,22 @@ import Testing
         #expect(output.costUSD == 0.0123)
         #expect(ClaudeOutput.parse(Data("not json".utf8)) == nil)
     }
+
+    @Test func maxTokensIsCutOff() throws {
+        let json = #"""
+        {"type":"result","subtype":"success","is_error":false,"result":"Hello, wor","stop_reason":"max_tokens",
+         "total_cost_usd":0.01,"usage":{"input_tokens":120,"output_tokens":4096}}
+        """#
+        let output = try #require(ClaudeOutput.parse(Data(json.utf8)))
+        #expect(output.isCutOff)
+        #expect(throws: ClaudeFailure.cutOff) { try output.checkComplete() }
+        #expect(ClaudeFailure.cutOff.message(for: .claude) == "The answer was cut off. Your text is unchanged.")
+        for reason in ["end_turn", "refusal"] {
+            let other = try #require(ClaudeOutput.parse(Data(#"{"result":"x","stop_reason":"\#(reason)"}"#.utf8)))
+            #expect(!other.isCutOff)
+            #expect(throws: Never.self) { try other.checkComplete() }
+        }
+    }
 }
 
 @Suite struct HistoryUsageTests {
