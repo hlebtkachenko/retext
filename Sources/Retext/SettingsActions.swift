@@ -176,6 +176,21 @@ private struct IconPicker: View {
         "list.bullet", "checklist", "pencil", "lightbulb", "hand.thumbsup",
     ]
 
+    /// Short names for VoiceOver and the tooltip instead of the SF Symbol names ("Shorten", not "arrow.down.right…").
+    static let names = [
+        "text.badge.checkmark": "Checked text", "globe": "Globe", "character.bubble": "Speech bubble with letter",
+        "textformat": "Text format", "text.quote": "Quote", "text.alignleft": "Left-aligned text", "scissors": "Scissors",
+        "arrow.down.right.and.arrow.up.left": "Shorten", "arrow.up.left.and.arrow.down.right": "Expand",
+        "wand.and.stars": "Magic wand", "sparkles": "Sparkles", "face.smiling": "Smiling face", "briefcase": "Briefcase",
+        "envelope": "Envelope", "bubble.left.and.text.bubble.right": "Conversation", "list.bullet": "Bulleted list",
+        "checklist": "Checklist", "pencil": "Pencil", "lightbulb": "Light bulb", "hand.thumbsup": "Thumbs up",
+    ]
+
+    /// A symbol outside the list (a hand-edited settings.json) reads as its name with spaces for the dots.
+    static func spokenName(_ symbol: String) -> String {
+        names[symbol] ?? symbol.replacingOccurrences(of: ".", with: " ")
+    }
+
     var body: some View {
         Button { picking.toggle() } label: {
             HStack(spacing: 6) {
@@ -183,7 +198,7 @@ private struct IconPicker: View {
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
-        .accessibilityLabel("Icon: \(symbol)")
+        .accessibilityLabel("Icon: \(Self.spokenName(symbol))")
         .popover(isPresented: $picking, arrowEdge: .bottom) {
             // A saved symbol outside the list stays offered, first, so the action keeps it until another is picked.
             let choices = (Self.symbols.contains(symbol) ? [] : [symbol]) + Self.symbols
@@ -199,8 +214,8 @@ private struct IconPicker: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(name)
-                    .accessibilityLabel(name)
+                    .help(Self.spokenName(name))
+                    .accessibilityLabel(Self.spokenName(name))
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
