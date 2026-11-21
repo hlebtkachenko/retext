@@ -250,6 +250,10 @@ import Testing
         try Data(json.utf8).write(to: url)
         let entry = try #require(History.load(from: url).lookup("k"))
         #expect(entry.input.count <= HistoryEntry.inputLimit && entry.output == "out")
+        // Saved back shortened: the file itself, read without `History.load`.
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let inputs = try #require((object["entries"] as? [[String: Any]])?.map { $0["input"] as? String })
+        #expect(!inputs.isEmpty && inputs.allSatisfy { ($0?.count ?? .max) <= HistoryEntry.inputLimit })
     }
 
     @Test func selectionLimit() {

@@ -53,10 +53,12 @@ public struct History: Codable, Equatable, Sendable {
         entries = Array(entries.prefix(Self.limit))
     }
 
-    /// Older entries kept the whole selection: shortened here, and saved shortened with the next add.
+    /// Older entries kept the whole selection: shortened here and saved back to `url` at once.
     public static func load(from url: URL) -> History {
-        let history = (try? Data(contentsOf: url)).flatMap { try? Store.decoder.decode(History.self, from: $0) } ?? History()
-        return History(entries: history.entries.map(\.shortened))
+        let decoded = (try? Data(contentsOf: url)).flatMap { try? Store.decoder.decode(History.self, from: $0) } ?? History()
+        let history = History(entries: decoded.entries.map(\.shortened))
+        if history != decoded { history.save(to: url) }
+        return history
     }
 
     public func save(to url: URL) { Store.write(self, to: url) }
