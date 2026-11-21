@@ -55,7 +55,7 @@ struct WelcomeView: View {
     var body: some View {
         Form {
             Section {
-                Text("Select text in any app, press \(state.settings.menuShortcut.label) and pick an action or type an instruction. Retext replaces the selection with the result, in the original font.")
+                Text("Select text in any app, press \(state.settings.menuShortcut.label), pick an action or type an instruction.")
             }
             Section("Setup") {
                 AccessibilityRow()
@@ -67,9 +67,6 @@ struct WelcomeView: View {
                     .lineLimit(2...4)
             } header: {
                 Text("Try it")
-            } footer: {
-                Text("Select the sample text above and press \(state.settings.menuShortcut.label), then pick Fix grammar.")
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -134,6 +131,6 @@ struct ProviderRow: View {
     }
 
     private var readyText: String {
-        state.settings.provider == .custom ? "Sends the requests to the API you set." : "Runs the requests with your own login."
+        state.settings.provider == .custom ? "Sends requests to the API you set." : "Runs requests with your own login."
     }
 }
