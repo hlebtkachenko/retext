@@ -10,7 +10,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     static let shared = SettingsWindow()
     private(set) var window: NSWindow?
 
-    /// With a pane, opens on it (rebuilding the content, since the sidebar selection is view state).
+    /// With a pane, opens on it (rebuilding the content, since the sidebar selection is view state). The title is set
+    /// here, before SwiftUI's first update: navigationTitle renames the window when another pane is picked, but leaves
+    /// "Untitled" when it opens on a pane other than Overview, and a title set from the view resets the pane's state.
     func show(_ pane: SettingsView.Pane? = nil) {
         if let pane {
             SettingsView.initialPane = pane
@@ -18,11 +20,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                 let frame = window.frame
                 window.contentViewController = NSHostingController(rootView: SettingsView())
                 window.setFrame(frame, display: false)
+                window.title = pane.rawValue
             }
         }
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
-            w.title = "Retext Settings"
+            w.title = SettingsView.initialPane.rawValue
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.setContentSize(NSSize(width: 760, height: 620))
             w.center()
@@ -40,10 +43,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
 struct SettingsView: View {
     enum Pane: String, CaseIterable, Identifiable {
-        case actions = "Actions", styles = "App styles", words = "Protected words", engine = "Engine", general = "General", usage = "Usage"
+        case overview = "Overview", actions = "Actions", styles = "App styles", words = "Protected words", engine = "Engine", general = "General", usage = "Usage"
         var id: Self { self }
         var symbol: String {
             switch self {
+            case .overview: "info.circle"
             case .actions: "list.bullet"
             case .styles: "app.badge"
             case .words: "lock"
@@ -55,7 +59,11 @@ struct SettingsView: View {
     }
 
     @ObservedObject private var state = AppState.shared
-    static var initialPane = Pane.actions
+    static var initialPane = Pane.overview
+    /// `--demo settings <pane> <extra>`: the word after the pane opens a dialog or expands a row, for screenshots.
+    static let demoExtra: String? = CommandLine.arguments.firstIndex(of: "--demo").flatMap { i in
+        CommandLine.arguments.dropFirst(i + 1).first == "settings" ? CommandLine.arguments.dropFirst(i + 3).first : nil
+    }
     @State private var pane: Pane? = SettingsView.initialPane
 
     var body: some View {
@@ -66,7 +74,8 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(190)
         } detail: {
             Group {
-                switch pane ?? .actions {
+                switch pane ?? .overview {
+                case .overview: OverviewPane()
                 case .actions: ActionsPane(actions: $state.settings.actions)
                 case .styles: StylesPane(styles: $state.settings.appStyles)
                 case .words: WordsPane(settings: $state.settings)
@@ -76,163 +85,8 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle((pane ?? .actions).rawValue)
+            .navigationTitle((pane ?? .overview).rawValue)
         }
-    }
-}
-
-// MARK: Actions
-
-private struct ActionsPane: View {
-    @Binding var actions: [CustomAction]
-    @State private var selection: CustomAction.ID?
-    @State private var confirmRestore = false
-
-    var body: some View {
-        Form {
-            Section {
-                ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                    let isSelected = selection == action.id
-                    // A button, not a tap gesture, so the rows are reachable with the keyboard and VoiceOver.
-                    Button { selection = action.id } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: action.symbol).frame(width: 20).foregroundStyle(isSelected ? Color.accentColor : .primary)
-                            Text(action.title).fontWeight(isSelected ? .semibold : .regular)
-                            Spacer()
-                            Text(action.kind.rawValue.capitalized).foregroundStyle(.secondary)
-                            Text("⌥\(index + 1)").foregroundStyle(.secondary).monospacedDigit()
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                }
-            } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("While text is selected, ⌥1 runs the first action, ⌥2 the second, and so on, in list order: move an action up or down to change its shortcut. Up to \(RetextSettings.maxActions) actions.")
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Button("Add Action", systemImage: "plus") {
-                            let action = CustomAction(title: "New action", symbol: "sparkles", prompt: "", kind: .other)
-                            actions.append(action)
-                            selection = action.id
-                        }
-                        .disabled(actions.count >= RetextSettings.maxActions)
-                        Spacer()
-                        Button("Restore Default Actions…") { confirmRestore = true }
-                    }
-                }
-            }
-
-            if let id = selection, actions.contains(where: { $0.id == id }) {
-                ActionEditor(action: binding(id), position: actions.firstIndex { $0.id == id }!, count: actions.count,
-                             move: { move(id, by: $0) },
-                             delete: { actions.removeAll { $0.id == id }; selection = nil })
-            }
-        }
-        .onAppear { selection = selection ?? actions.first?.id }
-        .confirmationDialog("Restore the default actions?", isPresented: $confirmRestore) {
-            Button("Restore Defaults", role: .destructive) {
-                actions = RetextSettings.defaultActions
-                selection = actions.first?.id
-            }
-        } message: {
-            Text("Your actions are replaced by Fix grammar, English and a translation into your Mac's language. Edited prompts and added actions are lost.")
-        }
-    }
-
-    private func binding(_ id: CustomAction.ID) -> Binding<CustomAction> {
-        Binding(get: { actions.first { $0.id == id } ?? CustomAction(title: "", symbol: "", prompt: "", kind: .other) },
-                set: { new in if let i = actions.firstIndex(where: { $0.id == id }) { actions[i] = new } })
-    }
-
-    private func move(_ id: CustomAction.ID, by offset: Int) {
-        guard let i = actions.firstIndex(where: { $0.id == id }), actions.indices.contains(i + offset) else { return }
-        actions.swapAt(i, i + offset)
-    }
-}
-
-private struct ActionEditor: View {
-    @Binding var action: CustomAction
-    let position: Int, count: Int
-    let move: (Int) -> Void
-    let delete: () -> Void
-    @State private var confirmDelete = false
-
-    var body: some View {
-        let defaultPrompt = RetextSettings.defaultPrompt(for: action)
-        Section {
-            TextField("Title", text: $action.title)
-            LabeledContent("SF Symbol") {
-                HStack {
-                    TextField("SF Symbol", text: $action.symbol, prompt: Text("globe")).labelsHidden()
-                    if NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil) == nil {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).frame(width: 20)
-                            .help("No SF Symbol has this name")
-                            .accessibilityLabel("No SF Symbol has this name")
-                    } else {
-                        Image(systemName: action.symbol).frame(width: 20)
-                    }
-                }
-            }
-            Picker("Kind", selection: $action.kind) {
-                Text("Grammar").tag(ActionKind.grammar)
-                Text("Translate").tag(ActionKind.translate)
-                Text("Other").tag(ActionKind.other)
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Prompt")
-                TextField("Prompt", text: $action.prompt, prompt: Text("What Retext should do with the selected text"), axis: .vertical)
-                    .labelsHidden()
-                    .lineLimit(5...14)
-                    .padding(6)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                Text("Describe the change in plain words. Click an example to use it:")
-                    .font(.callout).foregroundStyle(.secondary)
-                // One row when it fits, else one example per line.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 6) { exampleButtons }
-                    VStack(alignment: .leading, spacing: 6) { exampleButtons }
-                }
-            }
-            HStack {
-                Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(position == 0)
-                Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(position == count - 1)
-                Spacer()
-                Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
-                    .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
-                Button("Delete Action…", role: .destructive) { confirmDelete = true }
-            }
-        } header: {
-            Text("Edit “\(action.title)”")
-        } footer: {
-            Text("Kind: Grammar and Translate keep a one-line text on one line (unless an app style applies), and a Grammar result much longer than the text is rejected as an added note. Other has no such checks. Reset Prompt puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
-                .foregroundStyle(.secondary)
-        }
-        .confirmationDialog("Delete “\(action.title)”?", isPresented: $confirmDelete) {
-            Button("Delete Action", role: .destructive, action: delete)
-        } message: {
-            Text("Its prompt is lost, and the actions after it move up one shortcut.")
-        }
-    }
-
-    private var exampleButtons: some View {
-        ForEach(Self.examples, id: \.self) { example in
-            Button(example) { insert(example) }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .help("Use this prompt")
-        }
-    }
-
-    private static let examples = ["Make it shorter and keep the meaning.", "Rewrite it more politely.", "Rewrite it in a formal business tone."]
-
-    /// An empty prompt becomes the example; otherwise the example is added on a new line.
-    private func insert(_ example: String) {
-        let prompt = action.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        action.prompt = prompt.isEmpty ? example : prompt + "\n" + example
     }
 }
 
@@ -465,8 +319,13 @@ private struct EnginePane: View {
                 Picker("Default level", selection: $state.settings.defaultLevel) {
                     ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
+                // Name with its description below, the same layout for every level whatever the description's length.
                 ForEach(Level.allCases, id: \.self) { level in
-                    LabeledContent(level.title, value: describe(level))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(level.title)
+                        Text(describe(level)).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             } header: {
                 Text("Quality")
@@ -737,17 +596,8 @@ private struct GeneralPane: View {
     @State private var pendingImport: RetextSettings?
     @State private var backupError: String?
 
-    private static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-
     var body: some View {
         Form {
-            Section {
-                AccessibilityRow()
-                ProviderRow()
-                Button("Show Welcome Window…") { WelcomeWindow.shared.show() }
-            } header: {
-                Text("Permissions")
-            }
             Section {
                 Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { setOpenAtLogin($0) }))
             } footer: {
@@ -785,19 +635,12 @@ private struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Toggle("Check for updates", isOn: $state.settings.checkForUpdates)
-            } header: {
-                Text("Updates")
-            } footer: {
-                Text("At most once a day, at launch and when the Mac wakes, Retext asks GitHub for the latest release and shows \"Update available\" in the menu when there is a newer one. Nothing is downloaded automatically. Apart from the custom API, when you choose it, this is the only network request Retext makes itself.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
                 HStack {
                     Button("Export Settings…", action: export)
                     Button("Import Settings…", action: chooseImport)
                     Spacer()
                     Button("Reset All Settings to Defaults…", role: .destructive) { confirmReset = true }
+                        .foregroundStyle(.red)
                 }
             } header: {
                 Text("Backup")
@@ -813,16 +656,11 @@ private struct GeneralPane: View {
                 Text("Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away. Off: Retext asks only when you use a shortcut, and the first ⌥N in such an app may pass through.")
                     .foregroundStyle(.secondary)
             }
-            Section {
-                LabeledContent("Version", value: Self.version ?? "Development build")
-                Link("Retext on GitHub", destination: Identity.pageURL(repository: UpdateChecker.repository))
-            } header: {
-                Text("About")
-            } footer: {
-                Text("Not affiliated with Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic; ChatGPT and Codex are trademarks of OpenAI.").foregroundStyle(.secondary)
-            }
         }
-        .onAppear { loginStatus = SMAppService.mainApp.status }
+        .onAppear {
+            loginStatus = SMAppService.mainApp.status
+            if SettingsView.demoExtra == "reset" { confirmReset = true }
+        }
         .confirmationDialog("Clear the history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { state.history = History() }
         } message: {
@@ -830,9 +668,12 @@ private struct GeneralPane: View {
         }
         .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
             Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
+            // Cancel is the default button, so Return never resets.
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
-            Text("Actions, app styles, protected words and every other setting go back to the defaults. Export them first to keep a copy.")
+            Text("Actions, app styles, protected words, the provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
         }
+        .dialogSeverity(.critical)
         .confirmationDialog("Replace all settings with the imported ones?",
                             isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } })) {
             Button("Replace Settings", role: .destructive) {

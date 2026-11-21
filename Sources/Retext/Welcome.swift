@@ -18,7 +18,7 @@ enum AppWindows {
     }
 }
 
-/// Shown once on first launch (`RetextSettings.onboarded`), and from the menu or Settings → General later.
+/// Shown once on first launch (`RetextSettings.onboarded`), and from the menu or Settings → Overview later.
 @MainActor
 final class WelcomeWindow: NSObject, NSWindowDelegate {
     static let shared = WelcomeWindow()
@@ -84,7 +84,7 @@ struct WelcomeView: View {
     }
 }
 
-// MARK: Permission rows (Welcome and Settings → General)
+// MARK: Permission rows (Welcome and Settings → Overview)
 
 /// Live Accessibility status, polled while visible, since macOS sends no notification when it is granted.
 struct AccessibilityRow: View {
@@ -122,7 +122,8 @@ struct ProviderRow: View {
             switch status {
             case nil: ProgressView().controlSize(.small)
             case let status? where status.ready:
-                Label(status.detail, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
+                // The executable's path (or the API host), with ~ for the home folder so a screenshot shows no user name.
+                Label((status.detail as NSString).abbreviatingWithTildeInPath, systemImage: "checkmark.circle.fill").foregroundStyle(.green).truncationMode(.middle).lineLimit(1)
             case .some: Label("Not ready", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
         } label: {
