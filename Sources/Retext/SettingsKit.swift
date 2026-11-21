@@ -99,7 +99,7 @@ extension SettingsView.Pane {
 
 /// A bordered pop-up button showing the chosen value and up-down chevrons, as in System Settings.
 /// A SwiftUI `Picker` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
-/// Use it as a row's trailing control: `PopUpPicker("Provider", selection: $provider, options: Provider.allCases) { $0.title }`.
+/// Use it as a row's trailing control: `PopUpPicker("Provider", selection: $provider, options: Provider.allCases) { $0.title }.fixedSize()`.
 /// `title` is the VoiceOver label; the row shows the visible title.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let title: String
@@ -159,7 +159,7 @@ enum PullDownItem {
 
 /// A bordered pull-down button: the title, an optional symbol and one down chevron, opening a menu of commands.
 /// A SwiftUI `Menu` in a grouped Form draws without a border whatever its style, so this wraps `NSPopUpButton`.
-/// `PullDownButton("Presets", items: [.action("OpenAI") { ... }, .separator, .header("Local"), ...])`;
+/// `PullDownButton("Presets", items: [.action("OpenAI") { ... }, .separator, .header("Local"), ...]).fixedSize()`;
 /// rebuilt from `items` on every SwiftUI update, so pass the current state.
 struct PullDownButton: NSViewRepresentable {
     let title: String
@@ -184,6 +184,7 @@ struct PullDownButton: NSViewRepresentable {
 
     func updateNSView(_ button: NSPopUpButton, context: Context) {
         let menu = NSMenu()
+        menu.autoenablesItems = false
         // A pull-down shows its first item as the button's face.
         let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         face.image = systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
@@ -206,6 +207,7 @@ struct PullDownButton: NSViewRepresentable {
                     let entry = NSMenuItem(title: title, action: enabled ? #selector(run(_:)) : nil, keyEquivalent: "")
                     entry.target = self
                     entry.image = image
+                    entry.isEnabled = enabled
                     entry.tag = actions.count
                     actions.append(perform)
                     menu.addItem(entry)
@@ -213,6 +215,7 @@ struct PullDownButton: NSViewRepresentable {
                     let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                     entry.image = image
                     let sub = NSMenu(title: title)
+                    sub.autoenablesItems = false
                     add(children, to: sub)
                     entry.submenu = sub
                     menu.addItem(entry)
