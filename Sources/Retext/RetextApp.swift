@@ -145,7 +145,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             controller.demo(state)
             return
         }
-        signal(SIGTERM, SIG_IGN)
+        // A no-op handler, not SIG_IGN: an ignored signal stays ignored in `claude` and `codex`, which are stopped with SIGTERM.
+        signal(SIGTERM) { _ in }
         let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         terminate.setEventHandler {
             // queue: .main runs the handler on the main thread. Usage is saved on every change; only history waits.
