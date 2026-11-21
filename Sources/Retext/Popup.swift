@@ -265,7 +265,9 @@ final class PopupController {
                 return flash(.message("Select text first", isError: false), near: nil, for: 1.5)
             }
             if Engine.isTooLong(selection.text) {
-                return flash(.message("Selection too long (over 50,000 characters)", isError: true), near: selection.rect, for: 3)
+                // en_US grouping, like the rest of the English UI: "50,000" whatever the Mac's region.
+                let limit = Engine.maxSelectionLength.formatted(.number.grouping(.automatic).locale(Locale(identifier: "en_US")))
+                return flash(.message("Selection too long (over \(limit) characters)", isError: true), near: selection.rect, for: 3)
             }
             self.selection = selection
             model.actions = AppState.shared.settings.actions
