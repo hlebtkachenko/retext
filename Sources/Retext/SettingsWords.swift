@@ -1,7 +1,7 @@
 import RetextCore
 import SwiftUI
 
-// MARK: Protected words
+// MARK: Protected Words
 
 struct WordsPane: View {
     @Binding var settings: RetextSettings

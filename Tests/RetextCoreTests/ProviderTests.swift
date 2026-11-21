@@ -113,7 +113,7 @@ import Testing
 
     @Test func messagesNameTheProvider() {
         #expect(ClaudeFailure.notFound.message(for: .chatgpt).hasPrefix("Codex not found"))
-        #expect(ClaudeFailure.notLoggedIn.message(for: .custom) == "API key rejected. Check it in Settings → Engine.")
+        #expect(ClaudeFailure.notLoggedIn.message(for: .custom) == "API key rejected. Check it in Settings → AI.")
         #expect(ClaudeFailure.other("").message(for: .chatgpt) == "ChatGPT didn't answer. Your text is unchanged.")
         #expect(ClaudeFailure.limit.message == "Claude usage limit reached. Try again later.")
     }

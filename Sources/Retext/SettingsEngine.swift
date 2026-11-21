@@ -2,7 +2,7 @@ import AppKit
 import RetextCore
 import SwiftUI
 
-// MARK: Engine
+// MARK: AI
 
 struct EnginePane: View {
     @ObservedObject private var state = AppState.shared

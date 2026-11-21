@@ -2,7 +2,7 @@ import AppKit
 import RetextCore
 import SwiftUI
 
-// MARK: App styles
+// MARK: Per-App Styles
 
 /// An app the style picker offers; only Sendable values, so the scan can run off the main thread.
 private struct AppInfo: Hashable, Sendable {

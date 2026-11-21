@@ -2,7 +2,7 @@ import Foundation
 import RetextCore
 import Security
 
-/// Calls an OpenAI-compatible Chat Completions API (Settings → Engine → Custom API).
+/// Calls an OpenAI-compatible Chat Completions API (Settings → AI → Custom API).
 enum APIRunner {
     /// Throws `ClaudeFailure`. URLSession stops the request when the calling task is cancelled; `timeout` bounds the whole call.
     static func run(_ job: Job, text: String, custom: CustomProviderSettings, key: String?, timeout: Duration) async throws -> ClaudeOutput {

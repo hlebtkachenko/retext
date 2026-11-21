@@ -1,7 +1,7 @@
 import RetextCore
 import SwiftUI
 
-/// Runs one tiny request at Medium with the active provider; counted in Usage like any other call.
+/// Runs one tiny request at Medium with the active provider; counted in usage like any other call.
 struct TestButton: View {
     let title: String
     /// Extra checks before the request (nil = go on) and a description of what was tested after it.

@@ -81,7 +81,7 @@ enum UpdateChecker {
     }
 }
 
-/// What a manual check reports, in Settings → Overview.
+/// What a manual check reports, in Settings → About.
 enum UpdateCheckResult: Sendable {
     /// The current version.
     case upToDate(String)
