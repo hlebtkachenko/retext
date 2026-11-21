@@ -38,6 +38,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        // A reopened window starts a fresh visit, with nothing to go Back or Forward to.
+        SettingsNavigation.shared.clearHistory()
         if let window { AppWindows.closing(window) }
     }
 }
@@ -70,6 +72,12 @@ final class SettingsNavigation: ObservableObject {
         guard let next = forwardStack.popLast() else { return }
         backStack.append(pane)
         pane = next
+    }
+
+    /// Forgets Back and Forward and keeps the current pane.
+    func clearHistory() {
+        backStack.removeAll()
+        forwardStack.removeAll()
     }
 }
 
