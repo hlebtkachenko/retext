@@ -15,63 +15,66 @@ struct GeneralPane: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Open at login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { setOpenAtLogin($0) }))
-            } footer: {
-                if loginStatus == .requiresApproval {
-                    Text("Waiting for approval in System Settings → General → Login Items.").foregroundStyle(.secondary)
+            Section("Startup") {
+                IconRow(symbol: "power", tint: .green, title: "Open at Login",
+                        subtitle: loginStatus == .requiresApproval ? "Waiting for approval in System Settings → General → Login Items." : nil) {
+                    Toggle("Open at Login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval },
+                                                          set: { setOpenAtLogin($0) }))
                 }
-            }
-            Section {
-                Toggle("Show in menu bar", isOn: $state.settings.showMenuBarIcon)
-            } footer: {
-                Text("Off: shortcuts keep working; open Retext again from Spotlight or Finder to get back to Settings.")
-                    .foregroundStyle(.secondary)
+                IconRow(symbol: "menubar.rectangle", tint: .blue, title: "Show in Menu Bar",
+                        subtitle: "When off, shortcuts keep working; open Retext from Spotlight or Finder to get to Settings.") {
+                    Toggle("Show in Menu Bar", isOn: $state.settings.showMenuBarIcon)
+                }
             }
             Section {
                 ShortcutField()
             } footer: {
-                Text("Choose ⌃⌥Space if another app uses ⌥Space; macOS may use ⌃⌥Space to switch input sources, which you can turn off in Keyboard Shortcuts.").foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Preview before replacing", isOn: $state.settings.previewBeforeReplace)
-            } footer: {
-                Text("Text that can't be edited is copied either way.")
+                Text("If another app uses ⌥Space, pick another shortcut or record your own. macOS may use ⌃⌥Space to switch input sources; you can turn that off in Keyboard Shortcuts.")
                     .foregroundStyle(.secondary)
             }
-            Section {
-                HStack {
-                    Button("Export Settings…", action: export)
-                    Button("Import Settings…", action: chooseImport)
+            Section("Preview") {
+                IconRow(symbol: "eye", tint: .orange, title: "Preview Before Replacing",
+                        subtitle: "Shows the result with the changes marked, so you can replace, copy or discard it. Text that can't be edited is copied either way.") {
+                    Toggle("Preview Before Replacing", isOn: $state.settings.previewBeforeReplace)
                 }
-            } header: {
-                Text("Backup")
-            } footer: {
-                Text("History and usage are not included and are kept on import and reset.")
-                    .foregroundStyle(.secondary)
+                PreviewSample()
+            }
+            Section("Backup") {
+                IconRow(symbol: "externaldrive.fill", tint: .teal, title: "Back up your actions, styles and protected words",
+                        subtitle: "Saves every setting except the API key to one file. History and usage stay on this Mac; an import keeps this Mac's Claude Code and Codex paths and API server.")
+                HStack {
+                    Spacer()
+                    Button("Export…", action: export)
+                    Button("Import…", action: chooseImport)
+                }
+            }
+            Section("Advanced") {
+                IconRow(symbol: "bolt.horizontal.fill", tint: .purple, title: "Improve Electron App Support",
+                        subtitle: "Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away.") {
+                    Toggle("Improve Electron App Support", isOn: $state.settings.electronSupport)
+                }
             }
             Section {
-                Toggle("Improve Electron app support", isOn: $state.settings.electronSupport)
-            } header: {
-                Text("Advanced")
-            } footer: {
-                Text("Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Button("Reset All Settings to Defaults…", role: .destructive) { confirmReset = true }
-                    .foregroundStyle(.red)
-                    // Here, not on the Form, so only this dialog is critical.
-                    .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
-                        Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
-                        // Cancel is the default button, so Return never resets.
-                        Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-                    } message: {
-                        Text("Actions, app styles, protected words, the provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
-                    }
-                    .dialogSeverity(.critical)
+                IconRow(symbol: "arrow.counterclockwise", tint: .red, title: "Reset All Settings",
+                        subtitle: "Every setting goes back to its default; history and usage are kept.") {
+                    Button("Reset…", role: .destructive) { confirmReset = true }
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Reset All Settings")
+                        // Here, not on the Form, so only this dialog is critical.
+                        .confirmationDialog("Reset all settings to their defaults?", isPresented: $confirmReset) {
+                            Button("Reset All Settings", role: .destructive) { replaceSettings(with: RetextSettings()) }
+                            // Cancel is the default button, so Return never resets.
+                            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+                        } message: {
+                            Text("Actions, per-app styles, Protected Words, the AI provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
+                        }
+                        .dialogSeverity(.critical)
+                }
             }
         }
+        // Every toggle sits in an IconRow, which shows its title.
+        .toggleStyle(.switch)
+        .labelsHidden()
         .onAppear {
             loginStatus = SMAppService.mainApp.status
             if SettingsView.demoExtra == "reset" { confirmReset = true }
@@ -90,7 +93,7 @@ struct GeneralPane: View {
                 pendingImport = nil
             }
         } message: {
-            Text("Your current actions, app styles, protected words and other settings are replaced.")
+            Text("Your current actions, per-app styles, Protected Words and other settings are replaced.")
         }
         .alert(backupError ?? "", isPresented: Binding(get: { backupError != nil }, set: { if !$0 { backupError = nil } })) {}
     }
@@ -129,5 +132,23 @@ struct GeneralPane: View {
     private func setOpenAtLogin(_ on: Bool) {
         try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
         loginStatus = SMAppService.mainApp.status
+    }
+}
+
+/// "Preview before replacing" shown with the real bar on sample text; decorative, the row above describes it.
+private struct PreviewSample: View {
+    @StateObject private var model: PopupModel = {
+        let model = PopupModel()
+        model.phase = .preview(TextDiff.words(old: "Thanks for you're message, I will sent the files tomorow.",
+                                              new: "Thanks for your message, I will send the files tomorrow."))
+        return model
+    }()
+
+    var body: some View {
+        PopupView(model: model, pick: { _ in }, choose: { _ in })
+            .fixedSize()
+            .frame(maxWidth: .infinity)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
