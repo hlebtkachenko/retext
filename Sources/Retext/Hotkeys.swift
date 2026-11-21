@@ -17,7 +17,10 @@ enum Hotkeys {
     /// Mirrors "Improve Electron app support".
     static var electronOnSwitch = true
     /// On while a shortcut is being recorded: every key passes through to the app, none is taken.
-    static var paused = false
+    /// The fallback hotkey lets go meanwhile, so the recorder can also capture the current shortcut.
+    static var paused = false {
+        didSet { if paused { unregisterFallback() } else { registerFallback() } }
+    }
     /// Set only while a "Copied" bubble is visible: ⌘Z then restores the previous clipboard instead of reaching the app.
     static var undo: (@MainActor () -> Void)?
     private static var tap: CFMachPort?
@@ -104,7 +107,7 @@ enum Hotkeys {
 
     /// Registers the current bar shortcut as the fallback hotkey, replacing an older one; nothing once the tap runs.
     private static func registerFallback() {
-        guard fallback != nil, tap == nil, !AppWindows.isDemo else { return }
+        guard fallback != nil, tap == nil, !paused, !AppWindows.isDemo else { return }
         let shortcut = (key: UInt32(menuKey), modifiers: fallbackModifiers)
         if let current = fallbackShortcut, current == shortcut { return }
         unregisterFallback()
