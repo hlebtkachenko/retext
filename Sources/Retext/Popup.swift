@@ -481,8 +481,8 @@ final class PopupController {
         anchor = rect
         panel.setFrame(frame(near: rect, size: fittingSize()), display: true)
         panel.alphaValue = 1
-        // `--demo`: shown without becoming key, so typing stays with the app in front.
-        if AppWindows.isDemo { return panel.orderFrontRegardless() }
+        // `--demo`: shown behind other windows without becoming key, so typing stays with the app in front.
+        if AppWindows.isDemo { return panel.orderBack(nil) }
         panel.makeKeyAndOrderFront(nil)
         if model.phase == .menu, let field = model.field { panel.makeFirstResponder(field) }
         installMonitors()
