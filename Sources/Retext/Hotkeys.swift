@@ -15,6 +15,8 @@ enum Hotkeys {
     static var menuModifiers = CGEventFlags.maskAlternate
     /// Mirrors "Improve Electron app support".
     static var electronOnSwitch = true
+    /// On while a shortcut is being recorded: every key passes through to the app, none is taken.
+    static var paused = false
     /// Set only while a "Copied" bubble is visible: ⌘Z then restores the previous clipboard instead of reaching the app.
     static var undo: (@MainActor () -> Void)?
     private static var tap: CFMachPort?
@@ -56,6 +58,7 @@ enum Hotkeys {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return false
         }
+        if paused { return false }
         if let undo, modifiers == .maskCommand, key == kVK_ANSI_Z {
             self.undo = nil
             DispatchQueue.main.async(execute: undo)
