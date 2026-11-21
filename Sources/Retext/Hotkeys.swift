@@ -28,6 +28,25 @@ enum Hotkeys {
         menuKey = Int(settings.barShortcut.keyCode)
         menuModifiers = flags(settings.barShortcut.modifiers)
         electronOnSwitch = settings.electronSupport
+        if BarShortcut.characterLookup == nil {
+            // The layout APIs are main-thread only; elsewhere the label falls back to the US layout.
+            BarShortcut.characterLookup = { code in Thread.isMainThread ? MainActor.assumeIsolated { typedCharacter(code) } : nil }
+        }
+    }
+
+    /// What a key types without modifiers in the current keyboard layout (Czech: keyCode 18 is "+"), so labels match the keycaps.
+    static func typedCharacter(_ keyCode: UInt16) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        var deadKeys: UInt32 = 0
+        var length = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        let status = data.withUnsafeBytes { bytes in
+            UCKeyTranslate(bytes.bindMemory(to: UCKeyboardLayout.self).baseAddress, keyCode, UInt16(kUCKeyActionDisplay), 0,
+                           UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeys, chars.count, &length, &chars)
+        }
+        return status == noErr && length > 0 ? String(utf16CodeUnits: chars, count: length) : nil
     }
 
     /// The tap's modifier flags for a shortcut's modifiers.
