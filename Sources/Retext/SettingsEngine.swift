@@ -33,29 +33,34 @@ struct EnginePane: View {
                 footer(provider)
             }
             Section {
-                IconRow(symbol: "star.fill", tint: .yellow, title: "Level", subtitle: "The bar and ⌥1…⌥9 use it; ↑ and ↓ in the bar change it for one run.") {
-                    Picker("Default Level", selection: $state.settings.defaultLevel) {
+                // No icon and no section title: one plain row, the picker on the title's line.
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Default Effort")
+                        Text("Change it for one run with ↑ and ↓ in the bar.")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Picker("Default Effort", selection: $state.settings.defaultLevel) {
                         ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
                 }
-            } header: {
-                SectionTitle("Default Level")
             }
             Section {
                 switch provider {
                 case .claude:
-                    // The level and its model; the time limit is in the tooltip.
                     ForEach(Level.allCases, id: \.self) { level in
-                        IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
-                            Text(Model.shortName(state.settings.model(for: level).model)).foregroundStyle(.secondary)
-                        }
-                        .help("Stops after \(Self.seconds(level)) s")
-                        .accessibilityElement(children: .combine)
+                        ModelRow(provider: .claude, level: level, models: $state.settings.claudeModels,
+                                 listed: ClaudeModels.aliases, efforts: ClaudeModels.efforts)
                     }
-                case .chatgpt: ChatGPTModelsSection(settings: $state.settings, models: codexModels)
+                case .chatgpt:
+                    ForEach(Level.allCases, id: \.self) { level in
+                        ModelRow(provider: .chatgpt, level: level, models: $state.settings.chatGPTModels,
+                                 listed: codexModels, efforts: ChatGPTModels.efforts)
+                    }
                 case .custom: CustomModelsSection(custom: $state.settings.custom)
                 }
             } header: {
@@ -147,38 +152,60 @@ private struct ChatGPTSection: View {
     }
 }
 
-/// The Models rows for ChatGPT: each level's model and effort.
-private struct ChatGPTModelsSection: View {
+/// The Models choices for Claude Code: the `claude --model` aliases and the `claude --effort` values.
+private enum ClaudeModels {
+    static let aliases = ["haiku", "sonnet", "opus", "fable"]
     static let efforts = ["low", "medium", "high", "xhigh", "max"]
-    @Binding var settings: RetextSettings
-    let models: [String]
+}
+
+/// The Models choices for ChatGPT; its models come from `codex debug models`.
+private enum ChatGPTModels {
+    static let efforts = ["low", "medium", "high", "xhigh", "max"]
+}
+
+/// The Models rows' columns, the same on every provider: a title column as wide as the longest level title, the model
+/// control filling the rest, and a fixed effort column, so the controls line up on every row at any window width.
+private enum ModelColumns {
+    @MainActor static let title: CGFloat = Level.allCases
+        .map { ($0.title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]).width }
+        .max()!.rounded(.up) + 2
+    static let effort: CGFloat = 150
+}
+
+/// One level's Models row for a provider with built-in models (Claude Code, ChatGPT): a model and an effort pop-up,
+/// each with "Default (<built-in>)" first; the time limit is in the tooltip.
+private struct ModelRow: View {
+    let provider: Provider
+    let level: Level
+    @Binding var models: [Level: ProviderModel]
+    /// The models to offer; the saved one is added when it isn't listed, so a model that left the list still shows.
+    let listed: [String]
+    let efforts: [String]
 
     var body: some View {
-        ForEach(Level.allCases, id: \.self) { level in
-            let base = Provider.chatgpt.defaultModel(level)
-            IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
-                // "" is the provider's default for the level.
-                PopUpPicker("\(level.title) Model", selection: field(level, \.model), options: [""] + options(level)) {
-                    $0.isEmpty ? "Default (\(base.model))" : $0
-                }
-                .fixedSize()
-                PopUpPicker("\(level.title) Effort", selection: field(level, \.effort), options: [""] + Self.efforts) {
-                    $0.isEmpty ? "Default (\(base.effort))" : $0
-                }
-                .fixedSize()
+        let base = provider.defaultModel(level)
+        IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title, titleWidth: ModelColumns.title) {
+            // "" is the provider's default for the level.
+            PopUpPicker("\(level.title) Model", selection: field(\.model), options: [""] + options(listed, saved: \.model),
+                        width: .fill) {
+                $0.isEmpty ? "Default (\(base.model))" : $0
+            }
+            PopUpPicker("\(level.title) Effort", selection: field(\.effort), options: [""] + options(efforts, saved: \.effort),
+                        width: .fixed(ModelColumns.effort)) {
+                $0.isEmpty ? "Default (\(base.effort))" : $0
             }
         }
+        .help("Stops after \(EnginePane.seconds(level)) s")
     }
 
-    /// Listed models plus the saved one, so a model that left the list still shows.
-    private func options(_ level: Level) -> [String] {
-        let saved = settings.chatGPTModels[level]?.model ?? ""
-        return models + (saved.isEmpty || models.contains(saved) ? [] : [saved])
+    private func options(_ values: [String], saved path: KeyPath<ProviderModel, String>) -> [String] {
+        let saved = models[level]?[keyPath: path] ?? ""
+        return values + (saved.isEmpty || values.contains(saved) ? [] : [saved])
     }
 
-    private func field(_ level: Level, _ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
-        Binding(get: { settings.chatGPTModels[level]?[keyPath: path] ?? "" },
-                set: { settings.chatGPTModels[level, default: ProviderModel()][keyPath: path] = $0 })
+    private func field(_ path: WritableKeyPath<ProviderModel, String>) -> Binding<String> {
+        Binding(get: { models[level]?[keyPath: path] ?? "" },
+                set: { models[level, default: ProviderModel()][keyPath: path] = $0 })
     }
 }
 
@@ -250,12 +277,14 @@ private struct CustomModelsSection: View {
 
     var body: some View {
         ForEach(Level.allCases, id: \.self) { level in
-            IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title) {
-                TextField("\(level.title) Model", text: field(level, \.model), prompt: Text("Model id")).frame(width: 240)
-                TextField("\(level.title) Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
+            IconRow(symbol: symbol(level).name, tint: symbol(level).tint, title: level.title, titleWidth: ModelColumns.title) {
+                TextField("\(level.title) Model", text: field(level, \.model), prompt: Text("Model id")).frame(maxWidth: .infinity)
+                TextField("\(level.title) Effort", text: field(level, \.effort), prompt: Text("Effort (optional)"))
+                    .frame(width: ModelColumns.effort)
                     .help("Sent as reasoning_effort")
             }
             .labelsHidden()
+            .help("Stops after \(EnginePane.seconds(level)) s")
         }
     }
 
