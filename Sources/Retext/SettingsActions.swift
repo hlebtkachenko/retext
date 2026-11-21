@@ -128,6 +128,7 @@ private struct ActionEditor: View {
                     Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
                         .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
                     Button("Delete Action…", role: .destructive) { confirmDelete = true }
+                        .foregroundStyle(.red)
                 }
                 Text("Kind: Grammar and Translate keep a one-line text on one line (unless an app style applies), and a Grammar result much longer than the text is rejected as an added note. Other has no such checks. Reset Prompt puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
                     .font(.callout).foregroundStyle(.secondary)
