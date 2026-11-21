@@ -10,13 +10,14 @@ struct WordsPane: View {
     var body: some View {
         Form {
             Section {
+                IntroCard(symbol: "lock.fill", title: "Protected Words",
+                          text: "Names, brands and terms Retext keeps exactly as written: never corrected, reworded or translated.")
+            }
+            Section {
                 ForEach(settings.protectedWords, id: \.self) { word in
-                    HStack {
-                        Text(word)
-                        Spacer()
-                        Button("Remove \(word)", systemImage: "minus.circle") { settings.protectedWords.removeAll { $0 == word } }
-                            .labelStyle(.iconOnly).buttonStyle(.borderless)
-                    }
+                    WordRow(word: word,
+                            commit: { settings.editProtectedWord(word, to: $0) },
+                            remove: { settings.protectedWords.removeAll { $0 == word } })
                 }
                 HStack {
                     // Multi-line, so a pasted list keeps its lines; Return adds every term.
@@ -25,7 +26,7 @@ struct WordsPane: View {
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
-                Text("Names and terms that are never changed or translated.").foregroundStyle(.secondary)
+                Text("Click a word to edit it. Clearing it removes it.").foregroundStyle(.secondary)
             }
         }
     }
@@ -33,5 +34,44 @@ struct WordsPane: View {
     private func add() {
         settings.addProtectedWords(newWord)
         newWord = ""
+    }
+}
+
+/// One protected word, editable in place: the draft is saved on Return or when the field loses focus.
+private struct WordRow: View {
+    let word: String
+    let commit: (String) -> Void
+    let remove: () -> Void
+    @State private var draft: String
+    @FocusState private var focused: Bool
+
+    init(word: String, commit: @escaping (String) -> Void, remove: @escaping () -> Void) {
+        self.word = word
+        self.commit = commit
+        self.remove = remove
+        _draft = State(initialValue: word)
+    }
+
+    var body: some View {
+        HStack {
+            TextField("Protected word", text: $draft)
+                .labelsHidden()
+                .focused($focused)
+                .onSubmit(save)
+                .onChange(of: focused) { _, isFocused in if !isFocused { save() } }
+            Button("Remove \(word)", systemImage: "minus.circle", action: remove)
+                .labelStyle(.iconOnly).buttonStyle(.borderless)
+                .help("Remove")
+        }
+        .contextMenu { Button("Remove", role: .destructive, action: remove) }
+        .accessibilityAction(named: "Remove", remove)
+    }
+
+    /// Safe to run twice (Return, then losing focus): an unchanged word is a no-op. A changed word gets a new row;
+    /// a draft that saves as the same word (" Acme ") snaps back to it.
+    private func save() {
+        guard draft != word else { return }
+        commit(draft)
+        draft = word
     }
 }
