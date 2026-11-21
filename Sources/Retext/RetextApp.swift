@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
                 // The case name (styles, words) or the start of the title (app, protected).
-                SettingsView.initialPane = SettingsView.Pane.allCases.first { "\($0)" == pane || $0.rawValue.lowercased().hasPrefix(pane) } ?? .actions
+                SettingsView.initialPane = SettingsView.Pane.allCases.first { "\($0)" == pane || $0.rawValue.lowercased().hasPrefix(pane) } ?? .overview
                 SettingsWindow.shared.show()
                 print("window \(SettingsWindow.shared.window?.windowNumber ?? 0)")  // for screencapture -l
                 fflush(stdout)
