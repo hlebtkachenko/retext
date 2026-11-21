@@ -22,41 +22,40 @@ struct GeneralPane: View {
                                                           set: { setOpenAtLogin($0) }))
                 }
                 IconRow(symbol: "menubar.rectangle", tint: .blue, title: "Show in Menu Bar",
-                        subtitle: "When off, shortcuts keep working; open Retext from Spotlight or Finder to get to Settings.") {
+                        subtitle: "When off, shortcuts still work; open Retext from Spotlight to get back here.") {
                     Toggle("Show in Menu Bar", isOn: $state.settings.showMenuBarIcon)
                 }
             }
             Section {
                 ShortcutField()
             } footer: {
-                Text("If another app uses ⌥Space, pick another shortcut or record your own. macOS may use ⌃⌥Space to switch input sources; you can turn that off in Keyboard Shortcuts.")
+                Text(state.settings.barShortcut == .controlOptionSpace
+                     ? "macOS may use ⌃⌥Space to switch input sources; turn that off in Keyboard Shortcuts."
+                     : "If the bar doesn't open, another app may be using this shortcut.")
                     .foregroundStyle(.secondary)
             }
-            Section("Preview") {
-                IconRow(symbol: "eye", tint: .orange, title: "Preview Before Replacing",
-                        subtitle: "Shows the result with the changes marked, so you can replace, copy or discard it. Text that can't be edited is copied either way.") {
+            Section {
+                IconRow(symbol: "eye", tint: .orange, title: "Preview Before Replacing") {
                     Toggle("Preview Before Replacing", isOn: $state.settings.previewBeforeReplace)
                 }
+                .help("Text that can't be edited is copied either way.")
                 PreviewSample()
             }
-            Section("Backup") {
-                IconRow(symbol: "externaldrive.fill", tint: .teal, title: "Back up your actions, styles and protected words",
-                        subtitle: "Saves every setting except the API key to one file. History, usage and how much history is kept stay as they are on import and reset; an import also keeps this Mac's Claude Code and Codex paths and API server.")
-                HStack {
-                    Spacer()
+            Section {
+                IconRow(symbol: "externaldrive.fill", tint: .teal, title: "Back Up Settings",
+                        subtitle: "Your API key and history aren't included.") {
                     Button("Export…", action: export)
                     Button("Import…", action: chooseImport)
                 }
             }
             Section("Advanced") {
                 IconRow(symbol: "bolt.horizontal.fill", tint: .purple, title: "Improve Electron App Support",
-                        subtitle: "Asks every app you switch to for its accessibility tree, so ⌥1…⌥9 work in Electron apps (Slack, VS Code) right away.") {
+                        subtitle: "Makes ⌥1…⌥9 work right away in Electron apps such as Slack and VS Code.") {
                     Toggle("Improve Electron App Support", isOn: $state.settings.electronSupport)
                 }
             }
             Section {
-                IconRow(symbol: "arrow.counterclockwise", tint: .red, title: "Reset All Settings",
-                        subtitle: "Every setting goes back to its default; history and usage are kept.") {
+                IconRow(symbol: "arrow.counterclockwise", tint: .red, title: "Reset All Settings") {
                     Button("Reset…", role: .destructive) { confirmReset = true }
                         .foregroundStyle(.red)
                         .accessibilityLabel("Reset All Settings")
@@ -66,7 +65,7 @@ struct GeneralPane: View {
                             // Cancel is the default button, so Return never resets.
                             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
                         } message: {
-                            Text("Actions, per-app styles, Protected Words, the AI provider and every other setting go back to the defaults. History and usage are kept. Export your settings first to keep a copy.")
+                            Text("History and usage are kept. Export your settings first to keep a copy.")
                         }
                         .dialogSeverity(.critical)
                 }
@@ -95,7 +94,7 @@ struct GeneralPane: View {
                 pendingImport = nil
             }
         } message: {
-            Text("Your current actions, per-app styles, Protected Words and other settings are replaced.")
+            Text("History, usage and this Mac's Claude Code path, Codex path and API server are kept.")
         }
         .alert(backupError ?? "", isPresented: Binding(get: { backupError != nil }, set: { if !$0 { backupError = nil } })) {}
     }

@@ -12,8 +12,7 @@ struct WordsPane: View {
     var body: some View {
         Form {
             Section {
-                IntroCard(symbol: "lock.fill", title: "Protected Words",
-                          text: "Names, brands and terms Retext keeps exactly as written: never corrected, reworded or translated.")
+                IntroCard(symbol: "lock.fill", text: "Names and terms Retext keeps as written, even in translations.")
             }
             Section {
                 ForEach(settings.protectedWords, id: \.self) { word in
@@ -23,13 +22,13 @@ struct WordsPane: View {
                 }
                 HStack {
                     // Multi-line, so a pasted list keeps its lines; Return adds every term.
-                    TextField("New term", text: $newWord, prompt: Text("Add terms, one per line or separated by commas"), axis: .vertical)
+                    TextField("New word", text: $newWord, prompt: Text("Add words, one per line or separated by commas"), axis: .vertical)
                         .lineLimit(1...6).labelsHidden().onSubmit(add)
                         .focused($adding)
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
-                Text("Click a word to edit it. Clearing it removes it.").foregroundStyle(.secondary)
+                Text("Click a word to edit it.").foregroundStyle(.secondary)
             }
         }
         .onAppear { adding = true }

@@ -60,16 +60,12 @@ private struct IconTile: View {
 /// An explanatory card at the top of a pane: what the page is for, in a sentence or two.
 struct IntroCard: View {
     let symbol: String
-    let title: String
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             IconTile(symbol: symbol, tint: .accentColor, size: 34)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline)
-                Text(text).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
+            Text(text).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
@@ -89,7 +85,7 @@ struct TestButton: View {
 
     var body: some View {
         HStack {
-            Button(title, action: test).disabled(testing)
+            Button(title, action: test).disabled(testing).help("Sends one tiny request at Medium.")
             if testing { ProgressView().controlSize(.small) }
             if let result {
                 Label(result.text, systemImage: result.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")

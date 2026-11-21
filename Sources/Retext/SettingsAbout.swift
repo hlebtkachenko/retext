@@ -33,11 +33,11 @@ struct AboutPane: View {
             }
             Section("Updates") {
                 if let update = state.update { UpdateCard(release: update) }
-                IconRow(symbol: "arrow.triangle.2.circlepath", tint: .blue, title: "Check for updates automatically",
-                        subtitle: "Asks GitHub at most once a day. Nothing is downloaded.") {
-                    Toggle("Check for updates automatically", isOn: $state.settings.checkForUpdates).labelsHidden().toggleStyle(.switch)
+                IconRow(symbol: "arrow.triangle.2.circlepath", tint: .blue, title: "Check for Updates Automatically") {
+                    Toggle("Check for Updates Automatically", isOn: $state.settings.checkForUpdates).labelsHidden().toggleStyle(.switch)
                 }
-                IconRow(symbol: "checkmark.seal.fill", tint: .green, title: "Retext \(AppVersion.short ?? "development build")", subtitle: lastCheckedText) {
+                .help("Asks GitHub at most once a day. Nothing is downloaded.")
+                IconRow(symbol: "checkmark.seal.fill", tint: .green, title: lastCheckedText) {
                     if state.checkingForUpdates { ProgressView().controlSize(.small) }
                     Button("Check Now") { state.checkForUpdatesNow() }.disabled(state.checkingForUpdates)
                 }
@@ -108,8 +108,7 @@ private struct UpdateCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            IconRow(symbol: "arrow.down.circle.fill", tint: .accentColor, title: "Retext \(release.version) is available",
-                    subtitle: "You have \(AppVersion.short ?? "a development build").") {
+            IconRow(symbol: "arrow.down.circle.fill", tint: .accentColor, title: "Update Available (\(release.version))") {
                 if release.html_url.hasPrefix("https://github.com/"), let url = URL(string: release.html_url) {
                     Button("Open Release Page") { NSWorkspace.shared.open(url) }.buttonStyle(.borderedProminent)
                 }
@@ -130,8 +129,8 @@ private struct GetStartedCard: View {
         HStack(spacing: 14) {
             SidebarTile(symbol: "hand.wave.fill", tint: .accentColor, size: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Get Started with Retext").font(.headline)
-                Text("Allow Accessibility, check your AI provider and try the shortcut.").foregroundStyle(.secondary)
+                Text("Onboarding").font(.headline)
+                Text("Grant access, pick your AI and try the shortcut.").foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             Button("Start") { OnboardingWindow.shared.show() }.controlSize(.large)

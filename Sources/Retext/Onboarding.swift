@@ -23,7 +23,7 @@ enum AppWindows {
 }
 
 /// The setup walk-through: shown once on first launch (`RetextSettings.onboarded`), later from Settings → About
-/// (Get Started) and Help → Retext Onboarding.
+/// (Onboarding) and Help → Retext Onboarding.
 @MainActor
 final class OnboardingWindow: NSObject, NSWindowDelegate, ObservableObject {
     static let shared = OnboardingWindow()
@@ -142,10 +142,8 @@ private struct WelcomeStep: View {
             Form {
                 Section {
                     IconRow(symbol: "selection.pin.in.out", tint: .blue, title: "Select text in any app")
-                    IconRow(symbol: "keyboard", tint: .purple, title: "Press \(state.settings.barShortcut.displayLabel)",
-                            subtitle: "The bar opens next to the selection.")
-                    IconRow(symbol: "sparkles", tint: .pink, title: "Pick an action or type an instruction",
-                            subtitle: "The result replaces the selection.")
+                    IconRow(symbol: "keyboard", tint: .purple, title: "Press \(state.settings.barShortcut.displayLabel) to open the bar")
+                    IconRow(symbol: "sparkles", tint: .pink, title: "Pick an action or type an instruction")
                 }
             }
             .formStyle(.grouped)
@@ -158,15 +156,12 @@ private struct AccessStep: View {
     var body: some View {
         VStack(spacing: 0) {
             StepHeader(title: "Allow Accessibility",
-                       text: "Retext reads the text you select and pastes the result. macOS asks you to allow this once, in System Settings → Privacy & Security → Accessibility.") {
+                       text: "Retext needs it to read and replace the text you select.") {
                 SidebarTile(symbol: "accessibility", tint: .blue, size: 64)
             }
             Form {
                 Section {
                     AccessibilityRow()
-                } footer: {
-                    Text("Turn on Retext in the list. This step moves on by itself once access is allowed.")
-                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)
@@ -206,11 +201,7 @@ private struct ProviderStep: View {
                     ProviderRow()
                     TestButton(title: "Test Provider")
                 } footer: {
-                    HStack {
-                        Text("Paths, models and API keys are in Settings → AI.").font(.callout).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Open AI Settings…") { SettingsWindow.shared.show(.ai) }.buttonStyle(.link)
-                    }
+                    Button("Open AI Settings…") { SettingsWindow.shared.show(.ai) }.buttonStyle(.link)
                 }
             }
             .formStyle(.grouped)
@@ -225,7 +216,7 @@ private struct ShortcutStep: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            StepHeader(title: "Try It", text: "Pick the shortcut that opens the bar, then try it on the sample below.") {
+            StepHeader(title: "Try It", text: "Pick the shortcut that opens the bar.") {
                 SidebarTile(symbol: "keyboard", tint: .purple, size: 64)
             }
             Form {
@@ -236,10 +227,8 @@ private struct ShortcutStep: View {
                     TextField("Sample text", text: $sample, axis: .vertical)
                         .labelsHidden()
                         .lineLimit(2...4)
-                } header: {
-                    Text("Try it")
                 } footer: {
-                    Text("Select the sample, press \(state.settings.barShortcut.displayLabel) and pick Fix Grammar.")
+                    Text("Select the sample, press \(state.settings.barShortcut.displayLabel) and pick Fix grammar.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }
@@ -260,7 +249,8 @@ struct AccessibilityRow: View {
     @State private var trusted = AccessibilityRow.isTrusted
 
     var body: some View {
-        IconRow(symbol: "accessibility", tint: .blue, title: "Accessibility", subtitle: "Reads the selection, sees the shortcuts and pastes the result.") {
+        IconRow(symbol: "accessibility", tint: .blue, title: "Accessibility",
+                subtitle: trusted ? nil : "Turn on Retext in Privacy & Security → Accessibility.") {
             if trusted {
                 Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
@@ -273,6 +263,7 @@ struct AccessibilityRow: View {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
+        .help("Reads the selection, sees the shortcuts and pastes the result.")
     }
 
     /// The system prompt adds Retext to the Accessibility list (a new install is not listed before it asks); the
@@ -293,7 +284,7 @@ struct ProviderRow: View {
         // `--demo`: a fixed ready status, so a screenshot shows no real path.
         let status = AppWindows.isDemo ? ProviderStatus(ready: true, detail: Self.demoDetail(state.settings.provider), problem: nil) : state.providerStatus
         IconRow(symbol: "sparkles", tint: .pink, title: state.settings.provider.title,
-                subtitle: status.map { $0.ready ? readyText : $0.detail } ?? readyText) {
+                subtitle: status.flatMap { $0.ready ? nil : $0.detail }) {
             switch status {
             case nil: ProgressView().controlSize(.small)
             case let status? where status.ready:
@@ -304,10 +295,6 @@ struct ProviderRow: View {
             }
         }
         .onAppear { if !AppWindows.isDemo { state.checkProvider() } }
-    }
-
-    private var readyText: String {
-        state.settings.provider == .custom ? "Sends requests to the API you set." : "Runs requests with your own login."
     }
 
     private static func demoDetail(_ provider: Provider) -> String {

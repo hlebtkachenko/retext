@@ -38,12 +38,10 @@ struct HistoryPane: View {
                 } label: {
                     Text(countText)
                 }
-            } header: {
-                Text("History")
             } footer: {
                 Text(state.settings.historyRetention == .off
                      ? "Not saved; the last result is kept until Retext quits."
-                     : "Saved in plain text in ~/Library/Application Support/Retext/history.json, also used to reuse results for the same text.")
+                     : "Saved as plain text in ~/Library/Application Support/Retext/history.json.")
                     .foregroundStyle(.secondary)
             }
             UsageSection(usage: state.usage)
@@ -68,7 +66,7 @@ struct HistoryPane: View {
                         HistoryRow(entry: entry, open: { detail = entry }, delete: { state.history.remove(id: entry.id) })
                     }
                     if items.count > shown {
-                        Button("Show More (\(items.count - shown) more)") { shown += Self.page }
+                        Button("Show \(items.count - shown) More") { shown += Self.page }
                             .buttonStyle(.borderless)
                             .frame(maxWidth: .infinity)
                     }
@@ -83,7 +81,7 @@ struct HistoryPane: View {
             Button("Clear History", role: .destructive) { state.history = History() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
-            Text("All saved results are deleted. Retext no longer reuses them for the same text.")
+            Text("All saved results are deleted.")
         }
         .confirmationDialog(confirmTitle, isPresented: Binding(get: { pendingRetention != nil }, set: { if !$0 { pendingRetention = nil } })) {
             Button(pendingRetention == .off ? "Turn Off History" : "Delete Older Results", role: .destructive) {
@@ -125,7 +123,7 @@ struct HistoryPane: View {
 
     private var confirmMessage: String {
         guard let pendingRetention else { return "" }
-        if pendingRetention == .off { return "Saved results are deleted from history.json. The last result is kept until Retext quits." }
+        if pendingRetention == .off { return "Saved results are deleted." }
         let extra = state.history.entries.count - (pendingRetention.limit ?? 0)
         return "The \(extra) older \(extra == 1 ? "result is" : "results are") deleted."
     }
@@ -229,7 +227,7 @@ private struct HistoryDetail: View {
                 Text(entry.title).font(.title3.bold()).lineLimit(1)
                 Spacer()
                 // Older entries kept only the start of the original: a diff against it would mark nearly everything.
-                Toggle("Show changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
+                Toggle("Show Changes", isOn: $showChanges).toggleStyle(.switch).disabled(entry.isShortened)
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -260,7 +258,7 @@ private struct HistoryDetail: View {
                 } header: {
                     Text("Result")
                 }
-                Section("General") {
+                Section("Details") {
                     LabeledContent("Date", value: entry.date.formatted(Date.FormatStyle(date: .complete, time: .standard).locale(HistoryEntry.english)))
                     LabeledContent("Action", value: entry.kind == nil && entry.level != nil ? "Instruction: \(entry.title)" : entry.title)
                     if !entry.appName.isEmpty { LabeledContent("App", value: entry.appName) }
@@ -301,7 +299,7 @@ private struct UsageSection: View {
         Section {
             Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 8) {
                 GridRow {
-                    Text("Period").gridColumnAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("").gridColumnAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
                     Text("Runs")
                     Text("Tokens")
                     Text("Price")
@@ -325,7 +323,7 @@ private struct UsageSection: View {
         } header: {
             Text("Usage")
         } footer: {
-            Text("Runs include results reused from history. The price is the Claude Code list price for the same tokens; ChatGPT and custom API runs count tokens only.")
+            Text("Price is the Claude Code list price. ChatGPT and custom API runs count tokens only.")
                 .foregroundStyle(.secondary)
         }
     }

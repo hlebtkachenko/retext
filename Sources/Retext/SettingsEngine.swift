@@ -13,24 +13,26 @@ struct EnginePane: View {
         let provider = state.settings.provider
         Form {
             Section {
-                IntroCard(symbol: "sparkles", title: "How Retext uses AI",
-                          text: "The provider is the AI service that edits your text: Claude Code, ChatGPT or an API of your choice, set up once below. Each run uses a quality level: Medium is fast, High rewrites more naturally, Max gives the best result. In the bar, ↑ and ↓ change the level for one run; a run stops after \(Self.seconds(.medium)) s, \(Self.seconds(.max)) s at Max.")
+                IntroCard(symbol: "sparkles", text: "Higher levels give better results and take longer.")
             }
             Section {
-                IconRow(symbol: "star.fill", tint: .yellow, title: "Default Level", subtitle: "Every bar opens at it, and ⌥1…⌥9 run at it.") {
+                IconRow(symbol: "star.fill", tint: .yellow, title: "Default Level", subtitle: "The bar and ⌥1…⌥9 use it; ↑ and ↓ in the bar change it for one run.") {
                     Picker("Default Level", selection: $state.settings.defaultLevel) {
                         ForEach(Level.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .labelsHidden()
                     .fixedSize()
                 }
-                // Name with its model and role below, the same layout for every level whatever the description's length.
+                // The level and its model; the time limit is in the tooltip.
                 ForEach(Level.allCases, id: \.self) { level in
-                    IconRow(symbol: Self.symbol(level).name, tint: Self.symbol(level).tint, title: level.title, subtitle: describe(level))
-                        .accessibilityElement(children: .combine)
+                    IconRow(symbol: Self.symbol(level).name, tint: Self.symbol(level).tint, title: level.title) {
+                        Text(describe(level)).foregroundStyle(.secondary)
+                    }
+                    .help("Stops after \(Self.seconds(level)) s")
+                    .accessibilityElement(children: .combine)
                 }
             } header: {
-                Text("Quality")
+                Text("Levels")
             }
             switch provider {
             case .claude: EmptyView()
@@ -74,24 +76,19 @@ struct EnginePane: View {
 
     static func about(_ provider: Provider) -> String {
         switch provider {
-        case .claude: "Uses your own Claude Code login: subscription usage counts against your plan's limits; API-key logins are billed to your account."
-        case .chatgpt: "Uses your own ChatGPT login through the Codex CLI, without Retext reading or storing your OpenAI credentials: your text goes to OpenAI and usage counts against your plan's Codex limits."
-        case .custom: "Sends the selected text to the API at the base URL you set, whose pricing and privacy terms apply."
+        case .claude: "Uses your Claude Code login; plan limits apply, API keys are billed."
+        case .chatgpt: "Uses your ChatGPT login through Codex; your plan's Codex limits apply."
+        case .custom: "Sends your text to the API below; its pricing and privacy terms apply."
         }
     }
 
     private func describe(_ level: Level) -> String {
-        let role = switch level {
-        case .medium: "fast, the standard prompts"
-        case .high: "deeper native rewrite of word order, word choice, missing small words and calques"
-        case .max: "the most polished result, slowest"
-        }
         let m = state.settings.model(for: level)
         switch state.settings.provider {
-        case .claude: return "\(Model.shortName(m.model)): \(role)"
+        case .claude: return Model.shortName(m.model)
         case .chatgpt, .custom:
             guard !m.model.isEmpty else { return "No model set" }
-            return "\(m.model)\(m.effort.isEmpty ? "" : " (\(m.effort))"): \(role)"
+            return "\(m.model)\(m.effort.isEmpty ? "" : " (\(m.effort))")"
         }
     }
 
@@ -105,16 +102,16 @@ private struct ClaudeSection: View {
     var body: some View {
         let found = state.providerStatus?.ready != false
         Section {
-            TextField("Claude Code path", text: $claudePath, prompt: Text("Found automatically"))
+            TextField("Path", text: $claudePath, prompt: Text("Found automatically"))
             TestButton(title: "Test Claude Code", success: {
                 await ClaudeRunner.version(claudePath: claudePath).map { "Works (Claude Code \($0))" } ?? "Works"
             })
         } header: {
             Text("Claude Code")
         } footer: {
-            Text(found ? "The test sends one tiny request at Medium."
-                       : "Claude Code not found: install it, or enter the full path to the claude executable.")
-                .foregroundStyle(found ? .secondary : Color.orange)
+            if !found {
+                Text("Claude Code not found: install it, or enter the full path to the claude executable.").foregroundStyle(.orange)
+            }
         }
     }
 }
@@ -126,7 +123,7 @@ private struct ChatGPTSection: View {
 
     var body: some View {
         Section {
-            TextField("Codex path", text: $settings.codexPath, prompt: Text("Found automatically"))
+            TextField("Path", text: $settings.codexPath, prompt: Text("Found automatically"))
             LabeledContent("Login") {
                 switch loggedIn {
                 case nil: ProgressView().controlSize(.small)
@@ -135,6 +132,7 @@ private struct ChatGPTSection: View {
                 case .some(nil): Label("Codex not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }
             }
+            .help("Retext never reads or stores your OpenAI credentials, and runs Codex with its tools, web search, plugins and your Codex settings turned off.")
             TestButton(title: "Test ChatGPT", precheck: {
                 switch await CodexRunner.isLoggedInWithChatGPT(codexPath: settings.codexPath) {
                 case nil: .notFound
@@ -147,8 +145,9 @@ private struct ChatGPTSection: View {
         } header: {
             Text("ChatGPT (Codex)")
         } footer: {
-            Text("Needs the Codex CLI (npm install -g @openai/codex) signed in with codex login using your ChatGPT account; Retext runs it with its tools, web search, plugins and your Codex settings turned off.")
-                .foregroundStyle(.secondary)
+            if loggedIn != .some(true) {
+                Text("Install with npm install -g @openai/codex, then sign in with codex login.").foregroundStyle(.secondary)
+            }
         }
         .task(id: settings.codexPath) {
             loggedIn = nil
@@ -184,9 +183,6 @@ private struct ChatGPTModelsSection: View {
             }
         } header: {
             Text("ChatGPT Models")
-        } footer: {
-            Text("If a run says the model isn't available, pick another model or effort for that level; the list comes from codex debug models.")
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -224,9 +220,9 @@ private struct CustomAPISection: View {
                     .fixedSize()
                 }
             }
-            LabeledContent("API key") {
+            LabeledContent("API Key") {
                 HStack {
-                    SecureField("API key", text: $key, prompt: Text(keyPrompt)).labelsHidden()
+                    SecureField("API Key", text: $key, prompt: Text(keyPrompt)).labelsHidden()
                         .onSubmit(saveKey)
                     Button("Save", action: saveKey).disabled(key.trimmingCharacters(in: .whitespaces).isEmpty || custom.keyAccount == nil)
                     if keySaved, let account = custom.keyAccount {
@@ -250,7 +246,7 @@ private struct CustomAPISection: View {
             Text("Custom API")
         } footer: {
             Text(keyError ? "The Keychain didn't accept the key. Try again."
-                          : "Any OpenAI-compatible Chat Completions API (http only on the local network); the key is kept in the macOS Keychain and sent only to this URL's server.")
+                          : "Any OpenAI-compatible API (http only on your local network). The key stays in the Keychain and is sent only to this server.")
                 .foregroundStyle(keyError ? Color.orange : .secondary)
         }
     }
@@ -283,15 +279,13 @@ private struct CustomModelsSection: View {
                     HStack {
                         TextField("Model", text: field(level, \.model), prompt: Text("Model id"))
                         TextField("Effort", text: field(level, \.effort), prompt: Text("Effort (optional)")).frame(width: 130)
+                            .help("Sent as reasoning_effort")
                     }
                     .labelsHidden()
                 }
             }
         } header: {
             Text("Custom API Models")
-        } footer: {
-            Text("The model id the API expects for each level; effort is sent as reasoning_effort only when set.")
-                .foregroundStyle(.secondary)
         }
     }
 

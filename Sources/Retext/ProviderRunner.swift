@@ -36,7 +36,7 @@ struct ProviderStatus: Equatable, Sendable {
                                       problem: "Codex not found…")
             }
             guard CodexRunner.hasLogin else {
-                return ProviderStatus(ready: false, detail: "Run codex login in Terminal and sign in with ChatGPT. Retext needs Codex's file credential store (the default).", problem: "Codex isn't logged in…")
+                return ProviderStatus(ready: false, detail: "Run codex login in Terminal and sign in with ChatGPT.", problem: "Codex isn't logged in…")
             }
             return .ok(path)
         case .custom:

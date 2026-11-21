@@ -13,8 +13,7 @@ struct ActionsPane: View {
     var body: some View {
         Form {
             Section {
-                IntroCard(symbol: "bolt.fill", title: "Actions",
-                          text: "Saved instructions you'd otherwise type into the bar, like “fix the grammar” or “make it shorter”. Run one from the bar, or press ⌥1 to ⌥9 to run it right away on the selected text.")
+                IntroCard(symbol: "bolt.fill", text: "Saved instructions you run from the bar or with ⌥1…⌥9.")
             }
             Section {
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
@@ -22,8 +21,6 @@ struct ActionsPane: View {
                               move: { move(action.id, by: $0) }, delete: { confirmDelete = action })
                 }
                 .onMove { actions.move(fromOffsets: $0, toOffset: $1) }
-            } footer: {
-                Text("⌥1 to ⌥9 follow the list order. Drag a row to change it.").foregroundStyle(.secondary)
             }
             Section {
                 HStack {
@@ -54,7 +51,7 @@ struct ActionsPane: View {
             // Cancel is the default button, so Return never restores.
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
-            Text("Your actions are replaced by Fix grammar, English and a translation into your Mac's language. Edited prompts and added actions are lost.")
+            Text("Edited prompts and added actions are lost.")
         }
         .dialogSeverity(.critical)
         .confirmationDialog("Delete “\(confirmDelete?.title ?? "")”?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
@@ -122,8 +119,7 @@ private struct ActionRow: View {
                 .foregroundStyle(.tertiary)
                 .help("Drag to reorder")
                 .accessibilityHidden(true)
-            IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title,
-                    subtitle: kindName(action.kind)) {
+            IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title) {
                 shortcut
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }
@@ -227,7 +223,7 @@ private struct ActionSheet: View {
                     }
                     .overlay(alignment: .topLeading) {
                         if action.prompt.isEmpty {
-                            Text("What Retext should do with the selected text, e.g. “Make it shorter and keep the meaning.”")
+                            Text("What Retext should do with the selected text")
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 11).padding(.vertical, 6)
                                 .allowsHitTesting(false)

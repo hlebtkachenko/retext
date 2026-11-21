@@ -22,7 +22,7 @@ struct ShortcutField: View {
     var body: some View {
         let shortcut = state.settings.barShortcut
         IconRow(symbol: "command", tint: .indigo, title: "Shortcut",
-                subtitle: recorder.recording ? "Press the new shortcut, or esc to cancel." : "Opens the bar over the selected text.") {
+                subtitle: recorder.recording ? "Press the new shortcut, or esc to cancel." : nil) {
             if recorder.recording {
                 KeyCaps(text: recorder.live.isEmpty ? "Type Shortcut" : recorder.live, active: true)
                     .accessibilityLabel("Recording shortcut")

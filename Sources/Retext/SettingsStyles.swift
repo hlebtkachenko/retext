@@ -85,8 +85,7 @@ struct StylesPane: View {
     var body: some View {
         Form {
             Section {
-                IntroCard(symbol: "app.badge.fill", title: "Per-App Styles",
-                          text: "A style is added to the prompt whenever the selected text is in that app, so every action fits the place you write in: casual in Slack, formal in Mail.")
+                IntroCard(symbol: "app.badge.fill", text: "A style tells every action how to write in that app.")
             }
             ForEach($styles) { $style in
                 Section { row($style) }
@@ -101,7 +100,7 @@ struct StylesPane: View {
                 }
             } footer: {
                 if styles.isEmpty {
-                    Text("No app styles yet. Actions then write the same way in every app.").foregroundStyle(.secondary)
+                    Text("No app styles yet.").foregroundStyle(.secondary)
                 }
             }
         }
@@ -127,11 +126,7 @@ struct StylesPane: View {
                 }
                 .frame(width: 32, height: 32)
                 .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name).font(.headline)
-                    Text(bundleID.isEmpty ? "No app chosen" : bundleID)
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                }
+                Text(name).font(.headline).help(bundleID)
                 Spacer()
                 Menu {
                     AppMenu(title: "Change App", systemImage: "arrow.left.arrow.right", running: running, installed: installed) {
@@ -150,7 +145,7 @@ struct StylesPane: View {
                 .accessibilityLabel("Options for \(name)")
             }
             TextField("Style for \(name)", text: style.style,
-                      prompt: Text("How to write in this app, e.g. casual and short, no greetings"), axis: .vertical)
+                      prompt: Text("e.g. casual and short, no greetings"), axis: .vertical)
                 .lineLimit(2...5)
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
