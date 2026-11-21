@@ -16,16 +16,18 @@ struct GeneralPane: View {
     var body: some View {
         Form {
             PageDescription(.general)
-            Section("Startup") {
+            Section {
                 IconRow(symbol: "power", tint: .green, title: "Open at Login",
                         subtitle: loginStatus == .requiresApproval ? "Waiting for approval in System Settings → General → Login Items." : nil) {
                     Toggle("Open at Login", isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval },
                                                           set: { setOpenAtLogin($0) }))
                 }
-                IconRow(symbol: "menubar.rectangle", tint: .blue, title: "Show in Menu Bar",
-                        subtitle: "When off, shortcuts still work; open Retext from Spotlight to get back here.") {
+                IconRow(symbol: "menubar.rectangle", tint: .blue, title: "Show in Menu Bar") {
                     Toggle("Show in Menu Bar", isOn: $state.settings.showMenuBarIcon)
                 }
+                .help("When off, shortcuts still work; open Retext from Spotlight to get back here.")
+            } header: {
+                SectionTitle("Startup")
             }
             Section {
                 ShortcutField()
@@ -49,11 +51,13 @@ struct GeneralPane: View {
                     Button("Import…", action: chooseImport)
                 }
             }
-            Section("Advanced") {
+            Section {
                 IconRow(symbol: "bolt.horizontal.fill", tint: .purple, title: "Improve Electron App Support",
                         subtitle: "Makes ⌥1…⌥9 work right away in Electron apps such as Slack and VS Code.") {
                     Toggle("Improve Electron App Support", isOn: $state.settings.electronSupport)
                 }
+            } header: {
+                SectionTitle("Advanced")
             }
             Section {
                 IconRow(symbol: "arrow.counterclockwise", tint: .red, title: "Reset All Settings") {
