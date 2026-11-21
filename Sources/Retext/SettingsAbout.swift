@@ -81,7 +81,8 @@ struct AboutPane: View {
 
     private var lastCheckedText: String {
         guard let date = UpdateChecker.lastChecked else { return "Not checked yet" }
-        return "Last checked \(date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(HistoryEntry.english)))"
+        // English like History's dates; .long, since .abbreviated is all digits in some regions ("21. 11. 2026").
+        return "Last checked \(date.formatted(Date.FormatStyle(date: .long, time: .shortened).locale(HistoryEntry.english)))"
     }
 
     /// The last manual check's answer; an available release is shown by `UpdateCard` instead.
