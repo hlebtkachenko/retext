@@ -25,8 +25,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Settings → Usage: one currency format for every amount, a "Price" row, and one footer that names the Claude Code list price; ChatGPT and custom API calls count tokens only.
 - The menu-bar menu is shorter: your actions, "Copy Recent" (was "Recent (click to copy)"), the Accessibility, provider and update rows only when there is something to show, Check for Updates…, Settings… (⌘,) and Quit. The usage line and Welcome… are gone; usage is in Settings → Usage.
 - While Settings or Welcome is open, the Retext app menu has About, Check for Updates… and Settings… (⌘,), and the Help menu has "Welcome to Retext".
-- The bar's field placeholder reads "Instruction" (was "Edit as"). In a preview, Replace is a blue button. After a "Copied" result, ⌘Z shows "Clipboard restored".
-- History and Recent keep only the first 60 characters of the selection, enough to recognize it; older entries are shortened when Retext starts. The result is kept whole, and the cache still matches the full text.
+- The bar's field placeholder reads "Instruction" (was "Edit as"). In a preview, Replace is an accent-coloured button. After a "Copied" result, ⌘Z shows "Clipboard restored".
+- History and Recent keep only the first 60 characters of the selection, enough to recognize it; older entries are shortened and saved when Retext starts. The result is kept whole, and the cache still matches the full text.
 - Settings: footers are one sentence or gone. Protected words: Paste List… is gone; the add field takes several lines (one term per line, or separated by commas). General: the "Open at login" note shows only while macOS waits for approval, Clear History… is red with Cancel as the default, Reset All Settings to Defaults… sits alone at the bottom, and Backup holds Export and Import. Engine: removing the custom API key asks first.
 - The welcome window's intro is shorter, and the Try it note under the sample text is gone.
 - Build: `./build.sh` builds into `build.noindex/Retext.app` (was `build/`), so Spotlight doesn't offer the build copy as a second Retext. It waits for the running Retext to quit, verifies the installed copy's signature and unregisters the build copies from Launch Services.
@@ -37,8 +37,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Fixed
 - A Claude Code or Codex run that hangs and ignores the stop is killed 2 seconds later (SIGTERM, then SIGKILL to its process group), and a background job it started can't hold the run open. The login-shell lookup is stopped after 3 seconds the same way.
-- A `claude` or `codex` that wasn't found is looked up again on the next run, so installing it later works without relaunching Retext.
-- A custom API answer cut off at the model's output limit fails with "The answer was cut off. Your text is unchanged." and is never pasted or cached.
+- A `claude` or `codex` that wasn't found, or whose found path was removed, is looked up again on the next run, so installing or moving it works without relaunching Retext.
+- A Claude Code or custom API answer cut off at the model's output limit fails with "The answer was cut off. Your text is unchanged." and is never pasted or cached; the call still counts in Settings → Usage.
 - After a paste, the previous clipboard comes back 1.5 seconds later (was 0.7), and only if the clipboard still holds Retext's result, so something you copied in between is kept.
 - A ⌘C copy that lands after Retext stopped waiting for it is undone too, so your clipboard isn't left holding the selection.
 - A second ⌥Space while Retext is still reading the selection is ignored instead of starting another read.
