@@ -58,9 +58,12 @@ import RetextCore
         #expect(CommandLocator.found.withLock { $0[name] } == nil)
     }
 
-    @Test func hitIsCached() {
-        #expect(CommandLocator.find("ls", override: "", candidates: []) == "/bin/ls")
-        #expect(CommandLocator.found.withLock { $0["ls"] } == "/bin/ls")
+    @Test func hitIsCached() throws {
+        // Any path the login shell finds (a GNU `ls` earlier on PATH is fine): only the caching is checked.
+        let first = try #require(CommandLocator.find("ls", override: "", candidates: []))
+        #expect(first.hasPrefix("/"))
+        #expect(CommandLocator.found.withLock { $0["ls"] } == first)
+        #expect(CommandLocator.find("ls", override: "", candidates: []) == first)
     }
 
     @Test func loginShellReturnsOutputLines() {
