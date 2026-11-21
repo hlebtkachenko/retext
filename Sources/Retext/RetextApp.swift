@@ -48,61 +48,48 @@ struct RetextApp: App {
                     .keyboardShortcut(index < 9 ? KeyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .option) : nil)
             }
             Divider()
-            Menu("Copy Recent") {
-                if state.history.entries.isEmpty { Text("Nothing yet") }
-                ForEach(state.history.entries) { entry in
-                    Button(Self.short(entry)) {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(entry.output, forType: .string)
-                    }
+            // Shown only when the active provider can't run: red, opens Settings → AI where it is fixed.
+            if let problem = state.providerStatus?.problem {
+                Button { SettingsWindow.shared.show(.ai) } label: {
+                    Image(nsImage: MenuBarIcon.problem)
+                    Text(Self.red(problem))
                 }
             }
-            Divider()
-            // Shown only when something blocks Retext (each opens the place that fixes it) or an update is out.
-            if hasProblemRows {
-                if !delegate.hotkeyOK {
-                    Button("Allow Accessibility…", systemImage: "exclamationmark.triangle") {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-                    }
-                }
-                if let problem = state.providerStatus?.problem {
-                    Button(problem, systemImage: "exclamationmark.triangle") { SettingsWindow.shared.show(.ai) }
-                }
-                if let update = availableUpdate {
-                    Button("Update available: \(update.version)…", systemImage: "arrow.down.circle") { NSWorkspace.shared.open(update.page) }
-                }
-                Divider()
-            }
-            Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
+            Button("History…") { SettingsWindow.shared.show(.history) }
             Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
+            Button(updateTitle) { AppState.shared.checkForUpdatesInSettings() }
             Divider()
             Button("Quit Retext") { NSApp.terminate(nil) }.keyboardShortcut("q")
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
-        // The main menu shown while Settings or Welcome is open: About Retext, Check for Updates…, Settings… ⌘, in the
-        // app menu (Settings is Retext's own window, not a SwiftUI Settings scene), Welcome to Retext in Help.
+        // The main menu shown while Settings or Onboarding is open: About Retext (Settings → About), Check for Updates…,
+        // Settings… ⌘, in the app menu (Settings is Retext's own window, not a SwiftUI Settings scene), Retext
+        // Onboarding in Help.
         .commands {
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") { AppState.shared.checkForUpdatesInSettings() }
+            CommandGroup(replacing: .appInfo) {
+                Button("About Retext") { SettingsWindow.shared.show(.about) }
+                Button(updateTitle) { AppState.shared.checkForUpdatesInSettings() }
             }
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { SettingsWindow.shared.show() }.keyboardShortcut(",")
             }
             CommandGroup(replacing: .help) {
-                Button("Welcome to Retext") { WelcomeWindow.shared.show() }
+                Button("Retext Onboarding") { OnboardingWindow.shared.show() }
             }
         }
     }
 
-    private var hasProblemRows: Bool {
-        !delegate.hotkeyOK || state.providerStatus?.problem != nil || availableUpdate != nil
+    /// "Update Available (x.y.z)…" once a newer release is known; both open Settings → About and check again.
+    private var updateTitle: String {
+        state.update.map { "Update Available (\($0.version))…" } ?? "Check for Updates…"
     }
 
-    /// The newer release the menu offers, when update checks are on.
-    private var availableUpdate: (version: String, page: URL)? {
-        guard state.settings.checkForUpdates, let update = state.update, let page = URL(string: update.html_url) else { return nil }
-        return (update.version, page)
+    /// The provider problem's menu text in red (menus that ignore the color still show the red symbol).
+    private static func red(_ text: String) -> AttributedString {
+        var red = AttributedString(text)
+        red.foregroundColor = .red
+        return red
     }
 
     /// SwiftUI writes isInserted back on every scene update; writing only real changes keeps that from
@@ -112,11 +99,6 @@ struct RetextApp: App {
                 set: { if $0 != state.settings.showMenuBarIcon { state.settings.showMenuBarIcon = $0 } })
     }
 
-    /// "Fix grammar · Mail: Teh quick brown…" for the Recent submenu; clicking copies the output.
-    private static func short(_ entry: HistoryEntry) -> String {
-        let input = RetextCore.Engine.normalize(entry.input)
-        return "\(entry.title.prefix(24)) · \(entry.appName): \(input.prefix(40))\(input.count > 40 ? "…" : "")"
-    }
 }
 
 @MainActor
@@ -132,18 +114,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             // A demo runs in the background with no Dock icon, so one left open quits itself.
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
             let state = CommandLine.arguments.dropFirst(i + 1).first ?? "menu"
+            // `--dark` anywhere after `--demo`: dark mode for screenshots, whatever the Mac's appearance.
+            if CommandLine.arguments.dropFirst(i + 1).contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
             if state == "settings" {
                 let pane = CommandLine.arguments.dropFirst(i + 2).first ?? ""
-                SettingsView.initialPane = SettingsView.Pane(demoName: pane) ?? .about
+                SettingsNavigation.shared.pane = SettingsView.Pane(demoName: pane) ?? .about
+                if SettingsView.demoExtra == "update" {
+                    // `--demo settings about update`: a found release, without asking GitHub.
+                    let page = Identity.pageURL(repository: UpdateChecker.repository).appending(path: "releases").absoluteString
+                    AppState.shared.update = Release(tag_name: "v9.9.9", html_url: page)
+                    AppState.shared.updateCheckResult = .available(AppState.shared.update!)
+                }
                 SettingsWindow.shared.show()
                 print("window \(SettingsWindow.shared.window?.windowNumber ?? 0)")  // for screencapture -l
                 fflush(stdout)
                 return
             }
-            if state == "welcome" {
-                WelcomeWindow.shared.isDemo = true
-                WelcomeWindow.shared.show()
-                print("window \(WelcomeWindow.shared.window?.windowNumber ?? 0)")
+            // `--demo onboarding [welcome|access|provider|shortcut]`; `--demo welcome` is the older name.
+            if state == "onboarding" || state == "welcome" {
+                let step = CommandLine.arguments.dropFirst(i + 2).first.flatMap(OnboardingWindow.Step.init(rawValue:)) ?? .welcome
+                AccessibilityRow.demoTrusted = step != .access
+                OnboardingWindow.shared.isDemo = true
+                OnboardingWindow.shared.show(at: step)
+                print("window \(OnboardingWindow.shared.window?.windowNumber ?? 0)")
                 fflush(stdout)
                 return
             }
@@ -154,9 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             // queue: .main delivers on the main thread.
             MainActor.assumeIsolated { SettingsWindow.shared.show() }
         }
-        // The value of kAXTrustedCheckOptionPrompt, a C global var that Swift 6 treats as shared mutable state.
-        let prompt = "AXTrustedCheckOptionPrompt"
-        _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
+        // A new user is asked in Onboarding's Accessibility step; one who finished it and lost the grant (a new build) is
+        // asked here. The value of kAXTrustedCheckOptionPrompt, a C global var that Swift 6 treats as shared mutable state.
+        if AppState.shared.settings.onboarded { _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary) }
         Hotkeys.menu = { [weak self] in self?.controller.trigger() }
         Hotkeys.action = { [weak self] index in self?.controller.trigger(index) }
         Hotkeys.configure(AppState.shared.settings)
@@ -173,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         }
         if Hotkeys.electronOnSwitch, let app = NSWorkspace.shared.frontmostApplication { SelectionIO.enableElectronAccessibility(app) }
-        if !AppState.shared.settings.onboarded { WelcomeWindow.shared.show() }
+        if !AppState.shared.settings.onboarded { OnboardingWindow.shared.show() }
         AppState.shared.update = UpdateChecker.available
         UpdateChecker.checkIfDue()
         // A Mac that sleeps instead of quitting would otherwise check only once. The network is often not back right
@@ -239,6 +232,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 /// height, drawn at every scale (crisp at 1x and 2x) as a template the menu bar tints for light and dark.
 @MainActor
 enum MenuBarIcon {
+    /// The provider-problem menu item's symbol: red, not a template, so the menu keeps its color.
+    static let problem: NSImage = {
+        let config = NSImage.SymbolConfiguration(paletteColors: [.systemRed])
+        let image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: "Problem")?
+            .withSymbolConfiguration(config) ?? NSImage()
+        image.isTemplate = false
+        return image
+    }()
+
     static let image: NSImage = {
         let symbol = NSImage(systemSymbolName: "character.cursor.ibeam", accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular))
