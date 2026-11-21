@@ -66,7 +66,7 @@ extension BarShortcut {
     /// Why this can't be the bar shortcut, as one sentence for the recorder; nil = accepted.
     /// Matches exact modifiers, the way the event tap does: ⌥⇧1 doesn't clash with ⌥1.
     public var problem: String? {
-        if modifiers.subtracting(.shift).isEmpty {
+        if !isValid {
             return "Add ⌃, ⌥ or ⌘: a key alone or with ⇧ would stop it from typing."
         }
         let key = Self.keyLabel(keyCode)

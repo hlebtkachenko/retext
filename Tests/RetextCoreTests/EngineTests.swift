@@ -145,6 +145,11 @@ import Testing
         // No modifier or only ⇧ would take Space from typing: the old key, then the default, instead.
         #expect(try decode(#"{"menuShortcut": "controlOptionSpace", "barShortcut": {"keyCode": 49, "modifiers": 0}}"#) == .controlOptionSpace)
         #expect(try decode(#"{"barShortcut": {"keyCode": 49, "modifiers": 4}}"#) == .optionSpace)
+        // An imported or hand-edited shortcut the recorder would refuse (⌘C), or one with a bit Retext doesn't know.
+        #expect(try decode(#"{"barShortcut": {"keyCode": 8, "modifiers": 8}}"#) == .optionSpace)
+        #expect(try decode(#"{"barShortcut": {"keyCode": 0, "modifiers": 16}}"#) == .optionSpace)
+        #expect(try decode(#"{"barShortcut": {"keyCode": 0, "modifiers": 17}}"#) == .optionSpace)
+        #expect(try decode(#"{"barShortcut": {"keyCode": 0, "modifiers": 1}}"#) == BarShortcut(keyCode: 0, modifiers: .control))
         #expect(BarShortcut.presets.map(\.displayLabel) == ["⌥Space", "⌃⌥Space", "⌃⇧Space"])
     }
 

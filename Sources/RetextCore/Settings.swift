@@ -32,8 +32,10 @@ public struct BarShortcut: Codable, Hashable, Sendable {
         self.modifiers = modifiers
     }
 
-    /// No modifier or only ⇧ would take a key from typing everywhere.
-    public var isValid: Bool { !modifiers.subtracting(.shift).isEmpty }
+    /// At least one of ⌃⌥⌘ (no modifier or only ⇧ would take a key from typing everywhere) and no bits Retext doesn't know.
+    public var isValid: Bool {
+        modifiers.isSubset(of: [.control, .option, .shift, .command]) && !modifiers.isDisjoint(with: [.control, .option, .command])
+    }
 
     /// The 1.x `menuShortcut` value; anything else is nil.
     static func legacy(_ name: String) -> BarShortcut? {
@@ -150,7 +152,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         actions = try c.decodeIfPresent([CustomAction].self, forKey: .actions) ?? d.actions
         appStyles = try c.decodeIfPresent([AppStyle].self, forKey: .appStyles) ?? d.appStyles
         protectedWords = try c.decodeIfPresent([String].self, forKey: .protectedWords) ?? d.protectedWords
-        barShortcut = (try? c.decodeIfPresent(BarShortcut.self, forKey: .barShortcut)).flatMap { $0?.isValid == true ? $0 : nil }
+        barShortcut = (try? c.decodeIfPresent(BarShortcut.self, forKey: .barShortcut)).flatMap { $0?.problem == nil ? $0 : nil }
             ?? (try? legacy.decodeIfPresent(String.self, forKey: .menuShortcut)).flatMap { $0.flatMap(BarShortcut.legacy) }
             ?? d.barShortcut
         claudePath = (try? c.decodeIfPresent(String.self, forKey: .claudePath)) ?? d.claudePath
