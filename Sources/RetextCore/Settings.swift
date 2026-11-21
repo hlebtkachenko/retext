@@ -4,11 +4,75 @@ public enum ActionKind: String, Codable, CaseIterable, Sendable {
     case grammar, translate, other
 }
 
-/// The shortcut that opens the bar. ⌃⌥Space avoids apps that also use ⌥Space.
-public enum MenuShortcut: String, Codable, CaseIterable, Sendable {
-    case optionSpace, controlOptionSpace
+/// The shortcut that opens the bar: a virtual key code (Carbon's kVK_*) and its modifiers. ⌃⌥Space and ⌃⇧Space avoid
+/// apps that also use ⌥Space.
+public struct BarShortcut: Codable, Hashable, Sendable {
+    /// The modifier keys, in Retext's own bits so RetextCore needs no CoreGraphics; Hotkeys maps them to CGEventFlags.
+    public struct Modifiers: OptionSet, Codable, Hashable, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+        public static let control = Modifiers(rawValue: 1 << 0)
+        public static let option = Modifiers(rawValue: 1 << 1)
+        public static let shift = Modifiers(rawValue: 1 << 2)
+        public static let command = Modifiers(rawValue: 1 << 3)
+    }
 
-    public var label: String { self == .optionSpace ? "⌥Space" : "⌃⌥Space" }
+    /// kVK_Space.
+    public static let spaceKey: UInt16 = 49
+    public static let optionSpace = BarShortcut(keyCode: spaceKey, modifiers: .option)
+    public static let controlOptionSpace = BarShortcut(keyCode: spaceKey, modifiers: [.control, .option])
+    public static let controlShiftSpace = BarShortcut(keyCode: spaceKey, modifiers: [.control, .shift])
+    public static let presets = [optionSpace, controlOptionSpace, controlShiftSpace]
+
+    public var keyCode: UInt16
+    public var modifiers: Modifiers
+
+    public init(keyCode: UInt16, modifiers: Modifiers) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+    }
+
+    /// No modifier or only ⇧ would take a key from typing everywhere.
+    public var isValid: Bool { !modifiers.subtracting(.shift).isEmpty }
+
+    /// "⌃⌥Space": modifiers in the macOS menu order ⌃⌥⇧⌘, then the key.
+    public var label: String {
+        let glyphs: [(Modifiers, String)] = [(.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
+        return glyphs.filter { modifiers.contains($0.0) }.map(\.1).joined() + (keyCode == Self.spaceKey ? "Space" : "Key \(keyCode)")
+    }
+
+    /// The 1.x `menuShortcut` value; anything else is nil.
+    static func legacy(_ name: String) -> BarShortcut? {
+        switch name {
+        case "optionSpace": optionSpace
+        case "controlOptionSpace": controlOptionSpace
+        default: nil
+        }
+    }
+}
+
+/// How many results history.json keeps (Recent and the cache).
+public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
+    case off, last20, last60, unlimited
+
+    /// The number of entries kept; nil = no limit.
+    public var limit: Int? {
+        switch self {
+        case .off: 0
+        case .last20: 20
+        case .last60: 60
+        case .unlimited: nil
+        }
+    }
+
+    public var title: String {
+        switch self {
+        case .off: "Off"
+        case .last20: "Last 20"
+        case .last60: "Last 60"
+        case .unlimited: "Unlimited"
+        }
+    }
 }
 
 public struct CustomAction: Codable, Hashable, Identifiable, Sendable {
@@ -44,7 +108,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     public var actions: [CustomAction]
     public var appStyles: [AppStyle]
     public var protectedWords: [String]
-    public var menuShortcut = MenuShortcut.optionSpace
+    public var barShortcut = BarShortcut.optionSpace
     /// Path to the `claude` executable; empty = find it automatically.
     public var claudePath = ""
     /// The active provider; Medium, High and Max map to its models.
@@ -56,7 +120,7 @@ public struct RetextSettings: Codable, Equatable, Sendable {
     /// The OpenAI-compatible API (base URL and models; the key is in the Keychain).
     public var custom = CustomProviderSettings()
     /// Off: no results are written to history.json and the cache isn't used.
-    public var keepHistory = true
+    public var historyRetention = HistoryRetention.last20
     /// On: AXManualAccessibility is set on every app switch, so ⌥N sees Electron selections before the first bar.
     /// Off: it is set only when Retext reads a selection.
     public var electronSupport = true
@@ -79,19 +143,30 @@ public struct RetextSettings: Codable, Equatable, Sendable {
         self.protectedWords = protectedWords
     }
 
+    /// Keys of older settings files, read once and never written: `keepHistory` (a Bool) became `historyRetention`,
+    /// `menuShortcut` ("optionSpace", "controlOptionSpace") became `barShortcut`.
+    private enum LegacyKeys: String, CodingKey {
+        case keepHistory, menuShortcut
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
         let d = RetextSettings()
         actions = try c.decodeIfPresent([CustomAction].self, forKey: .actions) ?? d.actions
         appStyles = try c.decodeIfPresent([AppStyle].self, forKey: .appStyles) ?? d.appStyles
         protectedWords = try c.decodeIfPresent([String].self, forKey: .protectedWords) ?? d.protectedWords
-        menuShortcut = (try? c.decodeIfPresent(MenuShortcut.self, forKey: .menuShortcut)) ?? d.menuShortcut
+        barShortcut = (try? c.decodeIfPresent(BarShortcut.self, forKey: .barShortcut)).flatMap { $0?.isValid == true ? $0 : nil }
+            ?? (try? legacy.decodeIfPresent(String.self, forKey: .menuShortcut)).flatMap { $0.flatMap(BarShortcut.legacy) }
+            ?? d.barShortcut
         claudePath = (try? c.decodeIfPresent(String.self, forKey: .claudePath)) ?? d.claudePath
         provider = (try? c.decodeIfPresent(Provider.self, forKey: .provider)) ?? d.provider
         codexPath = (try? c.decodeIfPresent(String.self, forKey: .codexPath)) ?? d.codexPath
         chatGPTModels = (try? c.decodeIfPresent([Level: ProviderModel].self, forKey: .chatGPTModels)) ?? d.chatGPTModels
         custom = (try? c.decodeIfPresent(CustomProviderSettings.self, forKey: .custom)) ?? d.custom
-        keepHistory = (try? c.decodeIfPresent(Bool.self, forKey: .keepHistory)) ?? d.keepHistory
+        historyRetention = (try? c.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention)).flatMap { $0 }
+            ?? (try? legacy.decodeIfPresent(Bool.self, forKey: .keepHistory)).flatMap { $0.map { $0 ? .last20 : .off } }
+            ?? d.historyRetention
         electronSupport = (try? c.decodeIfPresent(Bool.self, forKey: .electronSupport)) ?? d.electronSupport
         showMenuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon)) ?? d.showMenuBarIcon
         defaultLevel = (try? c.decodeIfPresent(Level.self, forKey: .defaultLevel)) ?? d.defaultLevel

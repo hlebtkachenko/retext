@@ -437,7 +437,7 @@ final class PopupController {
     private func result(of job: Job, timeout: Duration, for selection: Selection) async throws -> String {
         let state = AppState.shared
         let key = Engine.cacheKey(job, baseURL: state.settings.custom.baseURL, text: selection.text)
-        let keep = state.settings.keepHistory
+        let keep = state.settings.historyRetention != .off
         if keep, let hit = state.history.lookup(key) {
             state.usage.recordHit()
             return hit.output

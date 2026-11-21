@@ -102,7 +102,8 @@ import Testing
     @Test func roundTrip() throws {
         var settings = RetextSettings()
         settings.actions.append(CustomAction(title: "Shorter", symbol: "scissors", prompt: "Make it shorter.", kind: .other))
-        settings.menuShortcut = .controlOptionSpace
+        settings.barShortcut = .controlShiftSpace
+        settings.historyRetention = .last60
         settings.defaultLevel = .high
         let decoded = try JSONDecoder().decode(RetextSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded == settings)
@@ -113,14 +114,53 @@ import Testing
         #expect(empty.actions.map(\.prompt) == RetextSettings.defaultActions.map(\.prompt))
         #expect(empty.protectedWords.isEmpty)
         let partial = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"haikuThreshold": 100, "protectedWords": []}"#.utf8))
-        #expect(empty.menuShortcut == .optionSpace)
-        #expect(empty.keepHistory && empty.electronSupport && empty.showMenuBarIcon)
+        #expect(empty.barShortcut == .optionSpace && empty.historyRetention == .last20)
+        #expect(empty.electronSupport && empty.showMenuBarIcon)
         #expect(empty.defaultLevel == .medium)
         let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"menuShortcut": "hyper", "defaultLevel": "ultra"}"#.utf8))
-        #expect(unknown.menuShortcut == .optionSpace)
+        #expect(unknown.barShortcut == .optionSpace)
         #expect(unknown.defaultLevel == .medium)
         #expect(partial.protectedWords.isEmpty)
         #expect(partial.actions.count == RetextSettings.defaultActions.count)
+    }
+
+    @Test func keepHistoryMigratesToRetention() throws {
+        let off = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"keepHistory": false}"#.utf8))
+        let on = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"keepHistory": true}"#.utf8))
+        #expect(off.historyRetention == .off && on.historyRetention == .last20)
+        // The new key wins over the old one; an unknown value falls back to the old key, then the default.
+        let both = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"keepHistory": false, "historyRetention": "unlimited"}"#.utf8))
+        #expect(both.historyRetention == .unlimited)
+        let unknown = try JSONDecoder().decode(RetextSettings.self, from: Data(#"{"keepHistory": false, "historyRetention": "forever"}"#.utf8))
+        #expect(unknown.historyRetention == .off)
+        #expect(HistoryRetention.allCases.map(\.limit) == [0, 20, 60, nil])
+    }
+
+    @Test func menuShortcutMigratesToBarShortcut() throws {
+        func decode(_ json: String) throws -> BarShortcut { try JSONDecoder().decode(RetextSettings.self, from: Data(json.utf8)).barShortcut }
+        #expect(try decode(#"{"menuShortcut": "optionSpace"}"#) == BarShortcut(keyCode: 49, modifiers: .option))
+        #expect(try decode(#"{"menuShortcut": "controlOptionSpace"}"#) == BarShortcut(keyCode: 49, modifiers: [.control, .option]))
+        #expect(try decode(#"{"menuShortcut": "hyper"}"#) == .optionSpace)
+        #expect(try decode(#"{"menuShortcut": "controlOptionSpace", "barShortcut": {"keyCode": 49, "modifiers": 5}}"#) == .controlShiftSpace)
+        // No modifier or only ⇧ would take Space from typing: the old key, then the default, instead.
+        #expect(try decode(#"{"menuShortcut": "controlOptionSpace", "barShortcut": {"keyCode": 49, "modifiers": 0}}"#) == .controlOptionSpace)
+        #expect(try decode(#"{"barShortcut": {"keyCode": 49, "modifiers": 4}}"#) == .optionSpace)
+        #expect(BarShortcut.presets.map(\.label) == ["⌥Space", "⌃⌥Space", "⌃⇧Space"])
+    }
+
+    @Test func oldExportImportsAndSavesOnlyNewKeys() throws {
+        let json = #"""
+        {"actions": [{"id": "6E092739-3A73-441A-ADA5-10ABE26BDBB1", "title": "Fix grammar", "symbol": "x", "kind": "grammar", "prompt": "Fix it."}],
+         "appStyles": [], "protectedWords": ["Retext"], "menuShortcut": "controlOptionSpace", "keepHistory": false,
+         "defaultLevel": "high", "onboarded": true}
+        """#
+        let settings = try RetextSettings.imported(from: Data(json.utf8))
+        #expect(settings.barShortcut == .controlOptionSpace && settings.historyRetention == .off)
+        #expect(settings.protectedWords == ["Retext"] && settings.defaultLevel == .high)
+        let object = try #require(try JSONSerialization.jsonObject(with: settings.encoded()) as? [String: Any])
+        #expect(object["keepHistory"] == nil && object["menuShortcut"] == nil)
+        #expect(object["historyRetention"] as? String == "off" && object["barShortcut"] != nil)
+        #expect(try RetextSettings.imported(from: settings.encoded()) == settings)
     }
 
     @Test func untouched120DefaultsMigrate() throws {

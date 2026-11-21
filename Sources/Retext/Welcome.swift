@@ -59,7 +59,7 @@ struct WelcomeView: View {
     var body: some View {
         Form {
             Section {
-                Text("Select text in any app, press \(state.settings.menuShortcut.label), pick an action or type an instruction.")
+                Text("Select text in any app, press \(state.settings.barShortcut.label), pick an action or type an instruction.")
             }
             Section("Setup") {
                 AccessibilityRow()

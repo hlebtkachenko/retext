@@ -30,8 +30,8 @@ struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Picker("Open the bar with", selection: $state.settings.menuShortcut) {
-                    ForEach(MenuShortcut.allCases, id: \.self) { Text($0.label).tag($0) }
+                Picker("Open the bar with", selection: $state.settings.barShortcut) {
+                    ForEach(BarShortcut.presets, id: \.self) { Text($0.label).tag($0) }
                 }
             } footer: {
                 Text("Choose ⌃⌥Space if another app uses ⌥Space; macOS may use ⌃⌥Space to switch input sources, which you can turn off in Keyboard Shortcuts.").foregroundStyle(.secondary)
@@ -43,7 +43,9 @@ struct GeneralPane: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Toggle("Keep history", isOn: $state.settings.keepHistory)
+                // Off or Last 20 for now: History keeps 20 entries whatever the setting.
+                Toggle("Keep history", isOn: Binding(get: { state.settings.historyRetention != .off },
+                                                     set: { state.settings.historyRetention = $0 ? .last20 : .off }))
                 LabeledContent("\(state.history.entries.count) of \(History.limit) saved") {
                     Button("Clear History…", role: .destructive) { confirmClear = true }
                         .foregroundStyle(.red)
