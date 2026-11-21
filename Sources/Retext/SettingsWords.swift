@@ -6,6 +6,8 @@ import SwiftUI
 struct WordsPane: View {
     @Binding var settings: RetextSettings
     @State private var newWord = ""
+    /// The add field takes the focus, so typing on opening the pane never overwrites a saved word.
+    @FocusState private var adding: Bool
 
     var body: some View {
         Form {
@@ -23,12 +25,14 @@ struct WordsPane: View {
                     // Multi-line, so a pasted list keeps its lines; Return adds every term.
                     TextField("New term", text: $newWord, prompt: Text("Add terms, one per line or separated by commas"), axis: .vertical)
                         .lineLimit(1...6).labelsHidden().onSubmit(add)
+                        .focused($adding)
                     Button("Add", action: add).disabled(RetextSettings.terms(in: newWord).isEmpty)
                 }
             } footer: {
                 Text("Click a word to edit it. Clearing it removes it.").foregroundStyle(.secondary)
             }
         }
+        .onAppear { adding = true }
     }
 
     private func add() {
@@ -59,6 +63,8 @@ private struct WordRow: View {
                 .focused($focused)
                 .onSubmit(save)
                 .onChange(of: focused) { _, isFocused in if !isFocused { save() } }
+                // Switching panes or closing the window doesn't always end the focus first.
+                .onDisappear(perform: save)
             Button("Remove \(word)", systemImage: "minus.circle", action: remove)
                 .labelStyle(.iconOnly).buttonStyle(.borderless)
                 .help("Remove")
