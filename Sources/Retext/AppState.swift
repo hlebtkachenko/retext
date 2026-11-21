@@ -1,14 +1,15 @@
 import Foundation
 import RetextCore
 
-/// App-wide state backed by JSON files in ~/Library/Application Support/Retext.
+/// App-wide state backed by JSON files in ~/Library/Application Support/Retext. A `--demo` run reads and writes none
+/// of them: it shows sample data (`DemoData`), so screenshots never show the owner's settings or history.
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
 
     @Published var settings: RetextSettings {
         didSet {
-            settings.save(to: Store.url("settings.json"))
+            if !AppWindows.isDemo { settings.save(to: Store.url("settings.json")) }
             Hotkeys.configure(settings)
             if settings.provider != oldValue.provider || settings.claudePath != oldValue.claudePath
                 || settings.codexPath != oldValue.codexPath || settings.custom != oldValue.custom
@@ -23,10 +24,16 @@ final class AppState: ObservableObject {
     @Published private(set) var checkingForUpdates = false
     /// The last manual check's answer, shown in Settings → About.
     @Published var updateCheckResult: UpdateCheckResult?
-    @Published var history: History { didSet { history.save(to: Store.url("history.json")) } }
-    @Published var usage: Usage { didSet { usage.save(to: Store.url("usage.json")) } }
+    @Published var history: History { didSet { if !AppWindows.isDemo { history.save(to: Store.url("history.json")) } } }
+    @Published var usage: Usage { didSet { if !AppWindows.isDemo { usage.save(to: Store.url("usage.json")) } } }
 
     private init() {
+        if AppWindows.isDemo {
+            settings = DemoData.settings
+            history = DemoData.history
+            usage = DemoData.usage
+            return
+        }
         settings = RetextSettings.load(from: Store.url("settings.json"))
         history = History.load(from: Store.url("history.json"))
         usage = Usage.load(from: Store.url("usage.json"))
