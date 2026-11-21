@@ -28,7 +28,7 @@ enum Hotkeys {
     private static var fallback: (@MainActor () -> Void)?
     private static var fallbackRef: EventHotKeyRef?
     /// The key and Carbon modifiers last tried (registered or refused), so a settings change or the launch retry tries
-    /// again, and logs, only when the shortcut changed.
+    /// again, and logs, only when the shortcut changed or after a shortcut is recorded.
     private static var fallbackShortcut: (key: UInt32, modifiers: UInt32)?
     private static var fallbackHandlerInstalled = false
     /// The bar shortcut's modifiers as Carbon bits (⌥ by default).
@@ -137,10 +137,12 @@ enum Hotkeys {
         var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let status = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
             // The application event target delivers on the main thread.
+            // Retext registers no other Carbon hotkey; any press it doesn't act on is passed on.
             MainActor.assumeIsolated {
-                if !Hotkeys.paused, Hotkeys.tap == nil, let fallback = Hotkeys.fallback { DispatchQueue.main.async(execute: fallback) }
+                guard !Hotkeys.paused, Hotkeys.tap == nil, let fallback = Hotkeys.fallback else { return OSStatus(eventNotHandledErr) }
+                DispatchQueue.main.async(execute: fallback)
+                return noErr
             }
-            return noErr
         }, 1, &type, nil, nil)
         if status == noErr { fallbackHandlerInstalled = true } else {
             log.error("InstallEventHandler failed for the bar shortcut: OSStatus \(status, privacy: .public)")
