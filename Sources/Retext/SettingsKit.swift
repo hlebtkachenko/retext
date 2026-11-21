@@ -82,6 +82,17 @@ struct PageDescription: View {
     }
 }
 
+/// A section title in every pane's own weight: after `PageDescription`'s header-only section a plain `Section("…")`
+/// title is drawn small and secondary, so every pane titles its sections with this instead.
+struct SectionTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text).font(.headline).foregroundStyle(.primary)
+    }
+}
+
 extension SettingsView.Pane {
     /// The sentence `PageDescription` shows at the top of the pane.
     var summary: String {
