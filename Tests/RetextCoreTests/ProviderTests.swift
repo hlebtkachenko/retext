@@ -41,7 +41,7 @@ import Testing
         var settings = RetextSettings()
         settings.provider = .custom
         settings.custom.models[.high] = ProviderModel(model: "mistral-large-latest", effort: "")
-        let job = Engine.job(for: settings.actions[0], level: .high, text: "x", settings: settings, bundleID: nil)
+        let job = Engine.job(for: settings.actions[0], level: .high, settings: settings, bundleID: nil)
         #expect(job.provider == .custom && job.model == "mistral-large-latest" && job.effort.isEmpty)
         #expect(job.system.contains(Engine.highAddOn))
         settings.provider = .chatgpt
@@ -194,6 +194,10 @@ import Testing
         #expect(output.text == "I have two cats." && output.inputTokens == 50 && output.outputTokens == 6)
         #expect(OpenAICompatible.parse(Data(#"{"choices":[{"message":{"content":""}}]}"#.utf8)) == nil)
         #expect(OpenAICompatible.parse(Data(#"{"choices":[]}"#.utf8)) == nil)
+        #expect(!output.isCutOff)
+        let cut = try #require(OpenAICompatible.parse(Data(#"{"choices":[{"message":{"content":"I have"},"finish_reason":"length"}]}"#.utf8)))
+        #expect(cut.isCutOff)
+        #expect(ClaudeFailure.cutOff.message(for: .custom) == "The answer was cut off. Your text is unchanged.")
     }
 
     @Test func mapsHTTPErrors() {

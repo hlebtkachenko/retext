@@ -1,11 +1,13 @@
 import Foundation
 
 public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
+    public static let inputLimit = 60
     public var id: String { key + date.description }
     public let key: String
     public let date: Date
     public let appName: String
     public let title: String
+    /// The start of the selection (`inputLimit` characters of `Engine.normalize`), enough to recognize it in Recent.
     public let input: String
     public let output: String
     public let model: String
@@ -19,12 +21,20 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
         self.date = date
         self.appName = appName
         self.title = title
-        self.input = input
+        self.input = String(Engine.normalize(input).prefix(Self.inputLimit))
         self.output = output
         self.model = model
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
         self.costUSD = costUSD
+    }
+}
+
+extension HistoryEntry {
+    /// The same entry through `init`, which shortens `input`.
+    var shortened: HistoryEntry {
+        HistoryEntry(key: key, date: date, appName: appName, title: title, input: input, output: output, model: model,
+                     inputTokens: inputTokens, outputTokens: outputTokens, costUSD: costUSD)
     }
 }
 
@@ -43,8 +53,10 @@ public struct History: Codable, Equatable, Sendable {
         entries = Array(entries.prefix(Self.limit))
     }
 
+    /// Older entries kept the whole selection: shortened here, and saved shortened with the next add.
     public static func load(from url: URL) -> History {
-        (try? Data(contentsOf: url)).flatMap { try? Store.decoder.decode(History.self, from: $0) } ?? History()
+        let history = (try? Data(contentsOf: url)).flatMap { try? Store.decoder.decode(History.self, from: $0) } ?? History()
+        return History(entries: history.entries.map(\.shortened))
     }
 
     public func save(to url: URL) { Store.write(self, to: url) }
@@ -68,8 +80,8 @@ public struct UsageDay: Codable, Equatable, Sendable {
 
     public var summary: String {
         let models = callsByModel.map { "\($0.name) \($0.calls)" }.joined(separator: ", ")
-        return "Today: \(models.isEmpty ? "0 calls" : models), \(cacheHits) cached, "
-            + "\(inputTokens + outputTokens) tokens, ≈ $\(String(format: "%.2f", costUSD)) Claude Code list price"
+        let price = costUSD > 0 ? ", ≈ $\(String(format: "%.2f", costUSD)) Claude Code list price" : ""
+        return "Today: \(models.isEmpty ? "0 calls" : models), \(cacheHits) cached, \(inputTokens + outputTokens) tokens" + price
     }
 }
 

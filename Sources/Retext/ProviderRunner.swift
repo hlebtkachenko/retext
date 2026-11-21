@@ -7,9 +7,13 @@ enum ProviderRunner {
     static func run(_ job: Job, text: String, settings: RetextSettings, timeout: Duration,
                     apiKey: @Sendable (String) -> String? = Keychain.apiKey(account:)) async throws -> ClaudeOutput {
         switch job.provider {
-        case .claude: try await ClaudeRunner.run(job, text: text, claudePath: settings.claudePath, timeout: timeout)
-        case .chatgpt: try await CodexRunner.run(job, text: text, codexPath: settings.codexPath, timeout: timeout)
-        case .custom: try await APIRunner.run(job, text: text, custom: settings.custom, key: settings.custom.keyAccount.flatMap(apiKey), timeout: timeout)
+        case .claude: return try await ClaudeRunner.run(job, text: text, claudePath: settings.claudePath, timeout: timeout)
+        case .chatgpt: return try await CodexRunner.run(job, text: text, codexPath: settings.codexPath, timeout: timeout)
+        case .custom:
+            let output = try await APIRunner.run(job, text: text, custom: settings.custom, key: settings.custom.keyAccount.flatMap(apiKey), timeout: timeout)
+            // A truncated answer would replace the selection with part of it.
+            if output.isCutOff { throw ClaudeFailure.cutOff }
+            return output
         }
     }
 }
