@@ -2,83 +2,77 @@ import AppKit
 import RetextCore
 import SwiftUI
 
-/// The action list; clicking a row expands its editor right under it and collapses the others.
+/// The action list: drag a row (or use its context menu or VoiceOver actions) to reorder, click it to edit in a sheet.
 struct ActionsPane: View {
     @Binding var actions: [CustomAction]
-    @State private var expanded: CustomAction.ID?
+    /// The action the sheet edits; a new action is only added when its sheet is saved.
+    @State private var editing: CustomAction?
     @State private var confirmRestore = false
+    @State private var confirmDelete: CustomAction?
 
     var body: some View {
         Form {
             Section {
+                IntroCard(symbol: "bolt.fill", title: "Actions",
+                          text: "Saved instructions you'd otherwise type into the bar, like “fix the grammar” or “make it shorter”. Run one from the bar, or press ⌥1 to ⌥9 to run it right away on the selected text.")
+            }
+            Section {
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                    let isExpanded = expanded == action.id
-                    // A button, not a tap gesture, so the rows are reachable with the keyboard and VoiceOver.
-                    Button { withAnimation(.snappy) { expanded = isExpanded ? nil : action.id } } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                                .frame(width: 12)
-                            Image(systemName: action.symbol).frame(width: 20).foregroundStyle(isExpanded ? Color.accentColor : .primary)
-                            Text(action.title).fontWeight(isExpanded ? .semibold : .regular)
-                            Spacer()
-                            Text(action.kind.rawValue.capitalized).foregroundStyle(.secondary)
-                            Text("⌥\(index + 1)").foregroundStyle(.secondary).monospacedDigit()
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isExpanded ? .isSelected : [])
-                    .accessibilityHint(isExpanded ? "Collapses the editor" : "Expands the editor")
-                    if isExpanded {
-                        ActionEditor(action: binding(action.id), position: index, count: actions.count,
-                                     move: { move(action.id, by: $0) },
-                                     delete: { actions.removeAll { $0.id == action.id }; expanded = nil })
-                    }
+                    ActionRow(action: action, index: index, count: actions.count, open: { editing = action },
+                              move: { move(action.id, by: $0) }, delete: { confirmDelete = action })
                 }
+                .onMove { actions.move(fromOffsets: $0, toOffset: $1) }
             } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("⌥1 to ⌥9 run the actions in list order.")
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Button("Add Action", systemImage: "plus") {
-                            let action = CustomAction(title: "New action", symbol: "sparkles", prompt: "", kind: .other)
-                            actions.append(action)
-                            expanded = action.id
-                        }
-                        .disabled(actions.count >= RetextSettings.maxActions)
-                        Spacer()
-                        Button("Restore Default Actions…", role: .destructive) { confirmRestore = true }
-                            .foregroundStyle(.red)
+                Text("⌥1 to ⌥9 follow the list order. Drag a row to change it.").foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    Button("Add Action", systemImage: "plus") {
+                        editing = CustomAction(title: "New action", symbol: "sparkles", prompt: "", kind: .other)
                     }
+                    .disabled(actions.count >= RetextSettings.maxActions)
+                    .help(actions.count >= RetextSettings.maxActions ? "Up to \(RetextSettings.maxActions) actions, one per ⌥ shortcut" : "")
+                    Spacer()
+                    Button("Restore Default Actions…", role: .destructive) { confirmRestore = true }
+                        .foregroundStyle(.red)
                 }
             }
         }
+        .sheet(item: $editing) { action in
+            ActionSheet(action: action, isNew: !actions.contains { $0.id == action.id },
+                        save: save, delete: { editing = nil; confirmDelete = action })
+        }
         .onAppear {
             switch SettingsView.demoExtra {
-            case "expand", "icons": expanded = actions.first?.id
+            case "expand", "icons": editing = actions.first
             case "restore": confirmRestore = true
             default: break
             }
         }
         .confirmationDialog("Restore the default actions?", isPresented: $confirmRestore) {
-            Button("Restore Default Actions", role: .destructive) {
-                actions = RetextSettings.defaultActions
-                expanded = nil
-            }
+            Button("Restore Default Actions", role: .destructive) { actions = RetextSettings.defaultActions }
             // Cancel is the default button, so Return never restores.
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: {
             Text("Your actions are replaced by Fix grammar, English and a translation into your Mac's language. Edited prompts and added actions are lost.")
         }
         .dialogSeverity(.critical)
+        .confirmationDialog("Delete “\(confirmDelete?.title ?? "")”?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+                            presenting: confirmDelete) { action in
+            Button("Delete Action", role: .destructive) { actions.removeAll { $0.id == action.id } }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: { _ in
+            Text("Its prompt is lost, and the actions after it move up one shortcut.")
+        }
     }
 
-    private func binding(_ id: CustomAction.ID) -> Binding<CustomAction> {
-        Binding(get: { actions.first { $0.id == id } ?? CustomAction(title: "", symbol: "", prompt: "", kind: .other) },
-                set: { new in if let i = actions.firstIndex(where: { $0.id == id }) { actions[i] = new } })
+    private func save(_ action: CustomAction) {
+        if let i = actions.firstIndex(where: { $0.id == action.id }) {
+            actions[i] = action
+        } else if actions.count < RetextSettings.maxActions {
+            actions.append(action)
+        }
+        editing = nil
     }
 
     private func move(_ id: CustomAction.ID, by offset: Int) {
@@ -87,81 +81,173 @@ struct ActionsPane: View {
     }
 }
 
-/// The expanded action's fields, as form rows under its list row.
-private struct ActionEditor: View {
-    @Binding var action: CustomAction
-    let position: Int, count: Int
+/// Icon, title, kind and shortcut. A tap gesture, not a Button, so the row can still be dragged; keyboard and
+/// VoiceOver users open it with Return or the default action and reorder with the named actions.
+private struct ActionRow: View {
+    let action: CustomAction
+    let index: Int, count: Int
+    let open: () -> Void
     let move: (Int) -> Void
     let delete: () -> Void
-    @State private var confirmDelete = false
+
+    var body: some View {
+        content
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: open)
+            .focusable(interactions: .activate)
+            .onKeyPress(.return) { open(); return .handled }
+            .contextMenu {
+                Button("Edit…", systemImage: "pencil", action: open)
+                Divider()
+                Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(index == 0)
+                Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(index == count - 1)
+                Divider()
+                Button("Delete…", systemImage: "trash", role: .destructive, action: delete)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(action.title), \(kindName(action.kind)), Option \(index + 1)")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Opens the editor")
+            .accessibilityAction(.default, open)
+            .accessibilityAction(named: "Move Up") { move(-1) }
+            .accessibilityAction(named: "Move Down") { move(1) }
+    }
+
+    private var content: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.tertiary)
+                .help("Drag to reorder")
+                .accessibilityHidden(true)
+            IconRow(symbol: symbol, tint: kindTint(action.kind), title: action.title.isEmpty ? "Untitled" : action.title,
+                    subtitle: kindName(action.kind)) {
+                shortcut
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var shortcut: some View {
+        Text("⌥\(index + 1)")
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    /// A symbol name no SF Symbol has (a hand-edited settings.json) shows a warning sign.
+    private var symbol: String {
+        NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil) == nil ? "exclamationmark.triangle" : action.symbol
+    }
+}
+
+private func kindName(_ kind: ActionKind) -> String {
+    switch kind {
+    case .grammar: "Grammar"
+    case .translate: "Translate"
+    case .other: "Other"
+    }
+}
+
+private func kindTint(_ kind: ActionKind) -> Color {
+    switch kind {
+    case .grammar: .green
+    case .translate: .blue
+    case .other: .purple
+    }
+}
+
+/// The editor sheet: works on a copy, so Cancel (or Escape) leaves the action as it was and Done saves it.
+private struct ActionSheet: View {
+    @State private var action: CustomAction
+    let isNew: Bool
+    let save: (CustomAction) -> Void
+    let delete: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    init(action: CustomAction, isNew: Bool, save: @escaping (CustomAction) -> Void, delete: @escaping () -> Void) {
+        _action = State(initialValue: action)
+        self.isNew = isNew
+        self.save = save
+        self.delete = delete
+    }
 
     var body: some View {
         let defaultPrompt = RetextSettings.defaultPrompt(for: action)
-        Group {
-            TextField("Title", text: $action.title)
-            LabeledContent("Icon") { IconPicker(symbol: $action.symbol) }
-            Picker("Kind", selection: $action.kind) {
-                Text("Grammar").tag(ActionKind.grammar)
-                Text("Translate").tag(ActionKind.translate)
-                Text("Other").tag(ActionKind.other)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(isNew ? "New Action" : "Edit Action").font(.title2.bold())
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    Text("Title").gridColumnAlignment(.trailing)
+                    TextField("Title", text: $action.title, prompt: Text("e.g. Shorter")).labelsHidden()
+                }
+                GridRow {
+                    Text("Icon")
+                    IconPicker(symbol: $action.symbol)
+                }
+                GridRow {
+                    Text("Kind")
+                    Picker("Kind", selection: $action.kind) {
+                        Text("Grammar").tag(ActionKind.grammar)
+                        Text("Translate").tag(ActionKind.translate)
+                        Text("Other").tag(ActionKind.other)
+                    }
+                    .labelsHidden().fixedSize()
+                    .help("Grammar and Translate keep a one-line text on one line unless an app style applies, and a Grammar result much longer than the text is rejected. Other has no such checks.")
+                }
             }
-            .help("Grammar and Translate keep a one-line text on one line unless an app style applies, and a Grammar result much longer than the text is rejected. Other has no such checks.")
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Prompt")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Prompt").font(.headline)
+                    Spacer()
+                    Menu("Insert Example", systemImage: "plus") {
+                        ForEach(Self.examples, id: \.self) { example in
+                            Button(example) { insert(example) }
+                        }
+                    }
+                    .fixedSize()
+                    .help("Adds an example instruction to the end of the prompt")
+                    Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
+                        .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
+                        .help("Puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
+                }
                 // TextEditor, not a vertical TextField: Return starts a new line instead of ending the edit.
                 TextEditor(text: $action.prompt)
                     .font(.body)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 90, maxHeight: 240)
+                    .padding(6)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color(nsColor: .separatorColor))
+                    }
                     .overlay(alignment: .topLeading) {
                         if action.prompt.isEmpty {
-                            Text("What Retext should do with the selected text")
+                            Text("What Retext should do with the selected text, e.g. “Make it shorter and keep the meaning.”")
                                 .foregroundStyle(.tertiary)
-                                .padding(.leading, 5)
+                                .padding(.horizontal, 11).padding(.vertical, 6)
                                 .allowsHitTesting(false)
                         }
                     }
+                    .frame(minHeight: 120, maxHeight: .infinity)
                     .accessibilityLabel("Prompt")
-                    .padding(6)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                // One row when it fits, else one example per line.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 6) { exampleButtons }
-                    VStack(alignment: .leading, spacing: 6) { exampleButtons }
-                }
             }
             HStack {
-                Button("Move Up", systemImage: "arrow.up") { move(-1) }.disabled(position == 0)
-                Button("Move Down", systemImage: "arrow.down") { move(1) }.disabled(position == count - 1)
+                if !isNew {
+                    Button("Delete Action…", role: .destructive, action: delete).foregroundStyle(.red)
+                }
                 Spacer()
-                Button("Reset Prompt") { if let defaultPrompt { action.prompt = defaultPrompt } }
-                    .disabled(defaultPrompt == nil || defaultPrompt == action.prompt)
-                    .help("Puts back the built-in prompt for Grammar, or for Translate into the language named in the title.")
-                Button("Delete Action…", role: .destructive) { confirmDelete = true }
-                    .foregroundStyle(.red)
-            }
-            // On this row, not the Group: a modifier on a Group applies to each of its rows.
-            .confirmationDialog("Delete “\(action.title)”?", isPresented: $confirmDelete) {
-                Button("Delete Action", role: .destructive, action: delete)
-                Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-            } message: {
-                Text("Its prompt is lost, and the actions after it move up one shortcut.")
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(isNew ? "Add Action" : "Done") { save(action) }.keyboardShortcut(.defaultAction)
             }
         }
-        .padding(.leading, 20)
+        .padding(20)
+        .frame(minWidth: 480, idealWidth: 560, maxWidth: 900, minHeight: 420, idealHeight: 520, maxHeight: 900)
     }
 
-    private var exampleButtons: some View {
-        ForEach(Self.examples, id: \.self) { example in
-            Button(example) { insert(example) }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .help("Use this prompt")
-        }
-    }
-
-    private static let examples = ["Make it shorter and keep the meaning.", "Rewrite it more politely.", "Rewrite it in a formal business tone."]
+    private static let examples = ["Make it shorter and keep the meaning.", "Rewrite it more politely.", "Rewrite it in a formal business tone.",
+                                   "Turn it into a bulleted list.", "Make it sound friendlier and more casual."]
 
     /// An empty prompt becomes the example; otherwise the example is added on a new line.
     private func insert(_ example: String) {
@@ -173,7 +259,7 @@ private struct ActionEditor: View {
 /// A button showing the action's icon that opens a grid of symbols suited to text actions.
 private struct IconPicker: View {
     @Binding var symbol: String
-    @State private var picking = SettingsView.demoExtra == "icons"
+    @State private var picking = false
 
     /// Each checked with NSImage(systemSymbolName:); all predate macOS 26.
     static let symbols = [
@@ -206,6 +292,12 @@ private struct IconPicker: View {
             }
         }
         .accessibilityLabel("Icon: \(Self.spokenName(symbol))")
+        .task {
+            // The demo opens the grid once the sheet is up; presented together, the popover has no anchor yet.
+            guard SettingsView.demoExtra == "icons" else { return }
+            try? await Task.sleep(for: .milliseconds(400))
+            picking = true
+        }
         .popover(isPresented: $picking, arrowEdge: .bottom) {
             // A saved symbol outside the list stays offered, first, so the action keeps it until another is picked.
             let choices = (Self.symbols.contains(symbol) ? [] : [symbol]) + Self.symbols
