@@ -223,8 +223,7 @@ struct PopupView: View {
 
 final class KeyPanel: NSPanel {
     /// `--demo`: never key, so a screenshot run doesn't take the keyboard.
-    var isDemo = false
-    override var canBecomeKey: Bool { !isDemo }
+    override var canBecomeKey: Bool { !AppWindows.isDemo }
 }
 
 @MainActor
@@ -247,8 +246,6 @@ final class PopupController {
     private var activation: NSObjectProtocol?
     /// A selection read is in flight: another ⌥Space waits for it instead of starting a second read.
     private var isReading = false
-    /// `--demo`: the panel never becomes key, so typing stays with the app in front.
-    private var isDemo = false
 
     /// ⌥Space opens the menu (or closes it); ⌥1…⌥9 pass an action index and run it straight away.
     func trigger(_ action: Int? = nil) {
@@ -283,7 +280,6 @@ final class PopupController {
     }
 
     func demo(_ state: String) {
-        isDemo = true
         model.actions = AppState.shared.settings.actions
         model.level = CommandLine.arguments.last.flatMap(Level.init(rawValue:)) ?? AppState.shared.settings.defaultLevel
         model.phase = switch state {
@@ -485,7 +481,8 @@ final class PopupController {
         anchor = rect
         panel.setFrame(frame(near: rect, size: fittingSize()), display: true)
         panel.alphaValue = 1
-        if isDemo { return panel.orderFrontRegardless() }
+        // `--demo`: shown without becoming key, so typing stays with the app in front.
+        if AppWindows.isDemo { return panel.orderFrontRegardless() }
         panel.makeKeyAndOrderFront(nil)
         if model.phase == .menu, let field = model.field { panel.makeFirstResponder(field) }
         installMonitors()
@@ -540,8 +537,7 @@ final class PopupController {
 
     private func makePanel() -> KeyPanel {
         let panel = KeyPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isDemo = isDemo
-        panel.level = isDemo ? .normal : .popUpMenu
+        panel.level = AppWindows.isDemo ? .normal : .popUpMenu
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false

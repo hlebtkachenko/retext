@@ -131,11 +131,6 @@ public enum Engine {
 
     public static func isTooLong(_ text: String) -> Bool { text.count > maxSelectionLength }
 
-    @available(*, deprecated, message: "text is unused; call job(for:level:settings:bundleID:)")
-    public static func job(for action: CustomAction, level: Level, text: String, settings: RetextSettings, bundleID: String?) -> Job {
-        job(for: action, level: level, settings: settings, bundleID: bundleID)
-    }
-
     public static func job(for action: CustomAction, level: Level, settings: RetextSettings, bundleID: String?) -> Job {
         let m = settings.model(for: level)
         return Job(title: action.title, provider: settings.provider, model: m.model, effort: m.effort,
@@ -252,7 +247,7 @@ public struct ClaudeOutput: Decodable, Sendable {
     public let total_cost_usd: Double?
     public let usage: Usage?
     public let is_error: Bool?
-    /// Set from the custom API's `finish_reason`; nil from `claude -p`.
+    /// The custom API's `finish_reason`. `claude -p` JSON may carry its own `stop_reason`; only "length" counts as cut off.
     public let stop_reason: String?
 
     /// For the other providers' answers, so usage and history record them the same way.
