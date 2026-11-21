@@ -122,6 +122,7 @@ final class ShortcutRecorder: ObservableObject {
         if recording { Hotkeys.paused = false }
         recording = false
         live = ""
+        problem = nil
     }
 
     /// Whether to swallow the event: every key is, so ⌘Q or ⌘W don't act while recording.
@@ -133,7 +134,6 @@ final class ShortcutRecorder: ObservableObject {
         }
         if keyCode == 53, modifiers.isEmpty {  // esc
             stop()
-            problem = nil
             return true
         }
         let shortcut = BarShortcut(keyCode: keyCode, modifiers: modifiers)
@@ -144,7 +144,6 @@ final class ShortcutRecorder: ObservableObject {
         }
         let accept = accept
         stop()
-        problem = nil
         accept?(shortcut)
         AccessibilityNotification.Announcement("Shortcut set to \(shortcut.spokenLabel)").post()
         return true
