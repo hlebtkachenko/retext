@@ -24,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EVAL = os.path.join(ROOT, "eval")
 DRAFT = os.path.join(EVAL, "results", "draft")
 
-# These strings MUST match Sources/RetextCore/Settings.swift and Engine.swift; check_parity() warns when they drift.
+# These strings MUST match Sources/RetextCore/Settings.swift and Engine.swift; check_parity() stops the run when they drift.
 GRAMMAR_PROMPT = "Edit the text as a careful native-speaking editor of its language. Fix grammar, spelling and punctuation, and rephrase the parts a native speaker wouldn't say (word-for-word constructions from another language, wrong word choice or collocations, unnatural word order) the way a native would say them. Change nothing else: keep the language, the line breaks, all content, meaning, tone and register, sentence types (questions stay questions), forms of address and their capitalization, and any wording that is already natural. Casual text stays casual: keep its slang, abbreviations, emoji and lowercase style, and fix only real errors. If nothing needs fixing, return the text unchanged."
 TRANSLATE_PROMPT = "Translate the text into {lang} the way a native {lang} speaker would write it in the same situation. Convey the meaning and intent, not the words: restructure sentences, reorder words and use idiomatic {lang} phrasing. Never carry over constructions, word order or idioms from the source language. Keep the register (casual stays casual, neutral stays neutral, formal stays formal) and use correct forms of address. Keep all of the meaning, including emphasis and politeness, but render fillers and particles the way {lang} would, or leave them out where {lang} wouldn't use them. Make sure the result is flawless {lang}: grammar, spelling, inflection and word order. If the text is already {lang}, fix its grammar and rewrite any phrasing a native speaker wouldn't use; leave natural wording as it is."
 INSTRUCTION_TASK = "Rewrite the text as the user's instruction below asks. Keep the text's language unless the instruction asks for another. Keep its key information, and add no facts, reasons, numbers or commitments it doesn't contain (expanding on what it already says is fine). The result must read like natural writing by a skilled native speaker.\nInstruction: {instruction}"
@@ -83,8 +83,12 @@ def check_parity():
             src += fh.read()
     pieces = [GRAMMAR_PROMPT, CONTENT_RULES, *TRANSLATE_PROMPT.split("{lang}"), *INSTRUCTION_TASK.split("{instruction}")]
     missing = [p[:60] for p in pieces if p and swift_escape(p) not in src]
+    # The add-ons must equal Engine.highAddOn and Engine.maxAddOn exactly, not just appear somewhere.
+    for name, addon in (("highAddOn", ADDONS["high"]), ("maxAddOn", ADDONS["max"])):
+        if f'public static let {name} = "{swift_escape(addon)}"' not in src:
+            missing.append(f"Engine.{name}")
     for m in missing:
-        print(f"WARNING: prompt text drifted from Swift sources: {m!r}", file=sys.stderr)
+        print(f"ERROR: prompt text drifted from Swift sources: {m!r}", file=sys.stderr)
     return not missing
 
 
@@ -294,7 +298,8 @@ def main():
     ap.add_argument("--seed", default="1")
     ap.add_argument("--out", default="", help="report path (default: eval/results/draft/<timestamp>.md)")
     a = ap.parse_args()
-    check_parity()
+    if not check_parity():
+        sys.exit(1)
     cfgs = a.configs.split(",")
     for c in cfgs:
         if c not in CONFIGS:
