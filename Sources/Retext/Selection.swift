@@ -75,20 +75,9 @@ enum SelectionIO {
         let written = pb.changeCount
         app.activate()
         try? await Task.sleep(for: .milliseconds(150))
-        // The bar (a key panel) had the keyboard; ⌘V must reach the app, not the gap while it takes the keys back.
-        var waited = 0
-        while keyboardOwner() != app.processIdentifier, waited < 25 {
-            try? await Task.sleep(for: .milliseconds(20))
-            waited += 1
-        }
-        let before = focusedElement(of: app).flatMap(selectedText)
-        log.notice("paste into \(app.bundleIdentifier ?? "?", privacy: .public): keyboard owner \(keyboardOwner() ?? -1, privacy: .public), app pid \(app.processIdentifier, privacy: .public), waited \(waited * 20, privacy: .public) ms, selection \(before == nil ? "unreadable" : "readable", privacy: .public)")
-        press(kVK_ANSI_V)
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            let after = focusedElement(of: app).flatMap(selectedText)
-            log.notice("after paste: selection \(after == nil ? "unreadable" : after == before ? "unchanged" : "changed", privacy: .public)")
-        }
+        // To the app's process, not the keyboard: the bar is a non-activating panel, and after it closes macOS can keep
+        // routing keys to Retext (its "key thief"), so a ⌘V through the keyboard lands in Retext and nothing is pasted.
+        press(kVK_ANSI_V, to: app.processIdentifier)
         // Unstructured, so cancelling the run can't shorten the wait and restore before a slow app has pasted.
         restoring = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1500))
@@ -272,23 +261,13 @@ enum SelectionIO {
         return (text, attributes, hasAttachment)
     }
 
-    /// The process that gets typed keys now: the system-wide focused application.
-    private static func keyboardOwner() -> pid_t? {
-        let system = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(system, 0.1)
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(system, kAXFocusedApplicationAttribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        var pid: pid_t = 0
-        return AXUIElementGetPid(value as! AXUIElement, &pid) == .success ? pid : nil
-    }
-
-    private static func press(_ key: Int) {
+    /// ⌘ plus `key`, through the keyboard, or straight to `pid`'s process.
+    private static func press(_ key: Int, to pid: pid_t? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         for down in [true, false] {
             let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(key), keyDown: down)
             event?.flags = .maskCommand
-            event?.post(tap: .cghidEventTap)
+            if let pid { event?.postToPid(pid) } else { event?.post(tap: .cghidEventTap) }
         }
     }
 }
