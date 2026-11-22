@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import os
 
 struct Selection {
     let app: NSRunningApplication
@@ -138,17 +139,36 @@ enum SelectionIO {
     /// else the text field itself when it is small enough (Electron and web apps often report bogus bounds).
     private static func bounds(_ element: AXUIElement) -> CGRect? {
         let field = frame(element)
-        if let rect = selectionBounds(element), field.map({ $0.insetBy(dx: -4, dy: -4).contains(rect) }) ?? true {
-            return rect
+        let inField = { (rect: CGRect) in field.map { $0.insetBy(dx: -4, dy: -4).contains(rect) } ?? true }
+        let whole = selectionBounds(element)
+        let first = selectionBounds(element, firstCharacterOnly: true)
+        log.notice("selection bounds \(String(describing: whole), privacy: .public) first \(String(describing: first), privacy: .public) field \(String(describing: field), privacy: .public)")
+        if let whole, inField(whole) {
+            // Some Chromium-based apps can report only the end of a multi-line selection: start the anchor
+            // at the first character, so the bar lines up with where the selection begins.
+            guard let first, inField(first) else { return whole }
+            let top = min(first.minY, whole.minY)
+            return CGRect(x: first.minX, y: top, width: max(whole.maxX - first.minX, first.width), height: max(whole.maxY, first.maxY) - top)
         }
         if let field, field.height <= 240 { return field }
         return nil
     }
 
-    private static func selectionBounds(_ element: AXUIElement) -> CGRect? {
+    private static let log = Logger(subsystem: "dev.hapd.retext", category: "selection")
+
+    /// The selection's bounds, or only its first character's.
+    private static func selectionBounds(_ element: AXUIElement, firstCharacterOnly: Bool = false) -> CGRect? {
         var range: CFTypeRef?, value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &range) == .success, let range,
-              AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, range, &value) == .success,
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &range) == .success,
+              var range, CFGetTypeID(range) == AXValueGetTypeID() else { return nil }
+        if firstCharacterOnly {
+            var selected = CFRange()
+            guard AXValueGetValue(range as! AXValue, .cfRange, &selected), selected.length > 1 else { return nil }
+            var one = CFRange(location: selected.location, length: 1)
+            guard let first = AXValueCreate(.cfRange, &one) else { return nil }
+            range = first
+        }
+        guard AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, range, &value) == .success,
               let value else { return nil }
         return cgRect(value)
     }
