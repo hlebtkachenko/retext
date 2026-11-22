@@ -380,7 +380,7 @@ final class PopupController {
     private func replace(_ selection: Selection, with text: String) async {
         panel?.orderOut(nil)
         await SelectionIO.replace(in: selection.app, with: text, attributes: selection.attributes)
-        flash(.done, for: 1.2)
+        flash(.done, near: selection.rect, for: 1.2)
     }
 
     /// Shows the result with its changes marked and waits: Return replaces, Esc discards, ⌘C copies. No timer closes it.
@@ -485,7 +485,8 @@ final class PopupController {
 
     // MARK: Window
 
-    private func show(near rect: CGRect?) {
+    /// `key: false` for a bubble that only shows an outcome: it must not take the keyboard back from the app just pasted into.
+    private func show(near rect: CGRect?, key: Bool = true) {
         hideTask?.cancel()
         let panel = self.panel ?? makePanel()
         anchor = rect
@@ -493,6 +494,7 @@ final class PopupController {
         panel.alphaValue = 1
         // `--demo`: shown behind other windows without becoming key, so typing stays with the app in front.
         if AppWindows.isDemo { return panel.orderBack(nil) }
+        guard key else { return panel.orderFrontRegardless() }
         panel.makeKeyAndOrderFront(nil)
         if model.phase == .menu, let field = model.field { panel.makeFirstResponder(field) }
         installMonitors()
@@ -523,7 +525,7 @@ final class PopupController {
         case .message(let text, true, _, _): AccessibilityNotification.Announcement(text).post()
         default: break
         }
-        if panel?.isVisible != true { show(near: rect) } else { fit() }
+        if panel?.isVisible != true { show(near: rect, key: false) } else { fit() }
         panel?.orderFrontRegardless()
         hideTask?.cancel()
         hideTask = Task {

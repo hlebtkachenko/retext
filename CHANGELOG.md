@@ -43,6 +43,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
 
 ### Fixed
+- Replacing could do nothing while still showing "Replaced": after the bar closed, macOS kept sending keys to Retext, so its ⌘V never reached the app. The paste now goes straight to the app, the Replaced bubble shows at the text, and a bubble that opens on its own no longer takes the keyboard.
 - The bar lines up with the start of a multi-line selection in some Chromium-based apps, which report only where the selection ends.
 - Before Accessibility was allowed, ⌥Space reached the app in front and typed a no-break space over the selection.
 - A ChatGPT effort chosen for a level is used even when its model is left at Default; it used to fall back to the built-in effort.

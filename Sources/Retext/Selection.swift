@@ -75,7 +75,9 @@ enum SelectionIO {
         let written = pb.changeCount
         app.activate()
         try? await Task.sleep(for: .milliseconds(150))
-        press(kVK_ANSI_V)
+        // To the app's process, not the keyboard: the bar is a non-activating panel, and after it closes macOS can keep
+        // routing keys to Retext (its "key thief"), so a ⌘V through the keyboard lands in Retext and nothing is pasted.
+        press(kVK_ANSI_V, to: app.processIdentifier)
         // Unstructured, so cancelling the run can't shorten the wait and restore before a slow app has pasted.
         restoring = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1500))
@@ -142,7 +144,7 @@ enum SelectionIO {
         let inField = { (rect: CGRect) in field.map { $0.insetBy(dx: -4, dy: -4).contains(rect) } ?? true }
         let whole = selectionBounds(element)
         let first = selectionBounds(element, firstCharacterOnly: true)
-        log.notice("selection bounds \(String(describing: whole), privacy: .public) first \(String(describing: first), privacy: .public) field \(String(describing: field), privacy: .public)")
+        log.debug("selection bounds \(String(describing: whole), privacy: .public) first \(String(describing: first), privacy: .public) field \(String(describing: field), privacy: .public)")
         if let whole, inField(whole) {
             // Some Chromium-based apps can report only the end of a multi-line selection: start the anchor
             // at the first character, so the bar lines up with where the selection begins.
@@ -259,12 +261,13 @@ enum SelectionIO {
         return (text, attributes, hasAttachment)
     }
 
-    private static func press(_ key: Int) {
+    /// ⌘ plus `key`, through the keyboard, or straight to `pid`'s process.
+    private static func press(_ key: Int, to pid: pid_t? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         for down in [true, false] {
             let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(key), keyDown: down)
             event?.flags = .maskCommand
-            event?.post(tap: .cghidEventTap)
+            if let pid { event?.postToPid(pid) } else { event?.post(tap: .cghidEventTap) }
         }
     }
 }
