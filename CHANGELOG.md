@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [1.5.0] - 2026-11-22
 
 ### Added
 - A redesigned Settings window with a unified toolbar. The sidebar starts with a Retext row (app icon, name and "About", or "Update Available") that opens About (where Settings opens at launch), followed by General, Actions, Per-App Styles, Protected Words, AI (was Engine) and History. The window's title is the open pane's name; Back and Forward in the toolbar (⌘[ and ⌘]) step through the panes you opened, and each pane starts with a one-line description (About shows it in the hero, under the name). Pop-up and pull-down buttons are bordered, as in System Settings, and row icons are tinted symbols on a neutral tile.
@@ -126,7 +126,7 @@ First public release.
 - Settings for the bar shortcut (⌥Space or ⌃⌥Space), open at login, history, Electron app support and the Claude Code path.
 - Clear error messages when Claude Code is missing, not logged in, rate-limited or doesn't know a model.
 
-[Unreleased]: https://github.com/hlebtkachenko/retext/compare/v1.4.0...HEAD
+[1.5.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.5.0
 [1.4.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.4.0
 [1.3.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.3.0
 [1.2.0]: https://github.com/hlebtkachenko/retext/releases/tag/v1.2.0
