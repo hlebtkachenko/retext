@@ -48,6 +48,19 @@ ditto "$app" ~/Applications/Retext.app
 files "$app" > "$icon/built"
 prune ~/Applications/Retext.app "$icon/built" installed
 codesign --verify --strict ~/Applications/Retext.app
+# An Accessibility entry made for an older build (an ad-hoc one is pinned to that exact binary) stays switched on in
+# System Settings but no longer applies, and switching it off and on keeps it. Reading the database needs Full Disk
+# Access for this terminal; without it, or on an ad-hoc build (which never matches a good entry), the check is skipped.
+tccdb="/Library/Application Support/com.apple.TCC/TCC.db"
+if [[ "$identity" != "-" ]] && sqlite3 "$tccdb" "select writefile('$icon/tcc-req', csreq) from access where service = 'kTCCServiceAccessibility' and client = 'dev.hapd.retext'" >/dev/null 2>&1 \
+    && [[ -s "$icon/tcc-req" ]]; then
+    req=$(csreq -r "$icon/tcc-req" -t 2>/dev/null || true)
+    if [[ -n "$req" ]] && ! codesign --verify -R="$req" ~/Applications/Retext.app 2>/dev/null; then
+        echo "Accessibility is set for an older Retext build and won't apply to this one. Run" >&2
+        echo "  tccutil reset Accessibility dev.hapd.retext" >&2
+        echo "then allow Retext when it asks." >&2
+    fi
+fi
 # Forget the build copies (and the old build/ one) so "Open at login" (SMAppService) resolves to the installed app.
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$lsregister" -u "$PWD/$app" 2>/dev/null || true
