@@ -144,7 +144,7 @@ enum SelectionIO {
         let inField = { (rect: CGRect) in field.map { $0.insetBy(dx: -4, dy: -4).contains(rect) } ?? true }
         let whole = selectionBounds(element)
         let first = selectionBounds(element, firstCharacterOnly: true)
-        log.notice("selection bounds \(String(describing: whole), privacy: .public) first \(String(describing: first), privacy: .public) field \(String(describing: field), privacy: .public)")
+        log.debug("selection bounds \(String(describing: whole), privacy: .public) first \(String(describing: first), privacy: .public) field \(String(describing: field), privacy: .public)")
         if let whole, inField(whole) {
             // Some Chromium-based apps can report only the end of a multi-line selection: start the anchor
             // at the first character, so the bar lines up with where the selection begins.
