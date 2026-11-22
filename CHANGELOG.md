@@ -43,6 +43,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Code of Conduct reports go through the repository's private reporting form (Security tab), like security reports, instead of the maintainer's GitHub profile.
 
 ### Fixed
+- The bar lines up with the start of a multi-line selection in some Chromium-based apps, which report only where the selection ends.
 - Before Accessibility was allowed, ⌥Space reached the app in front and typed a no-break space over the selection.
 - A ChatGPT effort chosen for a level is used even when its model is left at Default; it used to fall back to the built-in effort.
 - A Claude Code or Codex run that hangs and ignores the stop is killed 2 seconds later (SIGTERM, then SIGKILL to its process group), and a background job it started can't hold the run open. The login-shell lookup is stopped after 3 seconds the same way.
